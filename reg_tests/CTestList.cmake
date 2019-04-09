@@ -65,7 +65,7 @@ function(of_regression TESTNAME LABEL)
   regression(${TEST_SCRIPT} ${OPENFAST_EXECUTABLE} ${SOURCE_DIRECTORY} ${BUILD_DIRECTORY} ${TESTNAME} "${LABEL}")
 endfunction(of_regression)
 
-# openfast aeroacoustic 
+# openfast aeroacoustic
 function(of_regression_aeroacoustic TESTNAME LABEL)
   set(TEST_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/executeOpenfastAeroAcousticRegressionCase.py")
   set(OPENFAST_EXECUTABLE "${CTEST_OPENFAST_EXECUTABLE}")
@@ -179,6 +179,9 @@ endif()
 
 # AeroAcoustic regression test
 of_regression_aeroacoustic("IEA_LB_RWT-AeroAcoustics"  "openfast;aerodyn15;aeroacoustics")
+
+#OpenFAST-C++ regression tests
+ofcpp_regression("5MW_Land_DLL_WTurb_cpp"              "openfast-cpp;elastodyn;aerodyn15;servodyn")
 
 # Linearized OpenFAST regression tests
 of_regression_linear("WP_Stationary_Linear"         "openfast;linear;elastodyn")

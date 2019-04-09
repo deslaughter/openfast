@@ -110,3 +110,4 @@ necessary for most development efforts.
    :maxdepth: 1
 
    other_docs.rst
+   cppapi/index.rst

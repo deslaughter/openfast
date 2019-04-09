@@ -2,7 +2,7 @@
 #define FAST_LIBRARY_H
 
 // routines in FAST_Library_$(PlatformName).dll
-#include "OpenFOAM_Types.h"
+#include "ExternalInflow_Types.h"
 #include "SCDataEx_Types.h"
 
 #ifdef __cplusplus
@@ -14,13 +14,31 @@
 EXTERNAL_ROUTINE void FAST_AllocateTurbines(int * iTurb, int *ErrStat, char *ErrMsg);
 EXTERNAL_ROUTINE void FAST_DeallocateTurbines(int *ErrStat, char *ErrMsg);
 
-EXTERNAL_ROUTINE void FAST_OpFM_Restart(int * iTurb, const char *CheckpointRootName, int *AbortErrLev, double * dt, int * NumBl, int * NumBlElem, int * n_t_global,
-   OpFM_InputType_t* OpFM_Input, OpFM_OutputType_t* OpFM_Output, SC_DX_InputType_t* SC_DX_Input, SC_DX_OutputType_t* SC_DX_Output, int *ErrStat, char *ErrMsg);
-EXTERNAL_ROUTINE void FAST_OpFM_Init(int * iTurb, double *TMax, const char *InputFileName, int * TurbineID, int * NumSC2CtrlGlob, int * NumSC2Ctrl, int * NumCtrl2SC, float * initSCInputsGlob, float * initSCInputsTurbine, int * NumActForcePtsBlade, int * NumActForcePtsTower, float * TurbinePosition,
-   int *AbortErrLev, double * dt, int * NumBl, int * NumBlElem, OpFM_InputType_t* OpFM_Input, OpFM_OutputType_t* OpFM_Output, SC_DX_InputType_t* SC_DX_Input, SC_DX_OutputType_t* SC_DX_Output, 
-   int *ErrStat, char *ErrMsg);
-EXTERNAL_ROUTINE void FAST_OpFM_Solution0(int * iTurb, int *ErrStat, char *ErrMsg);
-EXTERNAL_ROUTINE void FAST_OpFM_Step(int * iTurb, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_AL_CFD_Restart(int * iTurb, const char *CheckpointRootName, int *AbortErrLev,
+                                          double * dt, int * InflowType, int * NumBl, int * NumBlElem, int * NumTwrElem, int * n_t_global,
+                                          ExtInfw_InputType_t* ExtInfw_Input, ExtInfw_OutputType_t* ExtInfw_Output,
+                                          SC_DX_InputType_t* SC_DX_Input, SC_DX_OutputType_t* SC_DX_Output,
+                                          int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_AL_CFD_Init(int * iTurb, double *TMax, const char *InputFileName,
+                                       int * TurbineID,
+                                       int * NumSC2CtrlGlob, int * NumSC2Ctrl, int * NumCtrl2SC,
+                                       float * initSCInputsGlob, float * initSCInputsTurbine,
+                                       int * NumActForcePtsBlade, int * NumActForcePtsTower, float * TurbinePosition,
+                                       int *AbortErrLev, double * dtDriver, double * dt, int * InflowType,
+                                       int * NumBl, int * NumBlElem, int * NumTwrElem,
+                                       ExtInfw_InputType_t* ExtInfw_Input, ExtInfw_OutputType_t* ExtInfw_Output,
+                                       SC_DX_InputType_t* SC_DX_Input, SC_DX_OutputType_t* SC_DX_Output,
+                                       int *ErrStat, char *ErrMsg);
+
+EXTERNAL_ROUTINE void FAST_CFD_Solution0(int * iTurb, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_CFD_InitIOarrays_SS(int * iTurb, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_CFD_Prework(int * iTurb, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_CFD_UpdateStates(int * iTurb, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_CFD_AdvanceToNextTimeStep(int * iTurb, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_CFD_WriteOutput(int * iTurb, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_CFD_Step(int * iTurb, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_CFD_Reset_SS(int * iTurb, int * n_timesteps, int *ErrStat, char *ErrMsg);
+EXTERNAL_ROUTINE void FAST_CFD_Store_SS(int * iTurb, int * n_t_global,  int *ErrStat, char *ErrMsg);
 
 EXTERNAL_ROUTINE void FAST_Restart(int * iTurb, const char *CheckpointRootName, int *AbortErrLev, int * NumOuts, double * dt, int * n_t_global, int *ErrStat, char *ErrMsg);
 EXTERNAL_ROUTINE void FAST_Sizes(int * iTurb, double *TMax, double *InitInputAry, const char *InputFileName, int *AbortErrLev, int * NumOuts, double * dt, int *ErrStat, char *ErrMsg, char *ChannelNames);
@@ -32,11 +50,11 @@ EXTERNAL_ROUTINE void FAST_CreateCheckpoint(int * iTurb, const char *CheckpointR
 // some constants (keep these synced with values in FAST's fortran code)
 #define INTERFACE_STRING_LENGTH 1025
 
-#define ErrID_None 0 
-#define ErrID_Info 1 
-#define ErrID_Warn 2 
-#define ErrID_Severe 3 
-#define ErrID_Fatal 4 
+#define ErrID_None 0
+#define ErrID_Info 1
+#define ErrID_Warn 2
+#define ErrID_Severe 3
+#define ErrID_Fatal 4
 
 
 #define SensorType_None -1

@@ -27,12 +27,16 @@ readTheDocs = os.environ.get('READTHEDOCS', None) == 'True'
 builddir = sys.argv[-1]
 sourcedir = sys.argv[-2]
 
+# Only build API docs if the user specifically requests it. On RTD we build it
+# all the time
+use_breathe = tags.has("use_breathe") or readTheDocs
+
 # Use this to turn Doxygen on or off
 useDoxygen = True
 
 # This function was adapted from https://gitlab.kitware.com/cmb/smtk
 # Only run when on readthedocs
-def runDoxygen(sourcfile, doxyfileIn, doxyfileOut):
+def runDoxygen(sourcefile, doxyfileIn, doxyfileOut):
     dx = open(os.path.join(sourcedir, doxyfileIn), 'r')
     cfg = dx.read()
     srcdir = os.path.abspath(os.path.join(os.getcwd(), '..'))
@@ -46,7 +50,12 @@ def runDoxygen(sourcfile, doxyfileIn, doxyfileOut):
     doxproc = subprocess.call(('doxygen', doxname))
 
 if readTheDocs and useDoxygen:
-    runDoxygen(sourcedir, 'Doxyfile.in', 'Doxyfile')
+    try:
+        runDoxygen(sourcedir, 'Doxyfile.rtd', 'Doxyfile')
+    except:
+        # Gracefully bailout if doxygen encounters errors
+        use_breathe = False
+
 
 # -- General configuration ------------------------------------------------
 
@@ -126,8 +135,8 @@ release = u'v3.0.0'
 # Usually you set "language" from the command line for these cases.
 language = None
 
-#If true, figures, tables and code-blocks are automatically numbered if they 
-#have a caption. At same time, the numref role is enabled. For now, it works 
+#If true, figures, tables and code-blocks are automatically numbered if they
+#have a caption. At same time, the numref role is enabled. For now, it works
 #only with the HTML builder and LaTeX builder. Default is False.
 numfig = True
 
@@ -244,6 +253,21 @@ texinfo_documents = [
     ),
 ]
 
+
+### Breathe configuration
+if readTheDocs:
+    breathe_projects = {
+        'openfast' : os.path.join(builddir, '../../', 'doxygen/xml/')
+    }
+else:
+    breathe_projects = {
+        'openfast' : os.path.join(builddir, '../', 'doxygen/xml/')
+    }
+
+breathe_default_project = "openfast"
+
+primary_domain = "cpp"
+
 def setup(app):
     try:
         app.add_css_file('css/math_eq.css')
@@ -261,4 +285,3 @@ def setup(app):
         objname="CMake configuration value",
         indextemplate="pair: %s; CMake configuration"
     )
-
