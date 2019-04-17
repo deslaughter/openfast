@@ -43,6 +43,12 @@ void readTurbineData(int iTurb, fast::fastInputs & fi, YAML::Node turbNode) {
   //Read turbine data for a given turbine using the YAML node
 
   get_if_present(turbNode, "turb_id", fi.globTurbineData[iTurb].TurbID, iTurb);
+  std::string simType;
+  get_if_present(turbNode, "sim_type", simType, std::string("ext-inflow"));
+  if (simType == "ext-loads")
+      fi.globTurbineData[iTurb].sType = fast::EXTLOADS;
+  else
+      fi.globTurbineData[iTurb].sType = fast::EXTINFLOW;
 
   std::string emptyString = "";
   get_if_present(turbNode, "FAST_input_filename", fi.globTurbineData[iTurb].FASTInputFileName);
@@ -71,78 +77,73 @@ void readTurbineData(int iTurb, fast::fastInputs & fi, YAML::Node turbNode) {
   get_if_present(turbNode, "air_density", fi.globTurbineData[iTurb].air_density, fZero);
 }
 
-void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, double * tEnd, int * couplingMode, bool * setExpLawWind, int * nIter) {
+void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, double * tEnd, int * couplingMode, bool * setExpLawWind, bool * setUniformXBladeForces, int * nIter) {
 
-    fi.comm = MPI_COMM_WORLD;
+  fi.comm = MPI_COMM_WORLD;
 
-    // Check if the input file exists and read it
-    if ( checkFileExists(cInterfaceInputFile) ) {
+  // Check if the input file exists and read it
+  if ( checkFileExists(cInterfaceInputFile) ) {
 
-      YAML::Node cDriverInp = YAML::LoadFile(cInterfaceInputFile);
-      get_required(cDriverInp, "n_turbines_glob", fi.nTurbinesGlob);
+    YAML::Node cDriverInp = YAML::LoadFile(cInterfaceInputFile);
+    get_required(cDriverInp, "n_turbines_glob", fi.nTurbinesGlob);
 
-      if (fi.nTurbinesGlob > 0) {
+    if (fi.nTurbinesGlob > 0) {
 
-          get_if_present(cDriverInp, "dry_run", fi.dryRun, false);
-          get_if_present(cDriverInp, "debug", fi.debug, false);
+        get_if_present(cDriverInp, "dry_run", fi.dryRun, false);
+        get_if_present(cDriverInp, "debug", fi.debug, false);
 
-          *couplingMode = 0; //CLASSIC is default
-          if(cDriverInp["coupling_mode"]) {
-              if ( cDriverInp["coupling_mode"].as<std::string>() == "strong" ) {
-                  *couplingMode = 1;
-              } else if ( cDriverInp["coupling_mode"].as<std::string>() == "classic" ) {
-                  *couplingMode = 0;
-              } else {
-                  throw std::runtime_error("coupling_mode is not well defined in the input file");
-              }
-          }
-          if (cDriverInp["n_iter"]) {
-              *nIter = cDriverInp["n_iter"].as<int>();
-              if (*nIter < 0) {
-                  *nIter = 1;
-              }
-          } else {
-              *nIter = 1;
-          }
+        *couplingMode = 0; //CLASSIC is default
+        if(cDriverInp["coupling_mode"]) {
+            if ( cDriverInp["coupling_mode"].as<std::string>() == "strong" ) {
+                *couplingMode = 1;
+            } else if ( cDriverInp["coupling_mode"].as<std::string>() == "classic" ) {
+                *couplingMode = 0;
+            } else {
+                throw std::runtime_error("coupling_mode is not well defined in the input file");
+            }
+        }
+        if (cDriverInp["n_iter"]) {
+            *nIter = cDriverInp["n_iter"].as<int>();
+            if (*nIter < 0) {
+                *nIter = 1;
+            }
+        } else {
+            *nIter = 1;
+        }
 
-          if(cDriverInp["sim_start"]) {
-              if (cDriverInp["sim_start"].as<std::string>() == "init") {
-                  fi.simStart = fast::init;
-              } else if(cDriverInp["sim_start"].as<std::string>() == "trueRestart") {
-                  fi.simStart = fast::trueRestart;
-              } else if(cDriverInp["sim_start"].as<std::string>() == "restartDriverInitFAST") {
-                  fi.simStart = fast::restartDriverInitFAST;
-              } else {
-                  throw std::runtime_error("sim_start is not well defined in the input file");
-              }
-          }
+        if(cDriverInp["sim_start"]) {
+            if (cDriverInp["sim_start"].as<std::string>() == "init") {
+                fi.simStart = fast::init;
+            } else if(cDriverInp["sim_start"].as<std::string>() == "trueRestart") {
+                fi.simStart = fast::trueRestart;
+            } else if(cDriverInp["sim_start"].as<std::string>() == "restartDriverInitFAST") {
+                fi.simStart = fast::restartDriverInitFAST;
+            } else {
+                throw std::runtime_error("sim_start is not well defined in the input file");
+            }
+        }
 
-          get_required(cDriverInp, "t_start", fi.tStart);
-          get_required(cDriverInp, "t_end", *tEnd);
-          get_required(cDriverInp, "n_checkpoint", fi.nEveryCheckPoint);
-          get_required(cDriverInp, "dt_driver", fi.dtDriver);
-          get_required(cDriverInp, "t_max", fi.tMax); // t_max is the total duration to which you want to run FAST. This should be the same or greater than the max time given in the FAST fst file.
-          get_if_present(cDriverInp, "set_exp_law_wind", *setExpLawWind, false);
+        get_required(cDriverInp, "t_start", fi.tStart);
+        get_required(cDriverInp, "t_end", *tEnd);
+        get_required(cDriverInp, "n_checkpoint", fi.nEveryCheckPoint);
+        get_required(cDriverInp, "dt_driver", fi.dtDriver);
+        get_required(cDriverInp, "t_max", fi.tMax); // t_max is the total duration to which you want to run FAST. This should be the same or greater than the max time given in the FAST fst file.
+        get_if_present(cDriverInp, "set_exp_law_wind", *setExpLawWind, false);
+        get_if_present(cDriverInp, "set_uniform_x_blade_forces", *setUniformXBladeForces, false);
 
-          get_if_present(cDriverInp, "super_controller", fi.scStatus, false);
-          if(fi.scStatus) {
-              get_required(cDriverInp, "sc_libfile", fi.scLibFile);
-              get_required(cDriverInp, "num_scinputs", fi.numScInputs);
-              get_required(cDriverInp, "num_scoutputs", fi.numScOutputs);
-          }
+        get_if_present(cDriverInp, "super_controller", fi.scStatus, false);
+        if(fi.scStatus) {
+            get_required(cDriverInp, "sc_libfile", fi.scLibFile);
+        }
 
-          fi.globTurbineData.resize(fi.nTurbinesGlob);
-          for (int iTurb=0; iTurb < fi.nTurbinesGlob; iTurb++) {
-              if (cDriverInp["Turbine" + std::to_string(iTurb)]) {
-                  readTurbineData(iTurb, fi, cDriverInp["Turbine" + std::to_string(iTurb)] );
-              } else {
-                  throw std::runtime_error("Node for Turbine" + std::to_string(iTurb) + " not present in input file or I cannot read it");
-              }
-          }
-
-      } else {
-          throw std::runtime_error("Number of turbines <= 0 ");
-      }
+        fi.globTurbineData.resize(fi.nTurbinesGlob);
+        for (int iTurb=0; iTurb < fi.nTurbinesGlob; iTurb++) {
+            if (cDriverInp["Turbine" + std::to_string(iTurb)]) {
+                readTurbineData(iTurb, fi, cDriverInp["Turbine" + std::to_string(iTurb)] );
+            } else {
+                throw std::runtime_error("Node for Turbine" + std::to_string(iTurb) + " not present in input file or I cannot read it");
+            }
+        }
 
     } else {
         throw std::runtime_error("Input file " + cInterfaceInputFile + " does not exist or I cannot access it");
@@ -172,13 +173,14 @@ int main(int argc, char** argv) {
     int ntStart, ntEnd ; // This doesn't belong in the FAST - C++ interface
     int nSubsteps; //
     bool setExpLawWind; // Set wind speed at Aerodyn nodes based on an exponential profile. Useful for testing the C++ API before running actuator line simulations.
+    bool setUniformXBladeForces; // Set uniform X blade forces on all blade nodes
     int nIter;
 
     std::string cDriverInputFile=argv[1];
     fast::OpenFAST FAST;
     fast::fastInputs fi ;
     try {
-        readInputFile(fi, cDriverInputFile, &tEnd, &couplingMode, &setExpLawWind, &nIter);
+        readInputFile(fi, cDriverInputFile, &tEnd, &couplingMode, &setExpLawWind, &setUniformXBladeForces, &nIter);
     } catch( const std::runtime_error & ex) {
         std::cerr << ex.what() << std::endl ;
         std::cerr << "Program quitting now" << std::endl ;
@@ -209,35 +211,37 @@ int main(int argc, char** argv) {
     }
 
     for (int nt = ntStart; nt < ntEnd; nt++) {
-      if (couplingMode == 0) {
-          // If running with a CFD solver, sample velocities at the actuator/velocity nodes here
-          if (setExpLawWind)
-              FAST.setExpLawWindSpeed( (nt+1)*fi.dtDriver );
-          for (int iSubstep=1; iSubstep < nSubsteps; iSubstep++) {
-              FAST.step();
-              std::cout << "iSubstep = " << iSubstep << std::endl ;
-          }
-          // Get forces at actuator nodes and advance CFD solve by one time step here
-      } else {
-          for (int j=0; j < nIter; j++) {
-              // If running with a CFD solver, use 'FAST.predict_states()' to predict position and force at actuator nodes at the next time step on the first pass
-              // Run a CFD time step as a 'predictor' to get velocity at the next time step
-              // Sample and set velocity at the actuator/velocity nodes after the first cfd predictor
-              if (setExpLawWind)
-                  FAST.setExpLawWindSpeed( (nt+1)*fi.dtDriver );
-              FAST.update_states_driver_time_step();
-          }
-          // Call this after enough outer iterations have been done
-          FAST.advance_to_next_driver_time_step();
-      }
 
-      if (FAST.isDebug()) {
-          FAST.computeTorqueThrust(0,torque,thrust);
-          std::cout.precision(16);
-          std::cout << "Torque = " << torque[0] << " " << torque[1] << " " << torque[2] << std::endl ;
-          std::cout << "Thrust = " << thrust[0] << " " << thrust[1] << " " << thrust[2] << std::endl ;
-      }
+        if (couplingMode == 0) {
+            // If running with a CFD solver, sample velocities at the actuator/velocity nodes here
+            if (setExpLawWind)
+                FAST.setExpLawWindSpeed( (nt+1)*fi.dtDriver );
+            if (setUniformXBladeForces)
+                FAST.setUniformXBladeForces();
 
+            for (int iSubstep=1; iSubstep < nSubsteps; iSubstep++) {
+                FAST.step();
+                std::cout << "iSubstep = " << iSubstep << std::endl ;
+            }
+            // Get forces at actuator nodes and advance CFD solve by one time step here
+        } else {
+            for (int j=0; j < nIter; j++) {
+                // If running with a CFD solver, use 'FAST.predict_states()' to predict position and force at actuator nodes at the next time step on the first pass
+                // Run a CFD time step as a 'predictor' to get velocity at the next time step
+                // Sample and set velocity at the actuator/velocity nodes after the first cfd predictor
+                if (setExpLawWind)
+                    FAST.setExpLawWindSpeed( (nt+1)*fi.dtDriver );
+                FAST.update_states_driver_time_step();
+            }
+            // Call this after enough outer iterations have been done
+            FAST.advance_to_next_driver_time_step();
+        }
+        if (FAST.isDebug()) {
+            FAST.computeTorqueThrust(0,torque,thrust);
+            std::cout.precision(16);
+            std::cout << "Torque = " << torque[0] << " " << torque[1] << " " << torque[2] << std::endl ;
+            std::cout << "Thrust = " << thrust[0] << " " << thrust[1] << " " << thrust[2] << std::endl ;
+        }
     }
 
     FAST.end() ;

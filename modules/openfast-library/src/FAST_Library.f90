@@ -87,7 +87,7 @@ subroutine FAST_Sizes(iTurb, TMax, InitInpAry, InputFileName_c, AbortErrLev_c, N
    IMPLICIT NONE
 #ifndef IMPLICIT_DLLEXPORT
 !DEC$ ATTRIBUTES DLLEXPORT :: FAST_Sizes
-!GCC$ ATTRIBUTES DLLEXPORT :: FAST_Sizes
+GCC$ ATTRIBUTES DLLEXPORT :: FAST_Sizes
 #endif
    INTEGER(C_INT),         INTENT(IN   ) :: iTurb            ! Turbine number
    REAL(C_DOUBLE),         INTENT(IN   ) :: TMax
@@ -209,7 +209,6 @@ subroutine FAST_Start(iTurb, NumInputs_c, NumOutputs_c, InputAry, OutputAry, Err
          ErrStat = ErrID_Fatal
          ErrMsg  = trim(ErrMsg)//NewLine//"FAST_Start:size of NumOutputs is invalid."
       ELSE
-
          CALL FillOutputAry_T(Turbine(iTurb), Outputs)
          OutputAry(1)              = Turbine(iTurb)%m_FAST%t_global
          OutputAry(2:NumOutputs_c) = Outputs
@@ -451,6 +450,91 @@ subroutine FAST_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, NumOuts_c, d
 #endif
 
 end subroutine FAST_Restart
+
+!==================================================================================================================================
+subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, TurbPosn, AbortErrLev_c, dt_c, NumBl_c, &
+     ExtLd_Input_from_FAST, ExtLd_Output_to_FAST, SC_Input_from_FAST, SC_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_BR_CFD_Init')
+!DEC$ ATTRIBUTES DLLEXPORT::FAST_CFD_Init
+   IMPLICIT NONE
+#ifndef IMPLICIT_DLLEXPORT
+!DEC$ ATTRIBUTES DLLEXPORT :: FAST_CFD_Init
+!GCC$ ATTRIBUTES DLLEXPORT :: FAST_CFD_Init
+#endif
+   INTEGER(C_INT),         INTENT(IN   ) :: iTurb            ! Turbine number
+   REAL(C_DOUBLE),         INTENT(IN   ) :: TMax
+   CHARACTER(KIND=C_CHAR), INTENT(IN   ) :: InputFileName_c(IntfStrLen)
+   INTEGER(C_INT),         INTENT(IN   ) :: TurbID           ! Need not be same as iTurb
+   REAL(C_FLOAT),          INTENT(IN   ) :: TurbPosn(3)
+   REAL(C_DOUBLE),         INTENT(IN   ) :: dt_c
+   INTEGER(C_INT),         INTENT(  OUT) :: AbortErrLev_c
+   INTEGER(C_INT),         INTENT(  OUT) :: NumBl_c
+   TYPE(ExtLdDX_InputType_C), INTENT(  OUT) :: ExtLd_Input_from_FAST
+   TYPE(ExtLdDX_OutputType_C),INTENT(  OUT) :: ExtLd_Output_to_FAST
+   TYPE(SC_InputType_C),   INTENT(INOUT) :: SC_Input_from_FAST
+   TYPE(SC_OutputType_C),  INTENT(INOUT) :: SC_Output_to_FAST
+   INTEGER(C_INT),         INTENT(  OUT) :: ErrStat_c
+   CHARACTER(KIND=C_CHAR), INTENT(  OUT) :: ErrMsg_c(IntfStrLen)
+
+   ! local
+   CHARACTER(IntfStrLen)                 :: InputFileName
+   INTEGER(C_INT)                        :: i
+   TYPE(FAST_ExternInitType)             :: ExternInitData
+   INTEGER(IntKi)                        :: CompLoadsType
+
+   CHARACTER(*),           PARAMETER     :: RoutineName = 'FAST_BR_CFD_Init'
+
+      ! transfer the character array from C to a Fortran string:
+   InputFileName = TRANSFER( InputFileName_c, InputFileName )
+   I = INDEX(InputFileName,C_NULL_CHAR) - 1            ! if this has a c null character at the end...
+   IF ( I > 0 ) InputFileName = InputFileName(1:I)     ! remove it
+
+      ! initialize variables:
+   n_t_global = 0
+   ErrStat = ErrID_None
+   ErrMsg = ""
+
+   ExternInitData%TMax = TMax
+   ExternInitData%TurbineID = TurbID
+   ExternInitData%TurbinePos = TurbPosn
+   ExternInitData%SensorType = SensorType_None
+   ExternInitData%NumCtrl2SC = 0
+   ExternInitData%NumSC2Ctrl = 0
+
+   CALL FAST_InitializeAll_T( t_initial, 1_IntKi, Turbine(iTurb), ErrStat, ErrMsg, InputFileName, ExternInitData )
+
+      ! set values for return to ExternalInflow
+   if (ErrStat .ne. ErrID_None) then
+      AbortErrLev_c = AbortErrLev
+      ErrStat_c = ErrStat
+      ErrMsg_c  = TRANSFER( TRIM(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
+      return
+   end if
+
+   if ( abs(dt_c - Turbine(iTurb)%p_FAST%dt) .gt. 1e-6) then
+      CALL SetErrStat(ErrID_Fatal, "Time step specified in C++ API does not match with time step specified in OpenFAST input file.", ErrStat, ErrMsg, RoutineName )
+      ErrStat_c = ErrStat
+      ErrMsg_c  = TRANSFER( trim(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
+      return
+   end if
+
+   NumBl_c     = Turbine(iTurb)%ED%p%NumBl
+
+   CompLoadsType = Turbine(iTurb)%p_FAST%CompAero
+
+   if ( (CompLoadsType .ne. Module_ExtLd) ) then
+      CALL SetErrStat(ErrID_Fatal, "CompAero is not set to 3 for use of the External Loads module. Use a different C++ initialization call for this turbine.", ErrStat, ErrMsg, RoutineName )
+      ErrStat_c = ErrStat
+      ErrMsg_c  = TRANSFER( trim(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
+      return
+   end if
+
+   call SetExtLoads_pointers(iTurb, ExtLd_Input_from_FAST, ExtLd_Output_to_FAST)
+
+   ErrStat_c     = ErrStat
+   ErrMsg_c      = TRANSFER( trim(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
+
+end subroutine FAST_BR_CFD_Init
+
 !==================================================================================================================================
 subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2CtrlGlob, NumSC2Ctrl, NumCtrl2SC, InitSCOutputsGlob, InitSCOutputsTurbine, &
      NumActForcePtsBlade, NumActForcePtsTower, TurbPosn, AbortErrLev_c, dtDriver_c, dt_c, InflowType, NumBl_c, NumBlElem_c, NumTwrElem_c, &
@@ -631,7 +715,6 @@ subroutine FAST_CFD_Solution0(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_CF
    ErrMsg        = TRIM(ErrMsg)//C_NULL_CHAR
    ErrMsg_c      = TRANSFER( ErrMsg, ErrMsg_c )
 
-
 end subroutine FAST_CFD_Solution0
 !==================================================================================================================================
 subroutine FAST_CFD_InitIOarrays_SS(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_CFD_InitIOarrays_SS')
@@ -650,7 +733,6 @@ subroutine FAST_CFD_InitIOarrays_SS(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='F
    ErrStat_c     = ErrStat
    ErrMsg        = TRIM(ErrMsg)//C_NULL_CHAR
    ErrMsg_c      = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
-
 
 end subroutine FAST_CFD_InitIOarrays_SS
 !==================================================================================================================================
@@ -745,6 +827,118 @@ subroutine FAST_AL_CFD_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, dt_c,
    call SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST)
 
 end subroutine FAST_AL_CFD_Restart
+
+!==================================================================================================================================
+subroutine FAST_BR_CFD_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, dt_c, numblades_c, &
+     n_t_global_c, ExtLd_Input_from_FAST, ExtLd_Output_to_FAST, &
+     SC_Input_from_FAST, SC_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_BR_CFD_Restart')
+!DEC$ ATTRIBUTES DLLEXPORT::FAST_BR_CFD_Restart
+   IMPLICIT NONE
+#ifndef IMPLICIT_DLLEXPORT
+!DEC$ ATTRIBUTES DLLEXPORT :: FAST_BR_CFD_Restart
+!GCC$ ATTRIBUTES DLLEXPORT :: FAST_BR_CFD_Restart
+#endif
+   INTEGER(C_INT),         INTENT(IN   ) :: iTurb            ! Turbine number
+   CHARACTER(KIND=C_CHAR), INTENT(IN   ) :: CheckpointRootName_c(IntfStrLen)
+   INTEGER(C_INT),         INTENT(  OUT) :: AbortErrLev_c
+   INTEGER(C_INT),         INTENT(  OUT) :: numblades_c
+   REAL(C_DOUBLE),         INTENT(  OUT) :: dt_c
+   INTEGER(C_INT),         INTENT(  OUT) :: n_t_global_c
+   TYPE(ExtLdDX_InputType_C), INTENT(  OUT) :: ExtLd_Input_from_FAST
+   TYPE(ExtLdDX_OutputType_C),INTENT(  OUT) :: ExtLd_Output_to_FAST
+   TYPE(SC_InputType_C),   INTENT(INOUT) :: SC_Input_from_FAST
+   TYPE(SC_OutputType_C),  INTENT(INOUT) :: SC_Output_to_FAST
+   INTEGER(C_INT),         INTENT(  OUT) :: ErrStat_c
+   CHARACTER(KIND=C_CHAR), INTENT(  OUT) :: ErrMsg_c(IntfStrLen)
+
+   ! local variables
+   INTEGER(C_INT)                        :: NumOuts_c
+   CHARACTER(IntfStrLen)                 :: CheckpointRootName
+   INTEGER(IntKi)                        :: I
+   INTEGER(IntKi)                        :: Unit
+   REAL(DbKi)                            :: t_initial_out
+   INTEGER(IntKi)                        :: NumTurbines_out
+   INTEGER(IntKi)                        :: CompLoadsType
+   CHARACTER(*),           PARAMETER     :: RoutineName = 'FAST_Restart'
+
+   CALL NWTC_Init()
+      ! transfer the character array from C to a Fortran string:
+   CheckpointRootName = TRANSFER( CheckpointRootName_c, CheckpointRootName )
+   I = INDEX(CheckpointRootName,C_NULL_CHAR) - 1                 ! if this has a c null character at the end...
+   IF ( I > 0 ) CheckpointRootName = CheckpointRootName(1:I)     ! remove it
+
+   Unit = -1
+   CALL FAST_RestoreFromCheckpoint_T(t_initial_out, n_t_global, NumTurbines_out, Turbine(iTurb), CheckpointRootName, ErrStat, ErrMsg, Unit )
+
+   if (ErrStat .ne. ErrID_None) then
+      ErrStat_c = ErrStat
+      ErrMsg_c  = TRANSFER( trim(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
+      return
+   end if
+
+   ! check that these are valid:
+   IF (t_initial_out /= t_initial) CALL SetErrStat(ErrID_Fatal, "invalid value of t_initial.", ErrStat, ErrMsg, RoutineName )
+   IF (NumTurbines_out /= 1) CALL SetErrStat(ErrID_Fatal, "invalid value of NumTurbines.", ErrStat, ErrMsg, RoutineName )
+
+   ! transfer Fortran variables to C:
+   n_t_global_c  = n_t_global
+   AbortErrLev_c = AbortErrLev
+   NumOuts_c     = min(MAXOUTPUTS, 1 + SUM( Turbine(iTurb)%y_FAST%numOuts )) ! includes time
+   numblades_c = Turbine(iTurb)%ED%p%NumBl
+   dt_c          = Turbine(iTurb)%p_FAST%dt
+
+#ifdef CONSOLE_FILE
+   if (ErrStat .ne. ErrID_None) call wrscr1(trim(ErrMsg))
+#endif
+
+   CompLoadsType = Turbine(iTurb)%p_FAST%CompAero
+
+   if ( (CompLoadsType .ne. Module_ExtLd) ) then
+      CALL SetErrStat(ErrID_Fatal, "CompAero is not set to 3 for use of the External Loads module. Use a different initialization call for this turbine.", ErrStat, ErrMsg, RoutineName )
+      ErrStat_c = ErrStat
+      ErrMsg_c  = TRANSFER( trim(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
+      return
+   end if
+
+
+   if (dt_c .ne. Turbine(iTurb)%p_FAST%dt) then
+      CALL SetErrStat(ErrID_Fatal, "Time step specified in C++ API does not match with time step specified in OpenFAST input file.", ErrStat, ErrMsg, RoutineName )
+      return
+   end if
+
+   call SetExtLoads_pointers(iTurb, ExtLd_Input_from_FAST, ExtLd_Output_to_FAST)
+
+   ErrStat_c     = ErrStat
+   ErrMsg_c      = TRANSFER( trim(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
+
+end subroutine FAST_BR_CFD_Restart
+!==================================================================================================================================
+subroutine SetExtLoads_pointers(iTurb, ExtLd_iFromOF, ExtLd_oToOF)
+
+   IMPLICIT NONE
+   INTEGER(C_INT),         INTENT(IN   ) :: iTurb            ! Turbine number
+   TYPE(ExtLdDX_InputType_C), INTENT(INOUT) :: ExtLd_iFromOF
+   TYPE(ExtLdDX_OutputType_C),INTENT(INOUT) :: ExtLd_oToOF
+
+   ExtLd_iFromOF%twrRefPos_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrRefPos_Len; ExtLd_iFromOF%twrRefPos = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrRefPos
+   ExtLd_iFromOF%twrDef_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrDef_Len; ExtLd_iFromOF%twrDef = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrDef
+   ExtLd_iFromOF%bldRefPos_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldRefPos_Len; ExtLd_iFromOF%bldRefPos = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldRefPos
+   ExtLd_iFromOF%bldDef_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldDef_Len; ExtLd_iFromOF%bldDef = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldDef
+   ExtLd_iFromOF%nBlades_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nBlades_Len; ExtLd_iFromOF%nBlades = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nBlades
+   ExtLd_iFromOF%nBladeNodes_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nBladeNodes_Len; ExtLd_iFromOF%nBladeNodes = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nBladeNodes
+   ExtLd_iFromOF%nTowerNodes_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nTowerNodes_Len; ExtLd_iFromOF%nTowerNodes = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nTowerNodes
+
+   ExtLd_iFromOF%hubRefPos_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%hubRefPos_Len; ExtLd_iFromOF%hubRefPos = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%hubRefPos
+   ExtLd_iFromOF%hubDef_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%hubDef_Len; ExtLd_iFromOF%hubDef = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%hubDef
+
+   ExtLd_iFromOF%nacRefPos_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nacRefPos_Len; ExtLd_iFromOF%nacRefPos = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nacRefPos
+   ExtLd_iFromOF%nacDef_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nacDef_Len; ExtLd_iFromOF%nacDef = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nacDef
+
+   ExtLd_oToOF%twrLd_Len   = Turbine(iTurb)%ExtLd%y%DX_y%c_obj%twrLd_Len;  ExtLd_oToOF%twrLd = Turbine(iTurb)%ExtLd%y%DX_y%c_obj%twrLd
+   ExtLd_oToOF%bldLd_Len   = Turbine(iTurb)%ExtLd%y%DX_y%c_obj%bldLd_Len;  ExtLd_oToOF%bldLd = Turbine(iTurb)%ExtLd%y%DX_y%c_obj%bldLd
+
+ end subroutine SetExtLoads_pointers
+
 !==================================================================================================================================
 subroutine SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST)
 
@@ -790,7 +984,6 @@ subroutine SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Ou
       SC_DX_Output_to_FAST%fromSC     = Turbine(iTurb)%SC_DX%y%c_obj%fromSC
    end if
 
-
 end subroutine SetExternalInflow_pointers
 !==================================================================================================================================
 subroutine FAST_CFD_Prework(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_CFD_Prework')
@@ -834,7 +1027,6 @@ subroutine FAST_CFD_Prework(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_CFD_
       ErrMsg_c  = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
    END IF
 
-
 end subroutine FAST_CFD_Prework
 !==================================================================================================================================
 subroutine FAST_CFD_UpdateStates(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_CFD_UpdateStates')
@@ -873,7 +1065,6 @@ subroutine FAST_CFD_UpdateStates(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST
       ErrMsg = TRIM(ErrMsg)//C_NULL_CHAR
       ErrMsg_c  = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
    END IF
-
 
 end subroutine FAST_CFD_UpdateStates
 !==================================================================================================================================
@@ -970,6 +1161,7 @@ subroutine FAST_CFD_Step(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_CFD_Ste
    ELSE
 
       CALL FAST_Solution_T( t_initial, n_t_global, Turbine(iTurb), ErrStat, ErrMsg )
+
       if (iTurb .eq. (NumTurbines-1) ) then
          n_t_global = n_t_global + 1
       end if

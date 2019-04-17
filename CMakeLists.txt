@@ -97,6 +97,7 @@ endif()
 set(OPENFAST_MODULES
   nwtc-library
   inflowwind
+  extloads
   aerodyn
   aerodyn14
   servodyn
