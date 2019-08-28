@@ -480,7 +480,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
          RETURN
       END IF
 
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( ( p_FAST%CompAero == Module_AD ) .OR. ( p_FAST%CompAero == Module_ExtLd) ) THEN
 
       allocate(Init%InData_AD%rotors(1), stat=errStat)
       if (errStat/=0) then
@@ -504,7 +504,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       Init%InData_AD%Linearize          = p_FAST%Linearize
       Init%InData_AD%InputFile          = p_FAST%AeroFile
       Init%InData_AD%RootName           = p_FAST%OutFileRoot
-
 
       Init%InData_AD%rotors(1)%HubPosition        = ED%y%HubPtMotion%Position(:,1)
       Init%InData_AD%rotors(1)%HubOrientation     = ED%y%HubPtMotion%RefOrientation(:,:,1)
@@ -547,7 +546,12 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
 
       AirDens = Init%OutData_AD%rotors(1)%AirDens
 
-   ELSEIF ( p_FAST%CompAero == Module_ExtLd ) THEN
+   ELSE
+      AirDens = 0.0_ReKi
+   END IF ! CompAero
+
+
+   IF ( p_FAST%CompAero == Module_ExtLd ) THEN
 
       IF ( PRESENT(ExternInitData) ) THEN
 
@@ -569,11 +573,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
 
       END IF
 
-   ELSE
-      AirDens = 0.0_ReKi
-   END IF ! CompAero
-
-
+   END IF
    ! ........................
    ! initialize InflowWind
    ! ........................
@@ -2025,7 +2025,7 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
    IF ( p_FAST%CompAero == Module_AD14 )  THEN
       y_FAST%Module_Ver( Module_AD14  ) = Init%OutData_AD14%Ver
       y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_AD14  ) ))
-   ELSEIF ( p_FAST%CompAero == Module_AD )  THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) )  THEN
       y_FAST%Module_Ver( Module_AD  ) = Init%OutData_AD%Ver
       y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_AD  ) ))
    END IF
@@ -3760,6 +3760,13 @@ SUBROUTINE ExtLd_SetInitInput(InitInData_ExtLd, InitOutData_ED, y_ED, InitOutDat
    InitInData_ExtLd%NacellePos         = y_ED%NacelleMotion%Position(:,1)
    InitInData_ExtLd%NacelleOrient      = y_ED%NacelleMotion%RefOrientation(:,:,1)
 
+   InitInData_ExtLd%az_blend_mean = ExternInitData%az_blend_mean
+   InitInData_ExtLd%az_blend_delta = ExternInitData%az_blend_delta
+   InitInData_ExtLd%vel_mean = ExternInitData%vel_mean
+   InitInData_ExtLd%wind_dir = ExternInitData%wind_dir
+   InitInData_ExtLd%z_ref = ExternInitData%z_ref
+   InitInData_ExtLd%shear_exp = ExternInitData%shear_exp
+
    RETURN
 
 END SUBROUTINE ExtLd_SetInitInput
@@ -3952,7 +3959,7 @@ SUBROUTINE FAST_WrSum( p_FAST, y_FAST, MeshMapData, ErrStat, ErrMsg )
    WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
 
    DescStr = GetNVD( y_FAST%Module_Ver( Module_AD ) )
-   IF ( p_FAST%CompAero /= Module_AD ) DescStr = TRIM(DescStr)//NotUsedTxt
+   IF ( (p_FAST%CompAero /= Module_AD) .and. (p_FAST%CompAero /= Module_ExtLd) ) DescStr = TRIM(DescStr)//NotUsedTxt
    WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
 
    DescStr = GetNVD( y_FAST%Module_Ver( Module_SrvD ) )
@@ -4397,7 +4404,7 @@ SUBROUTINE FAST_InitIOarrays( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, A
       CALL AD14_CopyOtherState( AD14%OtherSt(STATE_CURR), AD14%OtherSt(STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
          ! Copy values for interpolation/extrapolation:
 
       DO j = 1, p_FAST%InterpOrder + 1
@@ -4910,7 +4917,7 @@ SUBROUTINE FAST_InitIOarrays_SS( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD
       CALL AD14_CopyOtherState( AD14%OtherSt(STATE_PRED), AD14%OtherSt(STATE_SS_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
          ! Copy values for interpolation/extrapolation:
 
       DO j = 1, p_FAST%InterpOrder + 1
@@ -5523,8 +5530,7 @@ SUBROUTINE FAST_Reset_SS(t_initial, n_t_global, n_timesteps, p_FAST, y_FAST, m_F
       CALL AD14_CopyOtherState (AD14%OtherSt(STATE_SS_CURR), AD14%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
          ! Copy values for interpolation/extrapolation:
 
       DO j = 1, p_FAST%InterpOrder + 1
@@ -6097,8 +6103,7 @@ SUBROUTINE FAST_Store_SS(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
       CALL AD14_CopyOtherState (AD14%OtherSt(STATE_CURR), AD14%OtherSt(STATE_SS_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
          ! Copy values for interpolation/extrapolation:
 
       DO j = 1, p_FAST%InterpOrder + 1
@@ -6799,7 +6804,7 @@ SUBROUTINE FAST_AdvanceToNextTimeStep(t_initial, n_t_global, p_FAST, y_FAST, m_F
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AD14_CopyOtherState (AD14%OtherSt(STATE_PRED), AD14%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
       CALL AD_CopyContState   (AD%x( STATE_PRED), AD%x( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AD_CopyDiscState   (AD%xd(STATE_PRED), AD%xd(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
@@ -7164,7 +7169,6 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
    !! STATE_CURR values of x, xd, z, and OtherSt contain values at m_FAST%t_global;
    !! STATE_PRED values contain values at t_global_next.
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
       CALL FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, ExtInfw, HD, SD, ExtPtfm, &
                                MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -7254,7 +7258,7 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AD14_CopyOtherState (AD14%OtherSt(STATE_PRED), AD14%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
       CALL AD_CopyContState   (AD%x( STATE_PRED), AD%x( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AD_CopyDiscState   (AD%xd(STATE_PRED), AD%xd(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
