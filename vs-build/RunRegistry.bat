@@ -27,6 +27,7 @@ SET FAST_Loc=%Modules_Loc%\openfast-library\src
 SET ED_Loc=%Modules_Loc%\elastodyn\src
 SET AD14_Loc=%Modules_Loc%\aerodyn14\src
 SET IfW_Loc=%Modules_Loc%\inflowwind\src
+SET LidarSim_Loc=%Modules_Loc%\lidarsim\src
 SET HD_Loc=%Modules_Loc%\hydrodyn\src
 SET SD_Loc=%Modules_Loc%\subdyn\src
 SET MAP_Loc=%Modules_Loc%\map\src
@@ -45,7 +46,7 @@ SET SC_Loc=%Modules_Loc%\supercontroller\src
 
 SET ALL_FAST_Includes=-I "%FAST_Loc%" -I "%NWTC_Lib_Loc%" -I "%ED_Loc%" -I "%SrvD_Loc%" -I "%AD14_Loc%" -I^
  "%AD_Loc%" -I "%BD_Loc%" -I "%SC_Loc%" -I^
- "%IfW_Loc%" -I "%SD_Loc%" -I "%HD_Loc%" -I "%MAP_Loc%" -I "%FEAM_Loc%"  -I^
+ "%IfW_Loc%" -I "%LidarSim_Loc%" -I "%SD_Loc%" -I "%HD_Loc%" -I "%MAP_Loc%" -I "%FEAM_Loc%"  -I^
  "%IceF_Loc%" -I "%IceD_Loc%" -I "%MD_Loc%" -I "%OpFM_Loc%" -I "%Orca_Loc%" -I "%ExtPtfm_Loc%"
 
 
@@ -98,6 +99,12 @@ GOTO checkError
 SET CURR_LOC=%IfW_Loc%
 SET Output_Loc=%CURR_LOC%
 %REGISTRY% "%CURR_LOC%\%ModuleName%.txt" -I "%NWTC_Lib_Loc%" -I "%CURR_LOC%" -O "%Output_Loc%"
+GOTO checkError
+
+:LidarSim
+SET CURR_LOC=%LidarSim_Loc%
+SET Output_Loc=%CURR_LOC%
+%REGISTRY% "%CURR_LOC%\LidarSim_Registry.txt" -I "%NWTC_Lib_Loc%" -O "%Output_Loc%"
 GOTO checkError
 
 :IfW_TSFFWind
@@ -280,6 +287,7 @@ SET ED_Loc=
 SET BD_Loc=
 SET AD14_Loc=
 SET IfW_Loc=
+SET LidarSim_Loc=
 SET HD_Loc=
 SET SD_Loc=
 SET MAP_Loc=

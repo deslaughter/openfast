@@ -28,6 +28,7 @@ usefrom	MAP_Registry.txt
 usefrom	MoorDyn_Registry.txt
 usefrom	OrcaFlexInterface.txt
 usefrom	ExtPtfm_MCKF_Registry.txt
+usefrom  LidarSim_Registry.txt
 
 # ...... Constants ............................................................................
 
@@ -52,7 +53,8 @@ param	^	-	INTEGER	Module_MD	-	13	-	"MoorDyn"	-
 param	^	-	INTEGER	Module_Orca	-	14	-	"OrcaFlex integration (HD/Mooring)"	-
 param	^	-	INTEGER	Module_IceF	-	15	-	"IceFloe"	-
 param	^	-	INTEGER	Module_IceD	-	16	-	"IceDyn"	-
-param	^	-	INTEGER	NumModules	-	16	-	"The number of modules available in FAST"	-
+param ^  -  INTEGER  Module_LidSim - 17  -   "LidSim"	-
+param	^	-	INTEGER	NumModules	-	17	-	"The number of modules available in FAST"	-
 # Other Constants
 param	^	-	INTEGER	MaxNBlades	-	3	-	"Maximum number of blades allowed on a turbine"	-
 param	^	-	INTEGER	IceD_MaxLegs	-	4	-	"because I don't know how many legs there are before calling IceD_Init and I don't want to copy the data because of sibling mesh issues, I'm going to allocate IceD based on this number"	-
@@ -97,6 +99,7 @@ typedef	^	FAST_ParameterType	IntKi	CompHydro	-	-	-	"Compute hydrodynamic loads (
 typedef	^	FAST_ParameterType	IntKi	CompSub	-	-	-	"Compute sub-structural dynamics (switch) {Module_None; Module_HD}"	-
 typedef	^	FAST_ParameterType	IntKi	CompMooring	-	-	-	"Compute mooring system (switch) {Module_None; Module_MAP; Module_FEAM; Module_MD; Module_Orca}"	-
 typedef	^	FAST_ParameterType	IntKi	CompIce	-	-	-	"Compute ice loading (switch) {Module_None; Module_IceF, Module_IceD}"	-
+typedef	^	FAST_ParameterType	IntKi	CompLidar	-	-	"Compute LidarSim Module (switch) {0 = Off, 1 = On}}"	-	
 typedef	^	FAST_ParameterType	LOGICAL	UseDWM	-	-	-	"Use the DWM module in AeroDyn"	-
 typedef	^	FAST_ParameterType	LOGICAL	Linearize	-	-	-	"Linearization analysis (flag)"	-
 # Input file names:
@@ -109,6 +112,7 @@ typedef	^	FAST_ParameterType	CHARACTER(1024)	HydroFile	-	-	-	"Name of file conta
 typedef	^	FAST_ParameterType	CHARACTER(1024)	SubFile	-	-	-	"Name of file containing sub-structural input parameters"	-
 typedef	^	FAST_ParameterType	CHARACTER(1024)	MooringFile	-	-	-	"Name of file containing mooring system input parameters"	-
 typedef	^	FAST_ParameterType	CHARACTER(1024)	IceFile	-	-	-	"Name of file containing ice loading input parameters"	-
+typedef	^	FAST_ParameterType	CHARACTER(1024)	LidarFile	-	-	-	"Name of file containing LidarSim input parameters"	-
 #  Parameters for file/screen output
 #typedef	^	FAST_ParameterType	DbKi	SttsTime	-	-	-	"Amount of time between screen status messages"	s
 typedef	^	FAST_ParameterType	DbKi	TStart	-	-	-	"Time to begin tabular output"	s
@@ -253,6 +257,7 @@ typedef	^	^	SrvD_ParameterType	p	-	-	-	"Parameters"
 typedef	^	^	SrvD_InputType	u	-	-	-	"System inputs"
 typedef	^	^	SrvD_OutputType	y	-	-	-	"System outputs"
 typedef	^	^	SrvD_MiscVarType	m	-	-	-	"Misc (optimization) variables not associated with time"
+typedef	^	^	SrvD_AddOutsType	AddOuts	-	-	-	"avrSWAP Array AdditionalOutputs"
 typedef	^	^	SrvD_InputType	Input	{:}	-	-	"Array of inputs associated with InputTimes"
 typedef	^	^	DbKi	InputTimes	{:}	-	-	"Array of times associated with Input Array"
 
@@ -399,6 +404,12 @@ typedef	^	^	Orca_MiscVarType	m	-	-	-	"Misc/optimization variables"
 typedef	^	^	Orca_InputType	Input	{:}	-	-	"Array of inputs associated with InputTimes"
 typedef	^	^	DbKi	InputTimes	{:}	-	-	"Array of times associated with Input Array"
 
+# ..... LidarSim data ........................................................................................................
+typedef	FAST	LidarSim_Data	LidarSim_ParameterType	p		-	-	"Parameters"
+typedef	^	^	LidarSim_InputType						u		-	-	"System inputs"
+typedef	^	^	LidarSim_OutputType					y		-	-	"System outputs"
+typedef ^	^	LidarSim_InitInputType					InitInp	-	-	"Initial input data"
+
 # ..... FAST_ModuleMapType data .......................................................................................................
 # ! Data structures for mapping and coupling the various modules together
 # ED <-> BD
@@ -525,3 +536,4 @@ typedef	^	FAST_TurbineType	OrcaFlex_Data	Orca	-	-	-	"Data for the OrcaFlex inter
 typedef	^	FAST_TurbineType	IceFloe_Data	IceF	-	-	-	"Data for the IceFloe module"	-
 typedef	^	FAST_TurbineType	IceDyn_Data	IceD	-	-	-	"Data for the IceDyn module"	-
 typedef	^	FAST_TurbineType	ExtPtfm_Data	ExtPtfm	-	-	-	"Data for the ExtPtfm (external platform loading) module"	-
+typedef	^	FAST_TurbineType	LidarSim_Data	LidSim	-	-	-	"Data for LidarSim module"	-

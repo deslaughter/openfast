@@ -104,6 +104,7 @@ set(OPENFAST_MODULES
   icedyn
   icefloe
   map
+  lidarsim
 )
 
 set(OPENFAST_REGISTRY_INCLUDES "" CACHE INTERNAL "Registry includes paths")

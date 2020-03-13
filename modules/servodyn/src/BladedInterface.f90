@@ -90,6 +90,7 @@ MODULE BladedInterface
    
    INTEGER(IntKi), PARAMETER    :: R_v36 = 85         !< Start of below-rated torque-speed look-up table (record no.) for Bladed version 3.6
    INTEGER(IntKi), PARAMETER    :: R_v4  = 145        !< Start of below-rated torque-speed look-up table (record no.) for Bladed version 3.8 and later
+   INTEGER(IntKi), PARAMETER    :: R_v44 = 165        !< Start of below-rated torque-speed look-up table (record no.) for Bladed version 4.4
 
    INTEGER(IntKi), PARAMETER    :: R = R_v4           !< start of the generator speed look-up table  
             
@@ -262,7 +263,7 @@ SUBROUTINE BladedInterface_Init(u,p,m,y,InputFileData, ErrStat, ErrMsg)
    IF ( ErrStat >= AbortErrLev ) RETURN
    
    
-   CALL AllocAry( m%dll_data%avrSwap,   R+(2*p%DLL_NumTrq)-1, 'avrSwap', ErrStat2, ErrMsg2 )
+   CALL AllocAry( m%dll_data%avrSwap,   R+(2*p%DLL_NumTrq)-1+p%MAXDLLChainOutputs, 'avrSwap', ErrStat2, ErrMsg2 )
       CALL CheckError(ErrStat2,ErrMsg2)
       IF ( ErrStat >= AbortErrLev ) RETURN
 
@@ -376,11 +377,12 @@ END SUBROUTINE BladedInterface_End
 !==================================================================================================================================
 !> This routine sets the AVRswap array, calls the routine from the BladedDLL, and sets the outputs from the call to be used as
 !! necessary in the main ServoDyn CalcOutput routine.
-SUBROUTINE BladedInterface_CalcOutput(t, u, p, m, ErrStat, ErrMsg)
+SUBROUTINE BladedInterface_CalcOutput(t, u, p, AddOuts, m, ErrStat, ErrMsg)
 
    REAL(DbKi),                     INTENT(IN   )  :: t           !< Current simulation time in seconds
    TYPE(SrvD_InputType),           INTENT(IN   )  :: u           !< Inputs at t
    TYPE(SrvD_ParameterType),       INTENT(IN   )  :: p           !< Parameters
+   TYPE(SrvD_AddOutsType),         INTENT(IN   )  :: AddOuts     !< Additional outputs for the avrSWAP array
    TYPE(SrvD_MiscVarType),         INTENT(INOUT)  :: m           !< misc (optimization) variables
    INTEGER(IntKi),                 INTENT(  OUT)  :: ErrStat     !< Error status of the operation
    CHARACTER(*),                   INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
@@ -396,7 +398,7 @@ SUBROUTINE BladedInterface_CalcOutput(t, u, p, m, ErrStat, ErrMsg)
    
    
       ! Set the input values of the avrSWAP array:
-   CALL Fill_avrSWAP( t, u, p, LEN(ErrMsg), m%dll_data )
+   CALL Fill_avrSWAP( t, u, p, AddOuts, LEN(ErrMsg), m%dll_data )
    
 #ifdef DEBUG_BLADED_INTERFACE
 !CALL WrNumAryFileNR ( 58, (/t/),'1x,ES15.6E2', ErrStat, ErrMsg )
@@ -434,7 +436,7 @@ END SUBROUTINE BladedInterface_CalcOutput
 !==================================================================================================================================
 !> This routine fills the avrSWAP array with its inputs, as described in Appendices A and B of the Bladed User Manual of Bladed 
 !! version 3.81.
-SUBROUTINE Fill_avrSWAP( t, u, p, ErrMsgSz, dll_data )
+SUBROUTINE Fill_avrSWAP( t, u, p, AddOuts, ErrMsgSz, dll_data )
 !SUBROUTINE Fill_avrSWAP( StatFlag, t, u, p, ErrMsgSz, dll_data )
 !..................................................................................................................................
  
@@ -442,12 +444,16 @@ SUBROUTINE Fill_avrSWAP( t, u, p, ErrMsgSz, dll_data )
    REAL(DbKi),                     INTENT(IN   )  :: t           !< Current simulation time in seconds
    TYPE(SrvD_InputType),           INTENT(IN   )  :: u           !< Inputs at t
    TYPE(SrvD_ParameterType),       INTENT(IN   )  :: p           !< Parameters
+   TYPE(SrvD_AddOutsType),		     INTENT(IN   )  :: AddOuts     !< Additional outputs for the avrSWAP array
    INTEGER(IntKi),                 INTENT(IN   )  :: ErrMsgSz    !< Allowed size of the DLL-returned error message (-)
 !   REAL(SiKi),                     INTENT(INOUT)  :: avrSWAP(:)  ! the SWAP array for the Bladed DLL Interface
    TYPE(BladedDLLType),            INTENT(INOUT)  :: dll_data    !< data for the Bladed DLL
 
       ! local variables:
    INTEGER(IntKi)                                 :: I           ! Loop counter
+   INTEGER(IntKi)                                 :: L           ! Record number for start of Lidar data
+   
+   L  = R + (2*p%DLL_NumTrq)
    
    !! Set the values of the avrSWAP array that vary during a simulation
    
@@ -564,6 +570,9 @@ END IF
    dll_data%avrSWAP(109) = u%LSSTipMxa ! or u%LSShftMxs     !> * Record 109: Shaft torque (=hub Mx for clockwise rotor) (Nm) [SrvD input]
    dll_data%avrSWAP(117) = 0                                !> * Record 117: Controller state [always set to 0]
    
+   dll_data%avrSWAP(120) = L                                !> * Record 120: Record number for start of Lidar data
+   dll_data%avrSWAP(121) = L + 2 + p%GatesPerBeam + 6       !> * Record 121: Next available record number after Lidar data
+   
    !> * Records \f$R\f$ through \f$R + 2*DLL\_NumTrq - 1\f$: torque-speed look-up table elements. 
    DO I = 1,p%DLL_NumTrq  ! Loop through all torque-speed look-up table elements
       dll_data%avrSWAP( R + (2*I) - 2 ) = p%GenSpd_TLU(I)   !>  + Records \f$R, R+2, R+4,   \dots, R + 2*DLL\_NumTrq - 2\f$: Generator speed  look-up table elements (rad/s)
@@ -575,6 +584,25 @@ END IF
 ! Records 130-142 are outputs [see Retrieve_avrSWAP()]   
 ! Records L1 and onward are outputs [see Retrieve_avrSWAP()]
    
+   
+   !> NewData
+   dll_data%avrSWAP( L ) = AddOuts%NewData
+
+   !> BeamID
+   dll_data%avrSWAP( L + 1 ) = AddOuts%BeamID
+   
+   !> Line of sight velocities
+   DO I = 1,p%GatesPerBeam
+       dll_data%avrSWAP( L + 1 + I ) = AddOuts%Vlos( I )
+   ENDDO   
+   
+   !> Lidar roll, pitch and yaw tilt angular (rotational) displacement (deg) and velocities
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 1) = AddOuts%LdrRoll
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 2) = AddOuts%LdrPitch
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 3) = AddOuts%LdrYaw
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 4) = AddOuts%LdrXd
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 5) = AddOuts%LdrYd
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 6) = AddOuts%LdrZd   
    
    
    RETURN
