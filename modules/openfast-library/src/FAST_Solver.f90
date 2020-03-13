@@ -30,6 +30,7 @@ MODULE FAST_Solver
    USE AeroDyn
    USE AeroDyn14
    USE InflowWind
+   USE LidarSim
    USE ElastoDyn
    USE BeamDyn
    USE FEAMooring
@@ -4379,7 +4380,7 @@ END SUBROUTINE InitModuleMappings
 !! once at the start of the n_t_global loop and once in the j_pc loop, using different states.
 !! *** Note that modules that do not have direct feedthrough should be called first. ***
 SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, calcJacobian, NextJacCalcTime, p_FAST, m_FAST, &
-               ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat, ErrMsg )
+               ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim, MeshMapData, ErrStat, ErrMsg )
    REAL(DbKi)              , intent(in   ) :: this_time           !< The current simulation time (actual or time of prediction)
    INTEGER(IntKi)          , intent(in   ) :: this_state          !< Index into the state array (current or predicted states)
    INTEGER(IntKi)          , intent(in   ) :: n_t_global          !< current time step (used only for SrvD hack)
@@ -4405,6 +4406,7 @@ SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, ca
    TYPE(OrcaFlex_Data),      INTENT(INOUT) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(INOUT) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(INOUT) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(LidarSim_Data),	     INTENT(INOUT) :: LidSim              !< Data for Lidar Simulator
 
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
    
@@ -4454,7 +4456,7 @@ SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, ca
    !! ## Algorithm:
 
       !> Solve option 2 (modules without direct feedthrough):
-   CALL SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2, n_t_global < 0)
+   CALL SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, LidSim, MeshMapData, ErrStat2, ErrMsg2, n_t_global < 0)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )  
                
 #ifdef OUTPUT_MASS_MATRIX      
@@ -4921,7 +4923,7 @@ END SUBROUTINE SolveOption2c_Inp2AD_SrvD
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine implements the "option 2" solve for all inputs without direct links to HD, SD, MAP, or the ED platform reference 
 !! point.
-SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat, ErrMsg, firstCall)
+SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, LidSim, MeshMapData, ErrStat, ErrMsg, firstCall)
 !...............................................................................................................................
    LOGICAL                 , intent(in   ) :: firstCall           !< flag to determine how to call ServoDyn (a hack)
    REAL(DbKi)              , intent(in   ) :: this_time           !< The current simulation time (actual or time of prediction)
@@ -4937,6 +4939,7 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
    TYPE(AeroDyn_Data),       INTENT(INOUT) :: AD                  !< AeroDyn data
    TYPE(InflowWind_Data),    INTENT(INOUT) :: IfW                 !< InflowWind data
    TYPE(OpenFOAM_Data),      INTENT(INOUT) :: OpFM                !< OpenFOAM data
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< LidarSim data
 
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
    
@@ -4989,10 +4992,43 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
    END IF
    
 
+   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+      LidSim%u%NacelleMotion = ED%Output(1)%NacelleMotion
+	  CALL LidarSim_CalcOutput(this_time, LidSim%y, LidSim%p, LidSim%u,&
+                       IfW%p,IfW%x(this_state), IfW%xd(this_state), IfW%z(this_state), IfW%OtherSt(this_state), IfW%m,&
+					   ErrStat2, ErrMsg2)        
+	     CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      ! Additional signals for avrSWAP array
+      IF ( p_FAST%CompServo == Module_SrvD ) THEN
+         SrvD%AddOuts%NewData    = NINT(LidSim%y%SwapOutputs(1))
+         SrvD%AddOuts%BeamID     = NINT(LidSim%y%SwapOutputs(2))
+         SrvD%AddOuts%Vlos( 1:SrvD%p%GatesPerBeam ) = LidSim%y%SwapOutputs( 3:(2 + SrvD%p%GatesPerBeam) )
+         SrvD%AddOuts%LdrRoll    = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 1 )
+         SrvD%AddOuts%LdrPitch   = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 2 )
+         SrvD%AddOuts%LdrYaw     = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 3 )
+         SrvD%AddOuts%LdrXd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 4 )
+         SrvD%AddOuts%LdrYd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 5 )
+         SrvD%AddOuts%LdrZd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 6 )
+      END IF
+   ELSE
+      IF ( p_FAST%CompServo == Module_SrvD ) THEN
+         SrvD%AddOuts%NewData    = 0
+         SrvD%AddOuts%BeamID     = 0
+         SrvD%AddOuts%Vlos       = 0
+         SrvD%AddOuts%LdrRoll    = 0
+         SrvD%AddOuts%LdrPitch   = 0
+         SrvD%AddOuts%LdrYaw     = 0
+         SrvD%AddOuts%LdrXd      = 0
+         SrvD%AddOuts%LdrYd      = 0
+         SrvD%AddOuts%LdrZd      = 0
+      END IF
+   END IF
+   
+
    IF ( p_FAST%CompServo == Module_SrvD  ) THEN
          
       CALL SrvD_CalcOutput( this_time, SrvD%Input(1), SrvD%p, SrvD%x(this_state), SrvD%xd(this_state), SrvD%z(this_state), &
-                             SrvD%OtherSt(this_state), SrvD%y, SrvD%m, ErrStat2, ErrMsg2 )
+                             SrvD%OtherSt(this_state), SrvD%AddOuts, SrvD%y, SrvD%m, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    END IF

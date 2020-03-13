@@ -1233,6 +1233,36 @@
 		<File RelativePath="..\..\modules\inflowwind\src\InflowWind.f90"/>
 		<File RelativePath="..\..\modules\inflowwind\src\InflowWind_Subs.f90"/>
 		<File RelativePath="..\..\modules\inflowwind\src\Lidar.f90"/></Filter>
+		<Filter Name="LidarSim">
+		<Filter Name="Registry">
+		<File RelativePath="..\..\modules\lidarsim\src\LidarSim_Registry.txt">
+			<FileConfiguration Name="Debug_Double|Win32">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Debug|Win32">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Release_Double|Win32">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Release|x64">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Debug|x64">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Debug_Matlab|x64">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Debug_Double|x64">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Debug_Matlab|Win32">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Release|Win32">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Release_Matlab|x64">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Release_Double|x64">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration>
+			<FileConfiguration Name="Release_Matlab|Win32">
+				<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LidarSim" Description="Running Registry for Lidar Simulator" Outputs="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></FileConfiguration></File>
+		<File RelativePath="..\..\modules\lidarsim\src\LidarSim_Types.f90"/></Filter>
+		<File RelativePath="..\..\modules\lidarsim\src\LidarSim.f90"/>
+		<File RelativePath="..\..\modules\lidarsim\src\LidarSim_Subs.f90"/></Filter>
 		<Filter Name="Mooring Lines">
 		<Filter Name="FEAMooring">
 		<Filter Name="RegistryFiles">

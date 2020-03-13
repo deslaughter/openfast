@@ -47,6 +47,8 @@ IMPLICIT NONE
     REAL(DbKi)  :: Tmax      !< max time from glue code [s]
     REAL(ReKi)  :: AvgWindSpeed      !< average wind speed for the simulation [m/s]
     REAL(ReKi)  :: AirDens      !< air density [kg/m^3]
+    INTEGER(IntKi)  :: GatesPerBeam      !< Number of Lidar measurement distances [-]
+    INTEGER(IntKi)  :: MAXDLLChainOutputs      !< Number of entries in the avrSWAP reserved for the DLL chain [-]
     INTEGER(IntKi)  :: NumSC2Ctrl      !< number of controller inputs [from supercontroller] [-]
     INTEGER(IntKi)  :: NumCtrl2SC      !< number of controller outputs [to supercontroller] [-]
   END TYPE SrvD_InitInputType
@@ -208,6 +210,8 @@ IMPLICIT NONE
 ! =======================
 ! =========  SrvD_ParameterType  =======
   TYPE, PUBLIC :: SrvD_ParameterType
+    INTEGER(IntKi)  :: GatesPerBeam      !< Number of Lidar measurement distances [-]
+    INTEGER(IntKi)  :: MAXDLLChainOutputs      !< Number of entries in the avrSWAP reserved for the DLL chain [-]
     REAL(DbKi)  :: DT      !< Time step for continuous state integration & discrete state update [seconds]
     REAL(DbKi)  :: HSSBrDT      !< Time it takes for HSS brake to reach full deployment once deployed [seconds]
     REAL(ReKi)  :: HSSBrFrac      !< Fraction of full braking torque: 0 (off) <= HSSBrFrac <= 1 (full), (-) [-]
@@ -361,6 +365,19 @@ IMPLICIT NONE
     REAL(SiKi) , DIMENSION(:), ALLOCATABLE  :: SuperController      !< A swap array: used to pass output data from the DLL controller to the supercontroller [-]
   END TYPE SrvD_OutputType
 ! =======================
+! =========  SrvD_AddOutsType  =======
+  TYPE, PUBLIC :: SrvD_AddOutsType
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Vlos      !< LidarSim output array [-]
+    INTEGER(IntKi)  :: BeamID      !< Index of currently active beam (zero-based) [-]
+    INTEGER(IntKi)  :: NewData      !< Flag for new Lidar measurement data [-]
+    REAL(ReKi)  :: LdrRoll      !< LidarSim Roll angle (I-Coordinate System) [-]
+    REAL(ReKi)  :: LdrPitch      !< LidarSim Pitch angle (I-Coordinate System) [-]
+    REAL(ReKi)  :: LdrYaw      !< LidarSim Yaw angle (I-Coordinate System) [-]
+    REAL(ReKi)  :: LdrXd      !< LidarSim velocity in x direction (I-Coordinate System) [-]
+    REAL(ReKi)  :: LdrYd      !< LidarSim velocity in y direction (I-Coordinate System) [-]
+    REAL(ReKi)  :: LdrZd      !< LidarSim velocity in z direction (I-Coordinate System) [-]
+  END TYPE SrvD_AddOutsType
+! =======================
 CONTAINS
  SUBROUTINE SrvD_CopyInitInput( SrcInitInputData, DstInitInputData, CtrlCode, ErrStat, ErrMsg )
    TYPE(SrvD_InitInputType), INTENT(IN) :: SrcInitInputData
@@ -399,6 +416,8 @@ ENDIF
     DstInitInputData%Tmax = SrcInitInputData%Tmax
     DstInitInputData%AvgWindSpeed = SrcInitInputData%AvgWindSpeed
     DstInitInputData%AirDens = SrcInitInputData%AirDens
+    DstInitInputData%GatesPerBeam = SrcInitInputData%GatesPerBeam
+    DstInitInputData%MAXDLLChainOutputs = SrcInitInputData%MAXDLLChainOutputs
     DstInitInputData%NumSC2Ctrl = SrcInitInputData%NumSC2Ctrl
     DstInitInputData%NumCtrl2SC = SrcInitInputData%NumCtrl2SC
  END SUBROUTINE SrvD_CopyInitInput
@@ -467,6 +486,8 @@ ENDIF
       Db_BufSz   = Db_BufSz   + 1  ! Tmax
       Re_BufSz   = Re_BufSz   + 1  ! AvgWindSpeed
       Re_BufSz   = Re_BufSz   + 1  ! AirDens
+      Int_BufSz  = Int_BufSz  + 1  ! GatesPerBeam
+      Int_BufSz  = Int_BufSz  + 1  ! MAXDLLChainOutputs
       Int_BufSz  = Int_BufSz  + 1  ! NumSC2Ctrl
       Int_BufSz  = Int_BufSz  + 1  ! NumCtrl2SC
   IF ( Re_BufSz  .GT. 0 ) THEN 
@@ -533,6 +554,10 @@ ENDIF
       Re_Xferred   = Re_Xferred   + 1
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%AirDens
       Re_Xferred   = Re_Xferred   + 1
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%GatesPerBeam
+      Int_Xferred   = Int_Xferred   + 1
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%MAXDLLChainOutputs
+      Int_Xferred   = Int_Xferred   + 1
       IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%NumSC2Ctrl
       Int_Xferred   = Int_Xferred   + 1
       IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%NumCtrl2SC
@@ -637,6 +662,10 @@ ENDIF
       Re_Xferred   = Re_Xferred + 1
       OutData%AirDens = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
+      OutData%GatesPerBeam = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
+      OutData%MAXDLLChainOutputs = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
       OutData%NumSC2Ctrl = IntKiBuf( Int_Xferred ) 
       Int_Xferred   = Int_Xferred + 1
       OutData%NumCtrl2SC = IntKiBuf( Int_Xferred ) 
@@ -4476,6 +4505,8 @@ ENDIF
 ! 
    ErrStat = ErrID_None
    ErrMsg  = ""
+    DstParamData%GatesPerBeam = SrcParamData%GatesPerBeam
+    DstParamData%MAXDLLChainOutputs = SrcParamData%MAXDLLChainOutputs
     DstParamData%DT = SrcParamData%DT
     DstParamData%HSSBrDT = SrcParamData%HSSBrDT
     DstParamData%HSSBrFrac = SrcParamData%HSSBrFrac
@@ -4744,6 +4775,8 @@ ENDIF
   Re_BufSz  = 0
   Db_BufSz  = 0
   Int_BufSz  = 0
+      Int_BufSz  = Int_BufSz  + 1  ! GatesPerBeam
+      Int_BufSz  = Int_BufSz  + 1  ! MAXDLLChainOutputs
       Db_BufSz   = Db_BufSz   + 1  ! DT
       Db_BufSz   = Db_BufSz   + 1  ! HSSBrDT
       Re_BufSz   = Re_BufSz   + 1  ! HSSBrFrac
@@ -4964,6 +4997,10 @@ ENDIF
   Db_Xferred  = 1
   Int_Xferred = 1
 
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%GatesPerBeam
+      Int_Xferred   = Int_Xferred   + 1
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%MAXDLLChainOutputs
+      Int_Xferred   = Int_Xferred   + 1
       DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) = InData%DT
       Db_Xferred   = Db_Xferred   + 1
       DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) = InData%HSSBrDT
@@ -5387,6 +5424,10 @@ ENDIF
   Re_Xferred  = 1
   Db_Xferred  = 1
   Int_Xferred  = 1
+      OutData%GatesPerBeam = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
+      OutData%MAXDLLChainOutputs = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
       OutData%DT = DbKiBuf( Db_Xferred ) 
       Db_Xferred   = Db_Xferred + 1
       OutData%HSSBrDT = DbKiBuf( Db_Xferred ) 
@@ -7197,6 +7238,237 @@ ENDIF
     DEALLOCATE(mask1)
   END IF
  END SUBROUTINE SrvD_UnPackOutput
+
+ SUBROUTINE SrvD_CopyAddOutsType( SrcAddOutsTypeData, DstAddOutsTypeData, CtrlCode, ErrStat, ErrMsg )
+   TYPE(SrvD_AddOutsType), INTENT(IN) :: SrcAddOutsTypeData
+   TYPE(SrvD_AddOutsType), INTENT(INOUT) :: DstAddOutsTypeData
+   INTEGER(IntKi),  INTENT(IN   ) :: CtrlCode
+   INTEGER(IntKi),  INTENT(  OUT) :: ErrStat
+   CHARACTER(*),    INTENT(  OUT) :: ErrMsg
+! Local 
+   INTEGER(IntKi)                 :: i,j,k
+   INTEGER(IntKi)                 :: i1, i1_l, i1_u  !  bounds (upper/lower) for an array dimension 1
+   INTEGER(IntKi)                 :: ErrStat2
+   CHARACTER(ErrMsgLen)           :: ErrMsg2
+   CHARACTER(*), PARAMETER        :: RoutineName = 'SrvD_CopyAddOutsType'
+! 
+   ErrStat = ErrID_None
+   ErrMsg  = ""
+IF (ALLOCATED(SrcAddOutsTypeData%Vlos)) THEN
+  i1_l = LBOUND(SrcAddOutsTypeData%Vlos,1)
+  i1_u = UBOUND(SrcAddOutsTypeData%Vlos,1)
+  IF (.NOT. ALLOCATED(DstAddOutsTypeData%Vlos)) THEN 
+    ALLOCATE(DstAddOutsTypeData%Vlos(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstAddOutsTypeData%Vlos.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstAddOutsTypeData%Vlos = SrcAddOutsTypeData%Vlos
+ENDIF
+    DstAddOutsTypeData%BeamID = SrcAddOutsTypeData%BeamID
+    DstAddOutsTypeData%NewData = SrcAddOutsTypeData%NewData
+    DstAddOutsTypeData%LdrRoll = SrcAddOutsTypeData%LdrRoll
+    DstAddOutsTypeData%LdrPitch = SrcAddOutsTypeData%LdrPitch
+    DstAddOutsTypeData%LdrYaw = SrcAddOutsTypeData%LdrYaw
+    DstAddOutsTypeData%LdrXd = SrcAddOutsTypeData%LdrXd
+    DstAddOutsTypeData%LdrYd = SrcAddOutsTypeData%LdrYd
+    DstAddOutsTypeData%LdrZd = SrcAddOutsTypeData%LdrZd
+ END SUBROUTINE SrvD_CopyAddOutsType
+
+ SUBROUTINE SrvD_DestroyAddOutsType( AddOutsTypeData, ErrStat, ErrMsg )
+  TYPE(SrvD_AddOutsType), INTENT(INOUT) :: AddOutsTypeData
+  INTEGER(IntKi),  INTENT(  OUT) :: ErrStat
+  CHARACTER(*),    INTENT(  OUT) :: ErrMsg
+  CHARACTER(*),    PARAMETER :: RoutineName = 'SrvD_DestroyAddOutsType'
+  INTEGER(IntKi)                 :: i, i1, i2, i3, i4, i5 
+! 
+  ErrStat = ErrID_None
+  ErrMsg  = ""
+IF (ALLOCATED(AddOutsTypeData%Vlos)) THEN
+  DEALLOCATE(AddOutsTypeData%Vlos)
+ENDIF
+ END SUBROUTINE SrvD_DestroyAddOutsType
+
+ SUBROUTINE SrvD_PackAddOutsType( ReKiBuf, DbKiBuf, IntKiBuf, Indata, ErrStat, ErrMsg, SizeOnly )
+  REAL(ReKi),       ALLOCATABLE, INTENT(  OUT) :: ReKiBuf(:)
+  REAL(DbKi),       ALLOCATABLE, INTENT(  OUT) :: DbKiBuf(:)
+  INTEGER(IntKi),   ALLOCATABLE, INTENT(  OUT) :: IntKiBuf(:)
+  TYPE(SrvD_AddOutsType),  INTENT(IN) :: InData
+  INTEGER(IntKi),   INTENT(  OUT) :: ErrStat
+  CHARACTER(*),     INTENT(  OUT) :: ErrMsg
+  LOGICAL,OPTIONAL, INTENT(IN   ) :: SizeOnly
+    ! Local variables
+  INTEGER(IntKi)                 :: Re_BufSz
+  INTEGER(IntKi)                 :: Re_Xferred
+  INTEGER(IntKi)                 :: Db_BufSz
+  INTEGER(IntKi)                 :: Db_Xferred
+  INTEGER(IntKi)                 :: Int_BufSz
+  INTEGER(IntKi)                 :: Int_Xferred
+  INTEGER(IntKi)                 :: i,i1,i2,i3,i4,i5
+  LOGICAL                        :: OnlySize ! if present and true, do not pack, just allocate buffers
+  INTEGER(IntKi)                 :: ErrStat2
+  CHARACTER(ErrMsgLen)           :: ErrMsg2
+  CHARACTER(*), PARAMETER        :: RoutineName = 'SrvD_PackAddOutsType'
+ ! buffers to store subtypes, if any
+  REAL(ReKi),      ALLOCATABLE   :: Re_Buf(:)
+  REAL(DbKi),      ALLOCATABLE   :: Db_Buf(:)
+  INTEGER(IntKi),  ALLOCATABLE   :: Int_Buf(:)
+
+  OnlySize = .FALSE.
+  IF ( PRESENT(SizeOnly) ) THEN
+    OnlySize = SizeOnly
+  ENDIF
+    !
+  ErrStat = ErrID_None
+  ErrMsg  = ""
+  Re_BufSz  = 0
+  Db_BufSz  = 0
+  Int_BufSz  = 0
+  Int_BufSz   = Int_BufSz   + 1     ! Vlos allocated yes/no
+  IF ( ALLOCATED(InData%Vlos) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*1  ! Vlos upper/lower bounds for each dimension
+      Re_BufSz   = Re_BufSz   + SIZE(InData%Vlos)  ! Vlos
+  END IF
+      Int_BufSz  = Int_BufSz  + 1  ! BeamID
+      Int_BufSz  = Int_BufSz  + 1  ! NewData
+      Re_BufSz   = Re_BufSz   + 1  ! LdrRoll
+      Re_BufSz   = Re_BufSz   + 1  ! LdrPitch
+      Re_BufSz   = Re_BufSz   + 1  ! LdrYaw
+      Re_BufSz   = Re_BufSz   + 1  ! LdrXd
+      Re_BufSz   = Re_BufSz   + 1  ! LdrYd
+      Re_BufSz   = Re_BufSz   + 1  ! LdrZd
+  IF ( Re_BufSz  .GT. 0 ) THEN 
+     ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
+     IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating ReKiBuf.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+     END IF
+  END IF
+  IF ( Db_BufSz  .GT. 0 ) THEN 
+     ALLOCATE( DbKiBuf(  Db_BufSz  ), STAT=ErrStat2 )
+     IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating DbKiBuf.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+     END IF
+  END IF
+  IF ( Int_BufSz  .GT. 0 ) THEN 
+     ALLOCATE( IntKiBuf(  Int_BufSz  ), STAT=ErrStat2 )
+     IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating IntKiBuf.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+     END IF
+  END IF
+  IF(OnlySize) RETURN ! return early if only trying to allocate buffers (not pack them)
+
+  Re_Xferred  = 1
+  Db_Xferred  = 1
+  Int_Xferred = 1
+
+  IF ( .NOT. ALLOCATED(InData%Vlos) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%Vlos,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%Vlos,1)
+    Int_Xferred = Int_Xferred + 2
+
+      IF (SIZE(InData%Vlos)>0) ReKiBuf ( Re_Xferred:Re_Xferred+(SIZE(InData%Vlos))-1 ) = PACK(InData%Vlos,.TRUE.)
+      Re_Xferred   = Re_Xferred   + SIZE(InData%Vlos)
+  END IF
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%BeamID
+      Int_Xferred   = Int_Xferred   + 1
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%NewData
+      Int_Xferred   = Int_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%LdrRoll
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%LdrPitch
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%LdrYaw
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%LdrXd
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%LdrYd
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%LdrZd
+      Re_Xferred   = Re_Xferred   + 1
+ END SUBROUTINE SrvD_PackAddOutsType
+
+ SUBROUTINE SrvD_UnPackAddOutsType( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
+  REAL(ReKi),      ALLOCATABLE, INTENT(IN   ) :: ReKiBuf(:)
+  REAL(DbKi),      ALLOCATABLE, INTENT(IN   ) :: DbKiBuf(:)
+  INTEGER(IntKi),  ALLOCATABLE, INTENT(IN   ) :: IntKiBuf(:)
+  TYPE(SrvD_AddOutsType), INTENT(INOUT) :: OutData
+  INTEGER(IntKi),  INTENT(  OUT) :: ErrStat
+  CHARACTER(*),    INTENT(  OUT) :: ErrMsg
+    ! Local variables
+  INTEGER(IntKi)                 :: Buf_size
+  INTEGER(IntKi)                 :: Re_Xferred
+  INTEGER(IntKi)                 :: Db_Xferred
+  INTEGER(IntKi)                 :: Int_Xferred
+  INTEGER(IntKi)                 :: i
+  LOGICAL                        :: mask0
+  LOGICAL, ALLOCATABLE           :: mask1(:)
+  LOGICAL, ALLOCATABLE           :: mask2(:,:)
+  LOGICAL, ALLOCATABLE           :: mask3(:,:,:)
+  LOGICAL, ALLOCATABLE           :: mask4(:,:,:,:)
+  LOGICAL, ALLOCATABLE           :: mask5(:,:,:,:,:)
+  INTEGER(IntKi)                 :: i1, i1_l, i1_u  !  bounds (upper/lower) for an array dimension 1
+  INTEGER(IntKi)                 :: ErrStat2
+  CHARACTER(ErrMsgLen)           :: ErrMsg2
+  CHARACTER(*), PARAMETER        :: RoutineName = 'SrvD_UnPackAddOutsType'
+ ! buffers to store meshes, if any
+  REAL(ReKi),      ALLOCATABLE   :: Re_Buf(:)
+  REAL(DbKi),      ALLOCATABLE   :: Db_Buf(:)
+  INTEGER(IntKi),  ALLOCATABLE   :: Int_Buf(:)
+    !
+  ErrStat = ErrID_None
+  ErrMsg  = ""
+  Re_Xferred  = 1
+  Db_Xferred  = 1
+  Int_Xferred  = 1
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! Vlos not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%Vlos)) DEALLOCATE(OutData%Vlos)
+    ALLOCATE(OutData%Vlos(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%Vlos.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    ALLOCATE(mask1(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating mask1.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    mask1 = .TRUE. 
+      IF (SIZE(OutData%Vlos)>0) OutData%Vlos = UNPACK(ReKiBuf( Re_Xferred:Re_Xferred+(SIZE(OutData%Vlos))-1 ), mask1, 0.0_ReKi )
+      Re_Xferred   = Re_Xferred   + SIZE(OutData%Vlos)
+    DEALLOCATE(mask1)
+  END IF
+      OutData%BeamID = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
+      OutData%NewData = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
+      OutData%LdrRoll = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%LdrPitch = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%LdrYaw = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%LdrXd = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%LdrYd = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%LdrZd = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+ END SUBROUTINE SrvD_UnPackAddOutsType
 
 
  SUBROUTINE SrvD_Input_ExtrapInterp(u, t, u_out, t_out, ErrStat, ErrMsg )

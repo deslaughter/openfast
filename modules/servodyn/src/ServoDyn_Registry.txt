@@ -27,6 +27,8 @@ typedef	^	InitInputType	ReKi	r_TwrBase	{3}	-	-	"tower base origin for setting up
 typedef	^	InitInputType	DbKi	Tmax	-	-	-	"max time from glue code"	s
 typedef	^	InitInputType	ReKi	AvgWindSpeed	-	-	-	"average wind speed for the simulation"	m/s
 typedef	^	InitInputType	ReKi	AirDens	-	-	-	"air density"	kg/m^3
+typedef	^	InitInputType	IntKi	GatesPerBeam	-   -   -	"Number of Lidar measurement distances"	-
+typedef	^	InitInputType	IntKi	MAXDLLChainOutputs	-	-	-	"Number of entries in the avrSWAP reserved for the DLL chain" -
 typedef	^	InitInputType	IntKi	NumSC2Ctrl	-	-	-	"number of controller inputs [from supercontroller]"	-
 typedef	^	InitInputType	IntKi	NumCtrl2SC	-	-	-	"number of controller outputs [to supercontroller]"	-
 
@@ -183,6 +185,8 @@ typedef	^	MiscVarType	TMD_MiscVarType	TTMD	-	-	-	"TMD module misc vars - tower"	
 
 # ..... Parameters ................................................................................................................
 # Define parameters here:
+typedef	^	ParameterType	IntKi	GatesPerBeam	-   -   -	"Number of Lidar measurement distances"	-
+typedef	^	ParameterType	IntKi	MAXDLLChainOutputs	-	-	-	"Number of entries in the avrSWAP reserved for the DLL chain" -
 # Time step for integration of continuous states (if a fixed-step integrator is used) and update of discrete states:
 typedef	^	ParameterType	DbKi	DT	-	-	-	"Time step for continuous state integration & discrete state update"	seconds
 typedef	^	ParameterType	DbKi	HSSBrDT	-	-	-	"Time it takes for HSS brake to reach full deployment once deployed"	seconds
@@ -339,4 +343,15 @@ typedef	^	OutputType	ReKi	TBDrCon	{:}	-	-	"Instantaneous tip-brake drag constant
 typedef	^	OutputType	TMD_OutputType	NTMD	-	-	-	"TMD module outputs - nacelle"	-
 typedef	^	OutputType	TMD_OutputType	TTMD	-	-	-	"TMD module outputs - tower"	-
 typedef	^	OutputType	SiKi	SuperController	{:}	-	-	"A swap array: used to pass output data from the DLL controller to the supercontroller"	-
+
+# ..... avrSWAP Array AdditionalOutputs .......................................................................................................
+typedef	^	SrvD_AddOutsType	ReKi	Vlos		:   -   -	"LidarSim output array"	-
+typedef	^	SrvD_AddOutsType	IntKi	BeamID		-   -   -	"Index of currently active beam (zero-based)"	-
+typedef	^	SrvD_AddOutsType	IntKi	NewData		-   -   -	"Flag for new Lidar measurement data"	-
+typedef	^	SrvD_AddOutsType	ReKi	LdrRoll		-   -   -	"LidarSim Roll angle (I-Coordinate System)"	
+typedef	^	SrvD_AddOutsType	ReKi	LdrPitch	-   -   -	"LidarSim Pitch angle (I-Coordinate System)"	
+typedef	^	SrvD_AddOutsType	ReKi	LdrYaw		-   -   -	"LidarSim Yaw angle (I-Coordinate System)"	
+typedef	^	SrvD_AddOutsType	ReKi	LdrXd		-   -   -	"LidarSim velocity in x direction (I-Coordinate System)"	
+typedef	^	SrvD_AddOutsType	ReKi	LdrYd		-   -   -	"LidarSim velocity in y direction (I-Coordinate System)"	
+typedef	^	SrvD_AddOutsType	ReKi	LdrZd		-   -   -	"LidarSim velocity in z direction (I-Coordinate System)"
 
