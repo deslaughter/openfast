@@ -64,7 +64,7 @@ fast::OpenFAST::OpenFAST():
     ncRstVarNames_ = {"time", "rst_filename", "twr_ref_pos", "bld_ref_pos", "nac_ref_pos", "hub_ref_pos", "twr_def", "twr_vel", "twr_ld", "bld_def", "bld_vel", "bld_ld", "hub_def", "hub_vel", "nac_def", "nac_vel", "x_vel", "xdot_vel", "vel_vel", "x_force", "xdot_force", "orient_force", "vel_force", "force"};
     ncRstDimNames_ = {"n_tsteps", "n_states", "n_twr_data", "n_bld_data", "n_pt_data", "n_vel_pts_data", "n_force_pts_data", "n_force_pts_orient_data"};
 
-    ncOutVarNames_ = {"time", "twr_ref_pos", "twr_ref_orient", "bld_chord", "bld_rloc", "bld_ref_pos", "bld_ref_orient", "hub_ref_pos", "hub_ref_orient", "nac_ref_pos", "nac_ref_orient", "twr_disp", "twr_orient", "twr_vel", "twr_rotvel", "twr_moment", "bld_disp", "bld_orient", "bld_vel", "bld_rotvel", "bld_ld", "bld_ld_loc", "bld_moment", "hub_disp", "hub_orient", "hub_vel", "hub_rotvel", "nac_disp", "nac_orient", "nac_vel", "nac_rotvel"};
+    ncOutVarNames_ = {"time", "twr_ref_pos", "twr_ref_orient", "bld_chord", "bld_rloc", "bld_ref_pos", "bld_ref_orient", "hub_ref_pos", "hub_ref_orient", "nac_ref_pos", "nac_ref_orient", "twr_disp", "twr_orient", "twr_vel", "twr_rotvel", "twr_ld", "twr_moment", "bld_disp", "bld_orient", "bld_vel", "bld_rotvel", "bld_ld", "bld_ld_loc", "bld_moment", "hub_disp", "hub_orient", "hub_vel", "hub_rotvel", "nac_disp", "nac_orient", "nac_vel", "nac_rotvel"};
     ncOutDimNames_ = {"n_tsteps", "n_dim", "n_twr_nds", "n_blds", "n_bld_nds"};
 }
 
@@ -252,6 +252,46 @@ void fast::OpenFAST::prepareRestartFile(int iTurbLoc) {
 
 }
 
+void fast::OpenFAST::findOutputFile(int iTurbLoc) {
+
+    int ncid;
+    size_t n_tsteps;
+    size_t count1 = 1;
+    double latest_time;
+
+    //Find the file and open it in read only mode
+    std::stringstream outfile_ss;
+    outfile_ss << "turb_" ;
+    outfile_ss << std::setfill('0') << std::setw(2) << turbineMapProcToGlob[iTurbLoc];
+    outfile_ss << "_output.nc";
+    std::string out_filename = outfile_ss.str();
+    int ierr = nc_open(out_filename.c_str(), NC_NOWRITE, &ncid);
+    check_nc_error(ierr, "nc_open");
+
+
+    for (auto const& dim_name: ncOutDimNames_) {
+        int tmpDimID;
+        ierr = nc_inq_dimid(ncid, dim_name.data(), &tmpDimID);
+        if (ierr == NC_NOERR)
+            ncOutDimIDs_[dim_name] = tmpDimID;
+    }
+
+    for (auto const& var_name: ncOutVarNames_) {
+        int tmpVarID;
+        ierr = nc_inq_varid(ncid, var_name.data(), &tmpVarID);
+        if (ierr == NC_NOERR)
+            ncOutVarIDs_[var_name] = tmpVarID;
+    }
+
+    ierr = nc_inq_dimlen(ncid, ncOutDimIDs_["n_tsteps"], &n_tsteps);
+    check_nc_error(ierr, "nc_inq_dimlen");
+    n_tsteps -= 1; //To account for 0 based indexing
+    ierr = nc_get_vara_double(ncid, ncOutVarIDs_["time"], &n_tsteps, &count1, &latest_time);
+    check_nc_error(ierr, "nc_get_vara_double - getting latest time");
+    nc_close(ncid);
+
+}
+
 void fast::OpenFAST::prepareOutputFile(int iTurbLoc) {
 
     int ncid;
@@ -346,23 +386,21 @@ void fast::OpenFAST::prepareOutputFile(int iTurbLoc) {
         ncOutVarIDs_["bld_ld_loc"] = tmpVarID;
         ierr = nc_def_var(ncid, "bld_moment", NC_DOUBLE, 4, bldDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["bld_moment"] = tmpVarID;
-
-        ierr = nc_def_var(ncid, "hub_disp", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "hub_disp", NC_DOUBLE, 2, ptDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_disp"] = tmpVarID;
-        ierr = nc_def_var(ncid, "hub_orient", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "hub_orient", NC_DOUBLE, 2, ptDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_orient"] = tmpVarID;
-        ierr = nc_def_var(ncid, "hub_vel", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "hub_vel", NC_DOUBLE, 2, ptDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_vel"] = tmpVarID;
-        ierr = nc_def_var(ncid, "hub_rotvel", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "hub_rotvel", NC_DOUBLE, 2, ptDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_rotvel"] = tmpVarID;
-
-        ierr = nc_def_var(ncid, "nac_disp", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "nac_disp", NC_DOUBLE, 2, ptDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["nac_disp"] = tmpVarID;
-        ierr = nc_def_var(ncid, "nac_orient", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "nac_orient", NC_DOUBLE, 2, ptDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["nac_orient"] = tmpVarID;
-        ierr = nc_def_var(ncid, "nac_vel", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "nac_vel", NC_DOUBLE, 2, ptDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["nac_vel"] = tmpVarID;
-        ierr = nc_def_var(ncid, "nac_rotvel", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "nac_rotvel", NC_DOUBLE, 2, ptDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["nac_rotvel"] = tmpVarID;
 
     } else if (turbineData[iTurbLoc].sType == EXTINFLOW) {
@@ -410,15 +448,23 @@ void fast::OpenFAST::prepareOutputFile(int iTurbLoc) {
         ncOutVarIDs_["bld_ld"] = tmpVarID;
         ierr = nc_def_var(ncid, "bld_ld_loc", NC_DOUBLE, 4, bldDataDims.data(), &tmpVarID);
         ncOutVarIDs_["bld_ld_loc"] = tmpVarID;
-
-        ierr = nc_def_var(ncid, "hub_ref_pos", NC_DOUBLE, 3, ptRefDataDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "hub_ref_pos", NC_DOUBLE, 2, ptRefDataDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_ref_pos"] = tmpVarID;
-        ierr = nc_def_var(ncid, "hub_disp", NC_DOUBLE, 3, ptDataDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "hub_disp", NC_DOUBLE, 2, ptDataDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_disp"] = tmpVarID;
-        ierr = nc_def_var(ncid, "hub_vel", NC_DOUBLE, 3, ptDataDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "hub_vel", NC_DOUBLE, 2, ptDataDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_vel"] = tmpVarID;
-        ierr = nc_def_var(ncid, "hub_rotvel", NC_DOUBLE, 3, ptDataDims.data(), &tmpVarID);
+        ierr = nc_def_var(ncid, "hub_rotvel", NC_DOUBLE, 2, ptDataDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_rotvel"] = tmpVarID;
+
+        ierr = nc_def_var(ncid, "nac_ref_pos", NC_DOUBLE, 2, ptRefDataDims.data(), &tmpVarID);
+        ncOutVarIDs_["nac_ref_pos"] = tmpVarID;
+        ierr = nc_def_var(ncid, "nac_disp", NC_DOUBLE, 2, ptDataDims.data(), &tmpVarID);
+        ncOutVarIDs_["nac_disp"] = tmpVarID;
+        ierr = nc_def_var(ncid, "nac_vel", NC_DOUBLE, 2, ptDataDims.data(), &tmpVarID);
+        ncOutVarIDs_["nac_vel"] = tmpVarID;
+        ierr = nc_def_var(ncid, "nac_rotvel", NC_DOUBLE, 2, ptDataDims.data(), &tmpVarID);
+        ncOutVarIDs_["nac_rotvel"] = tmpVarID;
 
     }
 
@@ -557,7 +603,6 @@ void fast::OpenFAST::prepareOutputFile(int iTurbLoc) {
         }
     }
 
-
     ierr = nc_close(ncid);
     check_nc_error(ierr, "nc_close");
 
@@ -578,6 +623,7 @@ void fast::OpenFAST::init() {
             for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
 
                 findRestartFile(iTurb);
+                findOutputFile(iTurb);
                 char tmpRstFileRoot[INTERFACE_STRING_LENGTH];
                 strncpy(tmpRstFileRoot, turbineData[iTurb].FASTRestartFileName.c_str(), turbineData[iTurb].FASTRestartFileName.size());
                 tmpRstFileRoot[turbineData[iTurb].FASTRestartFileName.size()] = '\0';
@@ -597,7 +643,7 @@ void fast::OpenFAST::init() {
                 allocateMemory_postInit(iTurb);
 
                 get_ref_positions_from_openfast(iTurb);
-                
+
                 readRestartFile(iTurb, nt_global);
 
             }
@@ -676,6 +722,7 @@ void fast::OpenFAST::init() {
 
             for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
 
+                findOutputFile(iTurb);
                 findRestartFile(iTurb);
                 char tmpOutFileRoot[INTERFACE_STRING_LENGTH];
                 if (turbineData[iTurb].sType == EXTINFLOW) {
@@ -1166,24 +1213,23 @@ void fast::OpenFAST::advance_to_next_driver_time_step(bool writeFiles) {
     set_state_from_state(fast::STATE_NP1, fast::STATE_N);
 
     if (writeFiles) {
-      if ( (((nt_global - ntStart) % nEveryCheckPoint) == 0 )  && (nt_global != ntStart) ) {
-        for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
-            turbineData[iTurb].FASTRestartFileName = " "; // if blank, it will use FAST convention <RootName>.nt_global
-            FAST_CreateCheckpoint(&iTurb, turbineData[iTurb].FASTRestartFileName.data(), &ErrStat, ErrMsg);
-            checkError(ErrStat, ErrMsg);
-            writeRestartFile(iTurb, nt_global);
-        }
-        if(scStatus) {
-            std::cout << "Use of Supercontroller is not supported through the C++ API right now" << std::endl;
-            // if (fastMPIRank == 0) {
-            //     sc.writeRestartFile(nt_global);
-            // }
-        }
-      }
+      for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
+          int tStepRatio = dtDriver/dtFAST;
+          if ( (((nt_global - ntStart) % (restartFreq_*tStepRatio)) == 0 )  && (nt_global != ntStart) ) {
+              turbineData[iTurb].FASTRestartFileName = " "; // if blank, it will use FAST convention <RootName>.nt_global
+              FAST_CreateCheckpoint(&iTurb, turbineData[iTurb].FASTRestartFileName.data(), &ErrStat, ErrMsg);
+              checkError(ErrStat, ErrMsg);
+              writeRestartFile(iTurb, nt_global);
+          }
+          if(scStatus) {
+              if (fastMPIRank == 0) {
+                  sc->writeRestartFile(nt_global);
+              }
+          }
 
-      if ( (((nt_global - ntStart) % outputFreq_) == 0 )  && (nt_global != ntStart) ) {
-          for (int iTurb=0; iTurb < nTurbinesProc; iTurb++)
+          if ( (((nt_global - ntStart) % (outputFreq_ * tStepRatio) ) == 0 )  && (nt_global != ntStart) ) {
               writeOutputFile(iTurb, nt_global);
+          }
       }
 
     }
@@ -1302,9 +1348,9 @@ void fast::OpenFAST::step(bool writeFiles) {
     }
 
     if (writeFiles) {
-        if ( (((nt_global - ntStart) % restartFreq_) == 0 )  && (nt_global != ntStart) ) {
-            //sprintf(FASTRestartFileName, "../../CertTest/Test18.%d", nt_global);
-            for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
+        for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
+            int tStepRatio = dtDriver/dtFAST;
+            if ( (((nt_global - ntStart) % (restartFreq_ * tStepRatio)) == 0 )  && (nt_global != ntStart) ) {
                 turbineData[iTurb].FASTRestartFileName = " "; // if blank, it will use FAST convention <RootName>.nt_global
                 FAST_CreateCheckpoint(&iTurb, turbineData[iTurb].FASTRestartFileName.data(), &ErrStat, ErrMsg);
                 checkError(ErrStat, ErrMsg);
@@ -1316,11 +1362,10 @@ void fast::OpenFAST::step(bool writeFiles) {
                 //     sc.writeRestartFile(nt_global);
                 // }
             }
-        }
 
-        if ( (((nt_global - ntStart) % outputFreq_) == 0 )  && (nt_global != ntStart) ) {
-            for (int iTurb=0; iTurb < nTurbinesProc; iTurb++)
+            if ( (((nt_global - ntStart) % (outputFreq_ * tStepRatio) ) == 0 )  && (nt_global != ntStart) ) {
                 writeOutputFile(iTurb, nt_global);
+            }
         }
     }
 
@@ -1404,7 +1449,7 @@ void fast::OpenFAST::setDriverCheckpoint(int nt_checkpoint_driver) {
 
     if (nTurbinesProc > 0) {
         if (nSubsteps_ > 0) {
-            restartFreq_ = nt_checkpoint_driver * nSubsteps_;
+            restartFreq_ = nt_checkpoint_driver;
         } else {
             throw std::runtime_error("Trying to set driver checkpoint when nSubsteps_ is zero. Set driver time step first may be?");
         }
@@ -1584,7 +1629,13 @@ double fast::OpenFAST::getChord(int iNode, int iTurbGlob) {
 
 }
 
-void fast::OpenFAST::setVelocity(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, int nSize) {
+
+void fast::OpenFAST::getRelativeVelForceNode(std::vector<double> & vel, int iNode, int iTurbGlob, fast::timeStep t, int nSize) {
+
+    // Do nothing here
+}
+
+void fast::OpenFAST::setVelocity(std::vector<double> & currentVelocity, int iNode, int iTurbGlob) {
     assert(nSize==3);
     // Set velocity at current node of current turbine -
     int iTurbLoc = get_localTurbNo(iTurbGlob);
@@ -2374,7 +2425,8 @@ void fast::OpenFAST::writeOutputFile(int iTurbLoc, int n_t_global) {
     check_nc_error(ierr, "nc_open");
 
     size_t count1=1;
-    size_t n_tsteps = n_t_global/outputFreq_ - 1;
+    int tStepRatio = dtDriver/dtFAST;
+    size_t n_tsteps = n_t_global/tStepRatio/outputFreq_ - 1;
     double curTime = n_t_global * dtFAST;
     ierr = nc_put_vara_double(ncid, ncOutVarIDs_["time"], &n_tsteps, &count1, &curTime);
 
@@ -2480,14 +2532,14 @@ void fast::OpenFAST::writeOutputFile(int iTurbLoc, int n_t_global) {
 
         std::vector<double> tmpArray;
         tmpArray.resize(nTwrPts);
-        {
-            std::vector<size_t> count_dim{1,1,static_cast<size_t>(nTwrPts)};
-            for (size_t iDim=0;iDim < 3; iDim++) {
-                for (auto i=0; i < nTwrPts; i++)
-                    tmpArray[i] = brFSIData[iTurbLoc][3].twr_def[i*6+iDim] ;
-                std::vector<size_t> start_dim{n_tsteps,iDim,0};
-                ierr = nc_put_vara_double(ncid, ncOutVarIDs_["twr_disp"], start_dim.data(), count_dim.data(), tmpArray.data());
-            }
+        std::vector<size_t> count_dim{1,1,static_cast<size_t>(nTwrPts)};
+        for (size_t iDim=0;iDim < 3; iDim++) {
+            for (auto i=0; i < nTwrPts; i++)
+                tmpArray[i] = brFSIData[iTurbLoc][3].twr_def[i*6+iDim] ;
+            std::vector<size_t> start_dim{n_tsteps,iDim,0};
+            ierr = nc_put_vara_double(ncid, ncOutVarIDs_["twr_disp"], start_dim.data(), count_dim.data(), tmpArray.data());
+        }
+
         for (size_t iDim=0;iDim < 3; iDim++) {
             for (auto i=0; i < nTwrPts; i++)
                 tmpArray[i] = brFSIData[iTurbLoc][3].twr_def[i*6+3+iDim] ;
@@ -2502,7 +2554,7 @@ void fast::OpenFAST::writeOutputFile(int iTurbLoc, int n_t_global) {
         }
         for (size_t iDim=0;iDim < 3; iDim++) {
             for (auto i=0; i < nTwrPts; i++)
-                tmpArray[i] = brFSIData[iTurbLoc][3].twr_def[i*6+3+iDim] ;
+                tmpArray[i] = brFSIData[iTurbLoc][3].twr_vel[i*6+3+iDim] ;
             std::vector<size_t> start_dim{n_tsteps,iDim,0};
             ierr = nc_put_vara_double(ncid, ncOutVarIDs_["twr_rotvel"], start_dim.data(), count_dim.data(), tmpArray.data());
         }
@@ -2519,7 +2571,6 @@ void fast::OpenFAST::writeOutputFile(int iTurbLoc, int n_t_global) {
             std::vector<size_t> start_dim{n_tsteps,iDim,0};
             ierr = nc_put_vara_double(ncid, ncOutVarIDs_["twr_moment"], start_dim.data(), count_dim.data(), tmpArray.data());
         }
-    }
 
     tmpArray.resize(nBldPts);
     {
@@ -2645,7 +2696,8 @@ void fast::OpenFAST::writeRestartFile(int iTurbLoc, int n_t_global) {
     check_nc_error(ierr, "nc_open");
 
     size_t count1=1;
-    size_t n_tsteps = n_t_global/restartFreq_ - 1;
+    int tStepRatio = dtDriver/dtFAST;
+    size_t n_tsteps = n_t_global/tStepRatio/restartFreq_ - 1;
     double curTime = n_t_global * dtFAST;
     ierr = nc_put_vara_double(ncid, ncRstVarIDs_["time"], &n_tsteps, &count1, &curTime);
 
