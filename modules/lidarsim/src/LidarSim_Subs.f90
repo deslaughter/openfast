@@ -22,11 +22,11 @@
 
     CONTAINS
     
-	
+
 !#########################################################################################################################################################################
     
     SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, ErrStat, ErrMsg)
-	
+
     IMPLICIT                                NONE
     CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_ReadInputFile"
     
@@ -64,7 +64,7 @@
         RETURN
     END IF
     
-	
+
     !-------------------------------------------------------------------------------------------------
     ! Open the file
     !-------------------------------------------------------------------------------------------------
@@ -95,11 +95,11 @@
         RETURN
     END IF
     
-	
+
     !-------------------------------------------------------------------------------------------------
     ! File header
     !-------------------------------------------------------------------------------------------------
-	
+
     CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg)
     CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
     IF (ErrStat >= AbortErrLev) THEN
@@ -139,11 +139,11 @@
         RETURN
     END IF
 
-	
+
     !-------------------------------------------------------------------------------------------------
     ! General settings
     !-------------------------------------------------------------------------------------------------    
-	
+
     ! Echo on/off
     CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg)
     CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
@@ -201,11 +201,11 @@
         RETURN
     END IF
     
-	
+
     !-------------------------------------------------------------------------------------------------
     ! Lidar Configuration
     !-------------------------------------------------------------------------------------------------
-	
+
     CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
     CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
     IF (ErrStat >= AbortErrLev) THEN
@@ -356,11 +356,11 @@
         RETURN
     END IF
     
-	
+
     !-------------------------------------------------------------------------------------------------
     ! Measurement settings
     !-------------------------------------------------------------------------------------------------
-	
+
     CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg)
     CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
     IF (ErrStat >= AbortErrLev) THEN
@@ -374,11 +374,11 @@
         RETURN
     END IF
        
-	
-	 !-------------------------------------------------------------------------------------------------
+
+    !-------------------------------------------------------------------------------------------------
     ! Cartesian coordinates
     !-------------------------------------------------------------------------------------------------
-	
+
     CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
     CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
     IF (ErrStat >= AbortErrLev) THEN
@@ -444,11 +444,11 @@
         END IF
     END DO
     
-	 
+    
     !-------------------------------------------------------------------------------------------------
     ! Spherical coordinates
     !-------------------------------------------------------------------------------------------------
-	
+
     CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
     CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
     IF (ErrStat >= AbortErrLev) THEN
@@ -500,7 +500,7 @@
     ! Loop through spherical data table
     DO CounterNumberOfPoints_Spherical = 1, InputFileData%NumberOfPoints_Spherical
         ! Reading the number, azimuth and elevation in the corresponding variables.
-		  ! The left over parameters (1..n) are read into the range variable
+        ! The left over parameters (1..n) are read into the range variable
         ! This allows multiple range measurements with the same azimuth / elevation
         CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
@@ -518,12 +518,12 @@
     END DO
     InputFileData%Azimuth   = InputFileData%Azimuth * (Pi_D/180)
     InputFileData%Elevation = InputFileData%Elevation * (Pi_D/180)
-	
+
     
     !-------------------------------------------------------------------------------------------------
     ! Gaussian distribution
     !-------------------------------------------------------------------------------------------------    
-	
+
     ! Description
     CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
     CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
@@ -570,7 +570,7 @@
     !-------------------------------------------------------------------------------------------------
     ! Manual distribution
     !-------------------------------------------------------------------------------------------------    
-	
+
     ! Description
     CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
     CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
@@ -672,31 +672,31 @@
     CALL Cleanup()
     
     RETURN
-	
+
     CONTAINS
-	
+
     !-------------------------------------------------------------------------------------------------
     SUBROUTINE Cleanup()
-	
+
     CLOSE ( UnitInput )
     CLOSE ( TemporaryFileUnit )
     IF ( InputFileData%Echo ) THEN
         CLOSE(UnitEcho)
     END IF
-	
+
     END SUBROUTINE Cleanup
-	!-------------------------------------------------------------------------------------------------
+   !-------------------------------------------------------------------------------------------------
     
     END SUBROUTINE LidarSim_ReadInputFile
     
-	
+
 !#########################################################################################################################################################################
    
     SUBROUTINE LidarSim_ReadOutputList (TemporaryFileUnit, UnitInput, FileName, OutputArray, ReadNumberOutputs, VariableName, VariableDescribtion, ErrStat, ErrMsg, UnitEcho )
     
     IMPLICIT      NONE
     CHARACTER(*), PARAMETER           ::  RoutineName="LidarSim_ReadOutputList"
-	
+
     INTEGER,      INTENT(  OUT)       :: ReadNumberOutputs                          !< Length of the array that was actually read.
     INTEGER,      INTENT(IN   )       :: TemporaryFileUnit                          !< Temporary unit for skipping comments
     INTEGER,      INTENT(IN   )       :: UnitInput                                  !< I/O unit for input file.
@@ -757,14 +757,14 @@
     END DO
 
     RETURN
-	
+
     END SUBROUTINE LidarSim_ReadOutputList
     
-	
+
 !#########################################################################################################################################################################    
     
     SUBROUTINE LidarSim_SkipComments(TemporaryFileUnit, UnitInput, ErrStat, ErrMsg, UnitEcho)
-	
+
     IMPLICIT            NONE
     CHARACTER(*),       PARAMETER                   ::  RoutineName="LidarSim_SkipComments"
 
@@ -773,13 +773,13 @@
     INTEGER(IntKi),     INTENT(  OUT)               ::  ErrStat             !< Error status of the operation
     CHARACTER(*),       INTENT(  OUT)               ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
     INTEGER(IntKi),     INTENT(IN   ), OPTIONAL     ::  UnitEcho            !< The local unit number for this module's echo file
-	
+
     ! Local variables
     INTEGER(IntKi)                                  ::  ErrStatIO           !Error Status of the read commands
     CHARACTER(1024)                                 ::  TemporaryRead       !string to read a line in
     LOGICAL                                         ::  Commented           ! true if line is commented, false otherwise
     
-	! Initialization
+   ! Initialization
     ErrStat = 0
     ErrMsg = ''
     
@@ -800,7 +800,7 @@
         Commented = .FALSE.
     ENDIF
     
-    DO while( Commented == .TRUE. )
+    DO while( Commented .eqv. .TRUE. )
         READ(UnitInput,*,IOSTAT = ErrStatIO)    !Skip commented line in unit Input
         IF(ErrStatIO > 0) THEN
             CALL SetErrStat(ErrID_Fatal,'Error checking for comments in the original input file',ErrStat,ErrMsg,RoutineName)
@@ -826,18 +826,18 @@
         
     END SUBROUTINE
     
-	
+
 !#########################################################################################################################################################################    
     
     SUBROUTINE LidarSim_CreateRotationMatrix(Roll_N, Pitch_N, Yaw_N, LidarOrientation_N)
-	
+
     IMPLICIT         NONE
-	 CHARACTER(*),    PARAMETER       ::  RoutineName="LidarSim_CreateRotationMatrix"
-	
-    REAL(ReKi), 	   INTENT(IN   )   ::  Roll_N                      !Roll Rotation
-    REAL(ReKi), 	   INTENT(IN   )   ::  Pitch_N                     !Pitch Rotation
-    REAL(ReKi), 	   INTENT(IN   )   ::  Yaw_N                       !Yaw Rotation
-    REAL(ReKi), 	   INTENT(INOUT)   ::  LidarOrientation_N(3,3)     !Output Rotation matrix
+    CHARACTER(*),    PARAMETER       ::  RoutineName="LidarSim_CreateRotationMatrix"
+
+    REAL(ReKi),      INTENT(IN   )   ::  Roll_N                      !Roll Rotation
+    REAL(ReKi),      INTENT(IN   )   ::  Pitch_N                     !Pitch Rotation
+    REAL(ReKi),      INTENT(IN   )   ::  Yaw_N                       !Yaw Rotation
+    REAL(ReKi),      INTENT(INOUT)   ::  LidarOrientation_N(3,3)     !Output Rotation matrix
     
     ! Local variables
     REAL(ReKi)                       ::  Rotations(3,3,3)            !Temporary Rotation matrices
@@ -886,25 +886,25 @@
     
     END SUBROUTINE LidarSim_CreateRotationMatrix
     
-	
+
 !#########################################################################################################################################################################
     
     SUBROUTINE LidarSim_InitMeasuringPoints_Cartesian(p, InputFileData, ErrStat, ErrMsg)
-	
+
     IMPLICIT                            NONE
     CHARACTER(*),                       PARAMETER       ::  RoutineName="LidarSim_InitMeasuringPoints_Cartesian"
-	
+
     TYPE(LidarSim_ParameterType),       INTENT(INOUT)   ::  p                   !parameter data (destination of the InputFileData)
     TYPE(LidarSim_InputFile),           INTENT(IN   )   ::  InputFileData       !data read from the input file
     INTEGER(IntKi),                     INTENT(  OUT)   ::  ErrStat             !< Error status of the operation
     CHARACTER(*),                       INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
-	
+
     ! Local variables
     INTEGER(IntKi)                                      ::  LoopCounter         !< counter to run through all cartesian coordinates data
     INTEGER(IntKi)                                      ::  TmpErrStat          !< Temporary error status
     CHARACTER(ErrMsgLen)                                ::  TmpErrMsg           !< temporary error message
     
-	 ! Initialization
+    ! Initialization
     ErrStat        =  0
     ErrMsg         =  ""
     
@@ -919,14 +919,14 @@
         p%MeasuringPoints_L(3,LoopCounter) = InputFileData%Z_Cartesian_L(LoopCounter)
         p%MeasuringPoints_Spherical_L(:,LoopCounter) = LidarSim_Cartesian2Spherical(InputFileData%X_Cartesian_L(LoopCounter),InputFileData%Y_Cartesian_L(LoopCounter),InputFileData%Z_Cartesian_L(LoopCounter))
     END DO
-	
+
     END SUBROUTINE LidarSim_InitMeasuringPoints_Cartesian
    
    
 !#########################################################################################################################################################################
     
     SUBROUTINE LidarSim_InitMeasuringPoints_Spherical(p, InputFileData, ErrStat, ErrMsg)
-	
+
     IMPLICIT                            NONE
     CHARACTER(*),                       PARAMETER       ::  RoutineName="LidarSim_InitMeasuringPoints_Spherical"
 
@@ -942,7 +942,7 @@
     INTEGER(IntKi)                                      ::  TmpErrStat              !< Temporary error status
     CHARACTER(ErrMsgLen)                                ::  TmpErrMsg               !< temporary error message
 
-	 ! Initialization
+    ! Initialization
     ErrStat        =  0
     ErrMsg         =  ""
     
@@ -971,17 +971,17 @@
         InnerLoopCounter = 1
         OuterLoopCounter = OuterLoopCounter + 1
     END DO
-	
+
     END SUBROUTINE LidarSim_InitMeasuringPoints_Spherical
 
-	
+
 !#########################################################################################################################################################################
     
     FUNCTION LidarSim_Spherical2Cartesian(Azimuth, Elevation, Range)
-	
+
     IMPLICIT        NONE
-	 CHARACTER(*),   PARAMETER       ::  RoutineName="LidarSim_Spherical2Cartesian"
-	
+    CHARACTER(*),   PARAMETER       ::  RoutineName="LidarSim_Spherical2Cartesian"
+
     REAL(ReKi),     INTENT(IN   )   ::  Azimuth                             !Azimuth angle
     REAL(ReKi),     INTENT(IN   )   ::  Elevation                           !Elevation angle
     REAL(ReKi),     INTENT(IN   )   ::  Range                               !range gate
@@ -990,17 +990,17 @@
     LidarSim_Spherical2Cartesian(1)  =   Range*COS(Elevation)*COS(Azimuth)   !x
     LidarSim_Spherical2Cartesian(2)  =   Range*COS(Elevation)*SIN(Azimuth)   !y
     LidarSim_Spherical2Cartesian(3)  =   Range*SIN(Elevation)                !z
-	
+
     END FUNCTION LidarSim_Spherical2Cartesian
     
-	
+
 !#########################################################################################################################################################################    
     
     FUNCTION LidarSim_Cartesian2Spherical(X, Y, Z)
-	
+
     IMPLICIT        NONE
-	 CHARACTER(*),   PARAMETER       ::  RoutineName="LidarSim_Cartesian2Spherical"
-	
+    CHARACTER(*),   PARAMETER       ::  RoutineName="LidarSim_Cartesian2Spherical"
+
     REAL(ReKi),     INTENT(IN   )   ::  X                             !Azimuth angle
     REAL(ReKi),     INTENT(IN   )   ::  Y                           !Elevation angle
     REAL(ReKi),     INTENT(IN   )   ::  Z                               !range gate
@@ -1016,17 +1016,17 @@
         LidarSim_Cartesian2Spherical(2) = 0
         LidarSim_Cartesian2Spherical(3) = 0
     ENDIF
-	
+
     END FUNCTION LidarSim_Cartesian2Spherical
     
-	
+
 !#########################################################################################################################################################################
     
     FUNCTION LidarSim_TransformLidarToInertial(NacelleMotion, p, MeasuringPoint_L)
-	
+
     IMPLICIT        NONE
-	 CHARACTER(*),   PARAMETER       	 ::  RoutineName="LidarSim_TransformLidarToInertial"
-	
+    CHARACTER(*),   PARAMETER           ::  RoutineName="LidarSim_TransformLidarToInertial"
+
     REAL(ReKi)                          ::  LidarSim_TransformLidarToInertial(3)    !Output calculated transformation from the lidar coord. sys. to the inertial system
     TYPE(MeshType)                      ::  NacelleMotion                           !Data describing the motion of the nacelle coord. sys.
     TYPE(LidarSim_ParameterType)        ::  p                                       !Parameter data 
@@ -1041,7 +1041,7 @@
   
     END FUNCTION LidarSim_TransformLidarToInertial
     
-	
+
 !#########################################################################################################################################################################
     
     SUBROUTINE LidarSim_InitializeWeightingManual(p, InputFileData, ErrStat, ErrMsg)
@@ -1334,8 +1334,8 @@
     
     ! Fill ValidParamAry and ParamIndexAry in alphabetical order
     ValidParamAry( 1 : 8 ) = (/ & 
-        "AZIMUTHLI" ,"BEAMIDLI"  ,"ELEVATLI"  ,"MEASTIMELI","NEWDATALI" ,"PTCHDTDTLI", & 
-        "PTCHDTLI"  ,"PTCHLI"    /)
+        "AZIMUTHLI ","BEAMIDLI  ","ELEVATLI  ","MEASTIMELI","NEWDATALI ","PTCHDTDTLI", & 
+        "PTCHDTLI  ","PTCHLI    "/)
     ParamIndexAry( 1 : 8 ) = (/ & 
         AZIMUTHLI   ,BEAMIDLI    ,ELEVATLI    ,MEASTIMELI  ,NEWDATALI   ,PTCHDTDTLI  , & 
         PTCHDTLI    ,PTCHLI      /)
@@ -1345,7 +1345,7 @@
         ParamIndexAry( 8 + LoopCounter ) = 23 + LoopCounter
     ENDDO
     ValidParamAry( (9 + SizeOutput) : (11 + SizeOutput) ) = (/ & 
-        "ROLLDTDTLI","ROLLDTLI"  ,"ROLLLI"    /)
+        "ROLLDTDTLI","ROLLDTLI  ","ROLLLI    " /)
     ParamIndexAry( (9 + SizeOutput) : (11 + SizeOutput) ) = (/ & 
         ROLLDTDTLI  ,ROLLDTLI    ,ROLLLI      /)
     DO LoopCounter = 1,SizeOutput
@@ -1354,8 +1354,8 @@
         ParamIndexAry( 11 + SizeOutput + LoopCounter ) = 23 + SizeOutput + LoopCounter
     ENDDO
     ValidParamAry( (12 + (2*SizeOutput)) : (23 + (2*SizeOutput)) ) = (/ & 
-        "XDTDTLI"   ,"XDTLI"     ,"XLI"       ,"YAWDTDTLI" ,"YAWDTLI"   ,"YAWLI"     , & 
-        "YDTDTLI"   ,"YDTLI"     ,"YLI"       ,"ZDTDTLI"   ,"ZDTLI"     ,"ZLI"       /)
+        "XDTDTLI   ","XDTLI     ","XLI       ","YAWDTDTLI ","YAWDTLI   ","YAWLI     ", & 
+        "YDTDTLI   ","YDTLI     ","YLI       ","ZDTDTLI   ","ZDTLI     ","ZLI       "/)
     ParamIndexAry( (12 + (2*SizeOutput)) : (23 + (2*SizeOutput)) ) = (/ & 
         XDTDTLI     ,XDTLI       ,XLI         ,YAWDTDTLI   ,YAWDTLI     ,YAWLI       , & 
         YDTDTLI     ,YDTLI       ,YLI         ,ZDTDTLI     ,ZDTLI       ,ZLI         /)

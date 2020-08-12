@@ -42,6 +42,7 @@ target_link_libraries(openfast_prelib
   icedynlib
   icefloelib
   maplib
+  lidsimlib
 )
 
 add_library(openfast_postlib

@@ -20,7 +20,7 @@
     !#########################################################################################################################################################################
 
     SUBROUTINE LidarSim_Init(InitInp, y, p, InitOutData, ErrStat, ErrMsg )
-	
+
     IMPLICIT                                NONE
     CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_Init"
     
@@ -32,7 +32,7 @@
     CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
 
     !Local Variables
-    TYPE(LidarSim_InputFile)                               	::  InputFileData      !< Structure to load the input file data into
+    TYPE(LidarSim_InputFile)                                ::  InputFileData      !< Structure to load the input file data into
     CHARACTER(1024)                                         ::  RootFileName
     CHARACTER(1024)                                         ::  EchoFileName
 
@@ -70,10 +70,10 @@
 
     !----- Calls different Subroutines to initialize the measuring points   
     IF(InputFileData%TrajectoryType == 0) THEN
-        CALL LidarSim_InitMeasuringPoints_Cartesian(p, InputFileData, TmpErrStat, TmpErrMsg)   	! Calls Routine to initialize cartesian coordinate inputs
+        CALL LidarSim_InitMeasuringPoints_Cartesian(p, InputFileData, TmpErrStat, TmpErrMsg)    ! Calls Routine to initialize cartesian coordinate inputs
         CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
     ELSEIF(InputFileData%TrajectoryType == 1)THEN
-        CALL LidarSim_InitMeasuringPoints_Spherical(p, InputFileData, TmpErrStat, TmpErrMsg )  	! Calls Routine to initialize spherical coordinate inputs
+        CALL LidarSim_InitMeasuringPoints_Spherical(p, InputFileData, TmpErrStat, TmpErrMsg )   ! Calls Routine to initialize spherical coordinate inputs
         CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
     END IF
     
@@ -89,7 +89,7 @@
         CALL LidarSim_InitializeWeightingGauss(p, InputFileData, TmpErrStat, TmpErrMsg )       
         CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
     ELSEIF(InputFileData%WeightingType == 2) THEN
-        CALL LidarSim_InitializeWeightingManual(p, InputFileData, TmpErrStat, TmpErrMsg )      	! Calls Routine to initialize with manual weighting settings
+        CALL LidarSim_InitializeWeightingManual(p, InputFileData, TmpErrStat, TmpErrMsg )       ! Calls Routine to initialize with manual weighting settings
         CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
     ENDIF
 
@@ -101,7 +101,7 @@
     p%LastMeasuringPoint = 1                                                                    !< First measurement point
     p%NextBeamID = 0
        
-    CALL LidarSim_DestroyInputFile(InputFileData, ErrStat, ErrMsg)                             	! Calls to destory the data from the inputfile. Important data has to be transfered to the parameter data before
+    CALL LidarSim_DestroyInputFile(InputFileData, ErrStat, ErrMsg)                              ! Calls to destory the data from the inputfile. Important data has to be transfered to the parameter data before
 
     END SUBROUTINE LidarSim_Init
 
@@ -113,11 +113,11 @@
 
     IMPLICIT                                    NONE
     CHARACTER(*),                               PARAMETER           ::  RoutineName="LidarSim_CalcOutput"
-	
+
     REAL(DbKi),                                 INTENT(IN   )       ::  Time                !< Current simulation time in seconds
-    TYPE(LidarSim_ParameterType),              	INTENT(INOUT)       ::  p
-    TYPE(LidarSim_OutputType),                 	INTENT(INOUT)       ::  y                   !< Outputs computed at Time (IN for mesh reasons and data allocation)
-    TYPE(LidarSim_InputType),                  	INTENT(IN   )       ::  u                   !< Inputs from other Modules (e.g. ElastoDyn)
+    TYPE(LidarSim_ParameterType),               INTENT(INOUT)       ::  p
+    TYPE(LidarSim_OutputType),                  INTENT(INOUT)       ::  y                   !< Outputs computed at Time (IN for mesh reasons and data allocation)
+    TYPE(LidarSim_InputType),                   INTENT(IN   )       ::  u                   !< Inputs from other Modules (e.g. ElastoDyn)
 
     !Data for CalcOutput of IfW_Subs
     TYPE(InflowWind_ParameterType),             INTENT(IN   )       ::  IfW_p                       !< Parameters
@@ -192,13 +192,13 @@
     !#########################################################################################################################################################################
 
     SUBROUTINE LidarSim_End( y, p, u, ErrStat, ErrMsg)
-	
+
     IMPLICIT                                 NONE    
-    CHARACTER(*),              				   PARAMETER       :: RoutineName="LidarSim_End"
-	
-    TYPE(LidarSim_InputType),              	INTENT(INOUT)   ::  u           !< Input data for initialization
-    TYPE(LidarSim_ParameterType),          	INTENT(INOUT)   ::  p           !< Parameters
-    TYPE(LidarSim_OutputType),             	INTENT(INOUT)   ::  y           !< Output data
+    CHARACTER(*),                            PARAMETER       :: RoutineName="LidarSim_End"
+
+    TYPE(LidarSim_InputType),                INTENT(INOUT)   ::  u           !< Input data for initialization
+    TYPE(LidarSim_ParameterType),            INTENT(INOUT)   ::  p           !< Parameters
+    TYPE(LidarSim_OutputType),               INTENT(INOUT)   ::  y           !< Output data
     
     ! Error Handling
     INTEGER( IntKi ),                        INTENT(  OUT)   :: ErrStat      !< error status
@@ -210,7 +210,7 @@
     
     CALL LidarSim_DestroyOutput(y, ErrStat, ErrMsg)
     CALL LidarSim_DestroyParam(p, ErrStat, ErrMsg)
-	
+
     END SUBROUTINE LidarSim_End
     
     !#########################################################################################################################################################################
