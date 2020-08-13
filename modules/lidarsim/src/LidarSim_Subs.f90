@@ -1457,18 +1457,23 @@
     INTEGER(IntKi)                                              ::  LoopCounter
     REAL(ReKi)                                                  ::  Dot_LidarPosition_I(3)
     
+!FIXME: change to refer by name
     Dot_LidarPosition_I(1) = y%IMUOutputs(11)
     Dot_LidarPosition_I(2) = y%IMUOutputs(14)
     Dot_LidarPosition_I(3) = y%IMUOutputs(17)
     
     y%AllOutputs( 1 : 18 )  = y%IMUOutputs ( 1 : 18 )
-    y%AllOutputs( 19 )      = p%MeasuringPoints_Spherical_L(2,p%LastMeasuringPoint+LoopGatesPerBeam)        !Azimuth
-    y%AllOutputs( 20 )      = p%MeasuringPoints_Spherical_L(3,p%LastMeasuringPoint+LoopGatesPerBeam)        !Elevation
+    if (size(p%MeasuringPoints_Spherical_L,2) > 0) then
+       y%AllOutputs( 19 )      = p%MeasuringPoints_Spherical_L(2,p%LastMeasuringPoint+LoopGatesPerBeam)        !Azimuth
+       y%AllOutputs( 20 )      = p%MeasuringPoints_Spherical_L(3,p%LastMeasuringPoint+LoopGatesPerBeam)        !Elevation
+    endif
     y%AllOutputs( 21 )      = Time                                                                          !MeasTime
     y%AllOutputs( 22 )      = 1                                                                             !NewData
     y%AllOutputs( 23 )      = REAL(p%NextBeamID)                                                            !BeamID
 
-    y%AllOutputs( 24 + LoopGatesPerBeam ) = p%MeasuringPoints_Spherical_L(1,p%LastMeasuringPoint+LoopGatesPerBeam)   !Rangegates
+    if (size(p%MeasuringPoints_Spherical_L,2) > 0) then
+       y%AllOutputs( 24 + LoopGatesPerBeam ) = p%MeasuringPoints_Spherical_L(1,p%LastMeasuringPoint+LoopGatesPerBeam)   !Rangegates
+    endif
     y%AllOutputs( 24 + p%GatesPerBeam + LoopGatesPerBeam ) = Vlos + (  DOT_PRODUCT(Dot_LidarPosition_I,UnitVector))  !Output the measured V_los. Consiting of the windspeed and the movement of the measuring system itself
     
     DO LoopCounter = 1,SIZE(p%ValidOutputs)
