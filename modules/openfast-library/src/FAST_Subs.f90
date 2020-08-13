@@ -96,7 +96,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
    
    TYPE(IceFloe_Data),       INTENT(INOUT) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(INOUT) :: IceD                !< All the IceDyn data used in time-step loop
-   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim			      !< LidarSim data
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< LidarSim data
 
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
       
@@ -702,6 +702,10 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       ELSE
          CALL SetErrStat(ErrID_Severe,"LidarSim dosen't work without InflowWind",ErrStat,ErrMsg,RoutineName)
          p_FAST%CompLidar = Module_None
+      END IF
+      IF (ErrStat >= AbortErrLev) THEN
+         CALL Cleanup()
+         RETURN
       END IF
       IF ( p_FAST%CompServo == Module_SrvD ) THEN
          InitInData_SrvD%GatesPerBeam = LidSim%p%GatesPerBeam
