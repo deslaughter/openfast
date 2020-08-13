@@ -27,6 +27,14 @@
     
     SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, ErrStat, ErrMsg)
 
+   !  This subroutine originally opened the file as two units simultaneously. Unfortunately, the Fortran
+   !  standard does not currenlty allow for opening the same file twice simultaneously. This behaviour 
+   !  is an extension to the standard that only the Intel Fortran compiler allows.  gfortran and other
+   !  fortran compilers do not allow for this behaviour.
+   !
+   !  Therefore, to support an arbitrary number of comment lines, the file will be read into memory, then
+   !  parsed line by line. 
+
     IMPLICIT                                NONE
     CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_ReadInputFile"
     
@@ -55,89 +63,36 @@
     ErrStat        =  0
     ErrMsg         =  ""
     UnitEcho       = -1
+    UnitInput       = -1
+    TemporaryFileUnit = -1
     
     ! Allocate OutList space
     CALL AllocAry( InputFileData%OutList, 18, "InflowWind Input File's OutList", TmpErrStat, TmpErrMsg ) !Max additional output parameters = 18
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+      if (Failed()) return;
     
 
     !-------------------------------------------------------------------------------------------------
     ! Open the file
     !-------------------------------------------------------------------------------------------------
 
-    CALL GetNewUnit( UnitInput, TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL OpenFInpFile( UnitInput, TRIM(InputInitFile), TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    
-    CALL GetNewUnit( TemporaryFileUnit, TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL OpenFInpFile( TemporaryFileUnit, TRIM(InputInitFile), TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL GetNewUnit( UnitInput, TmpErrStat, TmpErrMsg );                                  if (Failed()) return;
+    CALL OpenFInpFile( UnitInput, TRIM(InputInitFile), TmpErrStat, TmpErrMsg );           if (Failed()) return;
+    CALL GetNewUnit( TemporaryFileUnit, TmpErrStat, TmpErrMsg );                          if (Failed()) return;
+    CALL OpenFInpFile( TemporaryFileUnit, TRIM(InputInitFile), TmpErrStat, TmpErrMsg );   if (Failed()) return;
     
 
     !-------------------------------------------------------------------------------------------------
     ! File header
     !-------------------------------------------------------------------------------------------------
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Lidar version', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);      if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Lidar version', TmpErrStat, TmpErrMsg );     if (Failed()) return;
   
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg)
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    CALL ReadCom( UnitInput, InputInitFile, 'description', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);      if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'description', TmpErrStat, TmpErrMsg );       if (Failed()) return;
     
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, '-------------', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);      if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, '-------------', TmpErrStat, TmpErrMsg );     if (Failed()) return;
 
 
     !-------------------------------------------------------------------------------------------------
@@ -145,298 +100,127 @@
     !-------------------------------------------------------------------------------------------------    
 
     ! Echo on/off
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%Echo, 'Echo', ' Echo input data to <RootName>.ech (flag)', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);                     if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%Echo, 'Echo', &
+            ' Echo input data to <RootName>.ech (flag)', TmpErrStat, TmpErrMsg );                        if (Failed()) return;
     
     IF ( InputFileData%Echo ) THEN
-        CALL OpenEcho ( UnitEcho, TRIM(EchoFileName), TmpErrStat, TmpErrMsg )
-        CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-        IF (ErrStat >= AbortErrLev) THEN
-            CALL CleanUp()
-            RETURN
-        END IF
+        CALL OpenEcho ( UnitEcho, TRIM(EchoFileName), TmpErrStat, TmpErrMsg );                           if (Failed()) return;
     
         REWIND(UnitInput)
         REWIND(TemporaryFileUnit)
     
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-        CALL ReadCom( UnitInput, InputInitFile, 'Lidar version', TmpErrStat, TmpErrMsg )
-        CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
+        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);       if (Failed()) return;
+        CALL ReadCom( UnitInput, InputInitFile, 'Lidar version', TmpErrStat, TmpErrMsg );                if (Failed()) return;
     
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-        CALL ReadCom( UnitInput, InputInitFile, 'description', TmpErrStat, TmpErrMsg )
-        CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
+        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);       if (Failed()) return;
+        CALL ReadCom( UnitInput, InputInitFile, 'description', TmpErrStat, TmpErrMsg );                  if (Failed()) return;
     
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-        CALL ReadCom( UnitInput, InputInitFile, '-------------', TmpErrStat, TmpErrMsg )
-        CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
+        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);       if (Failed()) return;
+        CALL ReadCom( UnitInput, InputInitFile, '-------------', TmpErrStat, TmpErrMsg );                if (Failed()) return;
     
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-        CALL ReadVar ( UnitInput, InputInitFile, InputFileData%Echo, 'Echo', 'Echo input data to <RootName>.ech (flag)', TmpErrStat, TmpErrMsg)
-        CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
+        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);       if (Failed()) return;
+        CALL ReadVar ( UnitInput, InputInitFile, InputFileData%Echo, 'Echo', &
+               'Echo input data to <RootName>.ech (flag)', TmpErrStat, TmpErrMsg);                       if (Failed()) return;
     
     END IF
     
     ! MAXDLLChainOutputs
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%MAXDLLChainOutputs, 'MAXDLLChainOutputs', 'Number of entries in the avrSWAP reserved for the DLL chain', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%MAXDLLChainOutputs, 'MAXDLLChainOutputs', &
+            'Number of entries in the avrSWAP reserved for the DLL chain', TmpErrStat, TmpErrMsg );      if (Failed()) return;
     
 
     !-------------------------------------------------------------------------------------------------
     ! Lidar Configuration
     !-------------------------------------------------------------------------------------------------
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Lidar input file separator line', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF    
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Lidar input file separator line', TmpErrStat, TmpErrMsg );  if (Failed()) return;
     
     ! Trajectory Type
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName ) 
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%TrajectoryType, 'TrajectoryType', 'Switch : {0 = cartesian coordinates; 1 = spherical coordinates}', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%TrajectoryType, 'TrajectoryType', &
+            'Switch : {0 = cartesian coordinates; 1 = spherical coordinates}', TmpErrStat, TmpErrMsg );  if (Failed()) return;
     
     ! Weighting Type
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%WeightingType, 'WeightingType', 'Switch : {0 = single point; 1 = gaussian distribution}', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%WeightingType, 'WeightingType', &
+            'Switch : {0 = single point; 1 = gaussian distribution}', TmpErrStat, TmpErrMsg );           if (Failed()) return;
         
     ! Position of the lidar system
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionX_N, 'LidarPositionX_N', 'Position of the lidar system (X coordinate) [m]', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionX_N, 'LidarPositionX_N', &
+            'Position of the lidar system (X coordinate) [m]', TmpErrStat, TmpErrMsg );                  if (Failed()) return;
     
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionY_N, 'LidarPositionY_N', 'Position of the lidar system (Y coordinate) [m]', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionY_N, 'LidarPositionY_N', &
+            'Position of the lidar system (Y coordinate) [m]', TmpErrStat, TmpErrMsg );                  if (Failed()) return;
     
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionZ_N, 'LidarPositionZ_N', 'Position of the lidar system (Z coordinate) [m]', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionZ_N, 'LidarPositionZ_N', &
+            'Position of the lidar system (Z coordinate) [m]', TmpErrStat, TmpErrMsg );                  if (Failed()) return;
     
     ! Rotation of the lidar system    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%RollAngle_N, 'Roll_N', 'Roll angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%RollAngle_N, 'Roll_N', &
+            'Roll angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg );   if (Failed()) return;
     InputFileData%RollAngle_N = InputFileData%RollAngle_N * (Pi_D/180)    
     
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%PitchAngle_N, 'Pitch_N', 'Pitch angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%PitchAngle_N, 'Pitch_N', &
+            'Pitch angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg );  if (Failed()) return;
     InputFileData%PitchAngle_N = InputFileData%PitchAngle_N * (Pi_D/180)
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%YawAngle_N, 'Yaw_N', 'Yaw Pitch angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%YawAngle_N, 'Yaw_N', &
+            'Yaw Pitch angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg ); if (Failed()) return;
     InputFileData%YawAngle_N = InputFileData%YawAngle_N * (Pi_D/180)
     
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%URef, 'URef', 'Mean u-component wind speed at the reference height', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%URef, 'URef', &
+            'Mean u-component wind speed at the reference height', TmpErrStat, TmpErrMsg );              if (Failed()) return;
     
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%GatesPerBeam, 'GatesPerBeam', 'Amount of gates per point', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%GatesPerBeam, 'GatesPerBeam', &
+            'Amount of gates per point', TmpErrStat, TmpErrMsg );                                        if (Failed()) return;
     
 
     !-------------------------------------------------------------------------------------------------
     ! Measurement settings
     !-------------------------------------------------------------------------------------------------
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%t_measurement_interval, 't_measurement_interval', 'Time between each measurement [s]', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);                     if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%t_measurement_interval, &
+            't_measurement_interval', 'Time between each measurement [s]', TmpErrStat, TmpErrMsg );      if (Failed()) return;
        
 
     !-------------------------------------------------------------------------------------------------
     ! Cartesian coordinates
     !-------------------------------------------------------------------------------------------------
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'cartesian coordinates', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'cartesian coordinates', TmpErrStat, TmpErrMsg );            if (Failed()) return;
     
     ! Number of cartesian points
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%NumberOfPoints_Cartesian, 'NumberOfPoints_Cartesian', 'Amount of Points [-]', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%NumberOfPoints_Cartesian, &
+            'NumberOfPoints_Cartesian', 'Amount of Points [-]', TmpErrStat, TmpErrMsg );                 if (Failed()) return;
     
     ! Table header
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Table Header', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Table Header', TmpErrStat, TmpErrMsg );                     if (Failed()) return;
     
-    CALL AllocAry( InputFileData%X_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'X Coordinate', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    CALL AllocAry( InputFileData%Y_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'Y Coordinate', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    CALL AllocAry( InputFileData%Z_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'Z Coordinate', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+    CALL AllocAry( InputFileData%X_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'X Coordinate', TmpErrStat, TmpErrMsg );           if (Failed()) return;
+    CALL AllocAry( InputFileData%Y_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'Y Coordinate', TmpErrStat, TmpErrMsg );           if (Failed()) return;
+    CALL AllocAry( InputFileData%Z_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'Z Coordinate', TmpErrStat, TmpErrMsg );           if (Failed()) return;
     
     ! Loop through table
     DO CounterNumberOfPoints_Cartesian = 1,InputFileData%NumberOfPoints_Cartesian
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-        CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-        IF (ErrStat >= AbortErrLev) THEN
-            CALL Cleanup()
-            RETURN
-        END IF
+        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);
+            if (Failed()) return;
         READ(UnitInput,*,IOSTAT=ErrStatIO) InputFileData%X_Cartesian_L(CounterNumberOfPoints_Cartesian),&
-        InputFileData%Y_Cartesian_L(CounterNumberOfPoints_Cartesian),InputFileData%Z_Cartesian_L(CounterNumberOfPoints_Cartesian)
+        InputFileData%Y_Cartesian_L(CounterNumberOfPoints_Cartesian),InputFileData%Z_Cartesian_L(CounterNumberOfPoints_Cartesian);
         IF( ErrStatIO > 0 ) THEN
             CALL SetErrStat(ErrID_Fatal,'Error reading cartesian coordinates',ErrStat,ErrMsg,RoutineName)
             CALL Cleanup()
@@ -449,67 +233,31 @@
     ! Spherical coordinates
     !-------------------------------------------------------------------------------------------------
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'spherical coordinates', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'spherical coordinates', TmpErrStat, TmpErrMsg );            if (Failed()) return;
     
     ! Number of spherical points
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%NumberOfPoints_Spherical, 'NumberOfPoints_Spherical', 'Amount of Points [-]', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%NumberOfPoints_Spherical, &
+            'NumberOfPoints_Spherical', 'Amount of Points [-]', TmpErrStat, TmpErrMsg );                 if (Failed()) return;
         
     ! Table header
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Table Header', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Table Header', TmpErrStat, TmpErrMsg );                     if (Failed()) return;
     
-    CALL AllocAry( InputFileData%Azimuth, InputFileData%NumberOfPoints_Spherical, 'Azimuth', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    CALL AllocAry( InputFileData%Elevation, InputFileData%NumberOfPoints_Spherical, 'Elevation', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    CALL AllocAry( InputFileData%Range, InputFileData%NumberOfPoints_Spherical,InputFileData%GatesPerBeam , 'Range', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+    CALL AllocAry( InputFileData%Azimuth, InputFileData%NumberOfPoints_Spherical, 'Azimuth', TmpErrStat, TmpErrMsg );                           if (Failed()) return;
+    CALL AllocAry( InputFileData%Elevation, InputFileData%NumberOfPoints_Spherical, 'Elevation', TmpErrStat, TmpErrMsg );                       if (Failed()) return;
+    CALL AllocAry( InputFileData%Range, InputFileData%NumberOfPoints_Spherical,InputFileData%GatesPerBeam , 'Range', TmpErrStat, TmpErrMsg );   if (Failed()) return;
     
     ! Loop through spherical data table
     DO CounterNumberOfPoints_Spherical = 1, InputFileData%NumberOfPoints_Spherical
         ! Reading the number, azimuth and elevation in the corresponding variables.
         ! The left over parameters (1..n) are read into the range variable
         ! This allows multiple range measurements with the same azimuth / elevation
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-        CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-        IF (ErrStat >= AbortErrLev) THEN
-            CALL Cleanup()
-            RETURN
-        END IF
+        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);
+            if (Failed()) return;
         READ(UnitInput,*,IOSTAT=ErrStatIO) InputFileData%Azimuth(CounterNumberOfPoints_Spherical),&
-        InputFileData%Elevation(CounterNumberOfPoints_Spherical),InputFileData%Range(CounterNumberOfPoints_Spherical,:) 
+        InputFileData%Elevation(CounterNumberOfPoints_Spherical),InputFileData%Range(CounterNumberOfPoints_Spherical,:)
         IF( ErrStatIO > 0 ) THEN
             CALL SetErrStat(ErrID_Fatal,'Error reading spherical coordinates',ErrStat,ErrMsg,RoutineName)
             CALL Cleanup()
@@ -525,46 +273,17 @@
     !-------------------------------------------------------------------------------------------------    
 
     ! Description
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Weighting function Gauss', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                             if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Weighting function Gauss', TmpErrStat, TmpErrMsg );                           if (Failed()) return;
 
     ! FWHM
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%FWHM, 'FWHM', 'Width of half maximum', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                             if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%FWHM, 'FWHM', 'Width of half maximum', TmpErrStat, TmpErrMsg ); if (Failed()) return;
     
     ! Number of points to evaluate
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%PointsToEvaluate, 'PointsToEvaluate', 'points evaluated to "integrate" (odd number so there is a point in the peak', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                             if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%PointsToEvaluate, 'PointsToEvaluate', &
+            'points evaluated to "integrate" (odd number so there is a point in the peak', TmpErrStat, TmpErrMsg );        if (Failed()) return;
     
     
     !-------------------------------------------------------------------------------------------------
@@ -572,60 +291,26 @@
     !-------------------------------------------------------------------------------------------------    
 
     ! Description
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Weighting function Manual', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Weighting function Manual', TmpErrStat, TmpErrMsg );                    if (Failed()) return;
     
     ! Number of manual weighting points
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%ManualWeightingPoints, 'ManualWeightingPoints', 'Number manual weightingpoints', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
+    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%ManualWeightingPoints, 'ManualWeightingPoints', &
+            'Number manual weightingpoints', TmpErrStat, TmpErrMsg );                                                if (Failed()) return;
     
     ! Table header
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Table header', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Table header', TmpErrStat, TmpErrMsg );                                 if (Failed()) return;
     
-    CALL AllocAry( InputFileData%ManualWeightingDistance, InputFileData%ManualWeightingPoints, 'ManualWeightingDistance', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    CALL AllocAry( InputFileData%ManualWeighting, InputFileData%ManualWeightingPoints, 'ManualWeighting', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+    CALL AllocAry( InputFileData%ManualWeightingDistance, InputFileData%ManualWeightingPoints, &
+            'ManualWeightingDistance', TmpErrStat, TmpErrMsg );                                                      if (Failed()) return;
+    CALL AllocAry( InputFileData%ManualWeighting, InputFileData%ManualWeightingPoints, &
+            'ManualWeighting', TmpErrStat, TmpErrMsg );                                                              if (Failed()) return;
     
     ! Loop through manual weighting data table
     DO CounterNumberManualWeighting = 1, InputFileData%ManualWeightingPoints
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-        CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-        IF (ErrStat >= AbortErrLev) THEN
-            CALL Cleanup()
-            RETURN
-        END IF
+        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                   if (Failed()) return;
         READ(UnitInput,*,IOSTAT=ErrStatIO) InputFileData%ManualWeightingDistance(CounterNumberManualWeighting), InputFileData%ManualWeighting(CounterNumberManualWeighting)
         IF( ErrStatIO > 0 ) THEN
             CALL SetErrStat(ErrID_Fatal,'Error reading manual weighting',ErrStat,ErrMsg,RoutineName)
@@ -635,53 +320,33 @@
     END DO
     
     ! OutList
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Outlist headline', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Outlist headline', TmpErrStat, TmpErrMsg );                             if (Failed()) return;
     
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
-    CALL ReadCom( UnitInput, InputInitFile, 'Outlist', TmpErrStat, TmpErrMsg )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
+    CALL ReadCom( UnitInput, InputInitFile, 'Outlist', TmpErrStat, TmpErrMsg );                                      if (Failed()) return;
     
     ! Read OutputList
-    CALL LidarSim_ReadOutputList (TemporaryFileUnit, UnitInput, InputInitFile, InputFileData%OutList, InputFileData%NumOuts, 'OutList',"List of user-requested output channels", TmpErrStat, TmpErrMsg,-1 )
-    CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
-    IF (ErrStat >= AbortErrLev) THEN
-        CALL Cleanup()
-        RETURN
-    END IF
+    CALL LidarSim_ReadOutputList (TemporaryFileUnit, UnitInput, InputInitFile, InputFileData%OutList, &
+            InputFileData%NumOuts, 'OutList',"List of user-requested output channels", TmpErrStat, TmpErrMsg,-1 );   if (Failed()) return;
     
     CALL Cleanup()
     
     RETURN
 
     CONTAINS
-
+    logical function Failed()
+      CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
+      Failed = ErrStat >= AbortErrLev
+      if (Failed) call Cleanup()
+    end function Failed
     !-------------------------------------------------------------------------------------------------
     SUBROUTINE Cleanup()
 
-    CLOSE ( UnitInput )
-    CLOSE ( TemporaryFileUnit )
+    if (UnitInput > -1_IntKi)          CLOSE ( UnitInput )
+    if (TemporaryFileUnit > -1_IntKi)  CLOSE ( TemporaryFileUnit )
     IF ( InputFileData%Echo ) THEN
-        CLOSE(UnitEcho)
+       if (UnitEcho > -1_IntKi)        CLOSE(UnitEcho)
     END IF
 
     END SUBROUTINE Cleanup

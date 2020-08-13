@@ -19,7 +19,7 @@
 
     !#########################################################################################################################################################################
 
-    SUBROUTINE LidarSim_Init(InitInp, y, p, InitOutData, ErrStat, ErrMsg )
+SUBROUTINE LidarSim_Init(InitInp, y, p, InitOutData, ErrStat, ErrMsg )
 
     IMPLICIT                                NONE
     CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_Init"
@@ -52,8 +52,8 @@
     
     ! Reads the Config from the Input file and writes it into the LidarSim_InputFile data 
     CALL LidarSim_ReadInputFile(InitInp%InputInitFile,EchoFileName , InputFileData, TmpErrStat, TmpErrMsg)!EchoFileName
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    
+      if (Failed()) return
+
     
     !Transfering InputFileData to the p
     p%MeasurementMaxSteps   =   CEILING(REAL(NINT(InputFileData%t_measurement_interval*100000))/REAL(NINT(InitInp%DT*100000))) !NINT to remove float precision errors. Back to REAL, otherwise the divion ignores everything behind the decima point. Ceiling to round up to next integer
@@ -100,14 +100,29 @@
     p%MeasurementCurrentStep = -1                                                               !< there was no measurement yet
     p%LastMeasuringPoint = 1                                                                    !< First measurement point
     p%NextBeamID = 0
-       
-    CALL LidarSim_DestroyInputFile(InputFileData, ErrStat, ErrMsg)                              ! Calls to destory the data from the inputfile. Important data has to be transfered to the parameter data before
+    
+   call Cleanup()
+   return
+ 
+   contains
+   logical function Failed()
+      CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+      Failed = ErrStat >= AbortErrLev
+      if (Failed) then
+         call Cleanup
+      endif
+   end function Failed
 
-    END SUBROUTINE LidarSim_Init
+   subroutine Cleanup()
+      CALL LidarSim_DestroyInputFile(InputFileData, TmpErrStat, TmpErrMsg)                              ! Calls to destory the data from the inputfile. Important data has to be transfered to the parameter data before
+      CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+   end subroutine Cleanup
+
+END SUBROUTINE LidarSim_Init
 
     !#########################################################################################################################################################################
 
-    SUBROUTINE LidarSim_CalcOutput (Time, y, p, u,&
+SUBROUTINE LidarSim_CalcOutput (Time, y, p, u,&
     IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates,  IfW_m,&
     ErrStat, ErrMsg )
 
@@ -176,6 +191,7 @@
             p%NextBeamID = p%NextBeamID + 1
         END IF
     ELSE                                            !Set NewData signals to zero
+!FIXME: move ValidOutputs out of p
         IF(ANY(p%ValidOutputs == 22)) THEN
             DO LoopCounter = 1,SIZE(p%ValidOutputs)
                 IF(p%ValidOutputs(LoopCounter) == 22) THEN
