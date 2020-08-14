@@ -45,27 +45,19 @@ SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, Er
    CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
 
    ! Local variables
-   REAL(ReKi)                                              ::  RotationAngle       !< Variable to temporary store the rotation angle (roll, pitch or yaw)
-   REAL(ReKi)                                              ::  Rotations(3,3,3)    !< DCMs for roll, pitch and yaw
    INTEGER(IntKi)                                          ::  UnitInput           !< Unit number for the input file
    INTEGER(IntKi)                                          ::  UnitEcho            !< The local unit number for this module's echo file
-   LOGICAL                                                 ::  CommentLine         !< True if line is commented out
-   CHARACTER(1024)                                         ::  ReadLine            !< Temporary variable to Read a Line in
-   INTEGER(IntKi)                                          ::  CounterNumberOfPoints_Cartesian !< Loop counter for the cartesian coordinates
-   INTEGER(IntKi)                                          ::  CounterNumberOfPoints_Spherical !< Loop counter for the spherical coordinates
-   INTEGER(IntKi)                                          ::  CounterNumberManualWeighting    !< Loop counter for the manual weighting points
-   INTEGER(IntKi)                                          ::  LineNo              !< Counter for current line in file (for rewind when reading comments)
 
    INTEGER(IntKi)                                          ::  TmpErrStat
    CHARACTER(ErrMsgLen)                                    ::  TmpErrMsg           !< temporary error message
    INTEGER(IntKi)                                          ::  ErrStatIO           !< temporary error for read commands
 
-   TYPE (FileInfoType)                     :: FileInfo                      ! The derived type for holding the file information.
-   integer(IntKi)            :: i
-   integer(IntKi)            :: CurLine
-   real(ReKi),allocatable    :: TmpRe(:)
-   real(ReKi)                :: TmpRe2(2)
-   real(ReKi)                :: TmpRe3(3)
+   TYPE (FileInfoType)                                     :: FileInfo             !< The derived type for holding the file information.
+   integer(IntKi)                                          :: i                    !< generic counter
+   integer(IntKi)                                          :: CurLine              !< current entry in FileInfo%Lines array
+   real(ReKi),allocatable                                  :: TmpRe(:)             !< temporary 2d array for reading values in
+   real(ReKi)                                              :: TmpRe2(2)            !< temporary 2 number array for reading values in
+   real(ReKi)                                              :: TmpRe3(3)            !< temporary 3 number array for reading values in
 
 
    ! Initialization
@@ -78,10 +70,14 @@ SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, Er
    CALL AllocAry( InputFileData%OutList, 18, "InflowWind Input File's OutList", TmpErrStat, TmpErrMsg ) !Max additional output parameters = 18
         if (Failed()) return;
 
-   ! process the entire input file and strip out comment lines
+   ! Read the entire input file, minus any comment lines, into the FileInfo
+   ! data structure in memory for further processing.
    call ProcessComFile( InputInitFile, FileInfo, TmpErrStat, TmpErrMsg )
          if (Failed()) return;
 
+   ! For diagnostic purposes, the following can be used to display the contents
+   ! of the FileInfo data structure.
+   !   call Print_FileInfo( CU, FileInfo ) ! CU is the screen -- different number on different systems.
 
    !-------------------------------------------------------------------------------------------------
    ! General settings
@@ -292,7 +288,6 @@ CONTAINS
    !-------------------------------------------------------------------------------------------------
 
 END SUBROUTINE LidarSim_ReadInputFile
-
 
 !#########################################################################################################################################################################
     
