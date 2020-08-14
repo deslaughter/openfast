@@ -24,475 +24,277 @@
     
 
 !#########################################################################################################################################################################
-    
-    SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, ErrStat, ErrMsg)
+
+SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, ErrStat, ErrMsg)
 
    !  This subroutine originally opened the file as two units simultaneously. Unfortunately, the Fortran
-   !  standard does not currenlty allow for opening the same file twice simultaneously. This behaviour 
+   !  standard does not currenlty allow for opening the same file twice simultaneously. This behaviour
    !  is an extension to the standard that only the Intel Fortran compiler allows.  gfortran and other
    !  fortran compilers do not allow for this behaviour.
    !
    !  Therefore, to support an arbitrary number of comment lines, the file will be read into memory, then
-   !  parsed line by line. 
+   !  parsed line by line.
 
-    IMPLICIT                                NONE
-    CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_ReadInputFile"
-    
-    CHARACTER(1024),                        INTENT(IN   )   ::  InputInitFile       !< Name of the Input File
-    CHARACTER(*),                           INTENT(IN   )   ::  EchoFileName        !< name of the echo file 
-    TYPE(LidarSim_InputFile),               INTENT(INOUT)   ::  InputFileData
-    INTEGER(IntKi),                         INTENT(  OUT)   ::  ErrStat             !< Error status of the operation
-    CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
-    
-    ! Local variables
-    REAL(ReKi)                                              ::  RotationAngle       !< Variable to temporary store the rotation angle (roll, pitch or yaw)
-    REAL(ReKi)                                              ::  Rotations(3,3,3)    !< DCMs for roll, pitch and yaw
-    INTEGER(IntKi)                                          ::  UnitInput           !< Unit number for the input file
-    INTEGER(IntKi)                                          ::  TemporaryFileUnit   !< Unit number for the same input file. opened twice to check for out commented variables
-    INTEGER(IntKi)                                          ::  UnitEcho            !< The local unit number for this module's echo file
-    LOGICAL                                                 ::  CommentLine         !< True if line is commented out
-    CHARACTER(1024)                                         ::  ReadLine            !< Temporary variable to Read a Line in
-    INTEGER(IntKi)                                          ::  CounterNumberOfPoints_Cartesian !< Loop counter for the cartesian coordinates
-    INTEGER(IntKi)                                          ::  CounterNumberOfPoints_Spherical !< Loop counter for the spherical coordinates    
-    INTEGER(IntKi)                                          ::  CounterNumberManualWeighting    !< Loop counter for the manual weighting points
-    INTEGER(IntKi)                                          ::  TmpErrStat
-    CHARACTER(ErrMsgLen)                                    ::  TmpErrMsg           !< temporary error message
-    INTEGER(IntKi)                                          ::  ErrStatIO           !< temporary error for read commands
-    
-    ! Initialization 
-    ErrStat        =  0
-    ErrMsg         =  ""
-    UnitEcho       = -1
-    UnitInput       = -1
-    TemporaryFileUnit = -1
-    
-    ! Allocate OutList space
-    CALL AllocAry( InputFileData%OutList, 18, "InflowWind Input File's OutList", TmpErrStat, TmpErrMsg ) !Max additional output parameters = 18
-      if (Failed()) return;
-    
+   IMPLICIT                                NONE
+   CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_ReadInputFile"
 
-    !-------------------------------------------------------------------------------------------------
-    ! Open the file
-    !-------------------------------------------------------------------------------------------------
+   CHARACTER(1024),                        INTENT(IN   )   ::  InputInitFile       !< Name of the Input File
+   CHARACTER(*),                           INTENT(IN   )   ::  EchoFileName        !< name of the echo file
+   TYPE(LidarSim_InputFile),               INTENT(INOUT)   ::  InputFileData
+   INTEGER(IntKi),                         INTENT(  OUT)   ::  ErrStat             !< Error status of the operation
+   CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
 
-    CALL GetNewUnit( UnitInput, TmpErrStat, TmpErrMsg );                                  if (Failed()) return;
-    CALL OpenFInpFile( UnitInput, TRIM(InputInitFile), TmpErrStat, TmpErrMsg );           if (Failed()) return;
-    CALL GetNewUnit( TemporaryFileUnit, TmpErrStat, TmpErrMsg );                          if (Failed()) return;
-    CALL OpenFInpFile( TemporaryFileUnit, TRIM(InputInitFile), TmpErrStat, TmpErrMsg );   if (Failed()) return;
-    
+   ! Local variables
+   REAL(ReKi)                                              ::  RotationAngle       !< Variable to temporary store the rotation angle (roll, pitch or yaw)
+   REAL(ReKi)                                              ::  Rotations(3,3,3)    !< DCMs for roll, pitch and yaw
+   INTEGER(IntKi)                                          ::  UnitInput           !< Unit number for the input file
+   INTEGER(IntKi)                                          ::  UnitEcho            !< The local unit number for this module's echo file
+   LOGICAL                                                 ::  CommentLine         !< True if line is commented out
+   CHARACTER(1024)                                         ::  ReadLine            !< Temporary variable to Read a Line in
+   INTEGER(IntKi)                                          ::  CounterNumberOfPoints_Cartesian !< Loop counter for the cartesian coordinates
+   INTEGER(IntKi)                                          ::  CounterNumberOfPoints_Spherical !< Loop counter for the spherical coordinates
+   INTEGER(IntKi)                                          ::  CounterNumberManualWeighting    !< Loop counter for the manual weighting points
+   INTEGER(IntKi)                                          ::  LineNo              !< Counter for current line in file (for rewind when reading comments)
 
-    !-------------------------------------------------------------------------------------------------
-    ! File header
-    !-------------------------------------------------------------------------------------------------
+   INTEGER(IntKi)                                          ::  TmpErrStat
+   CHARACTER(ErrMsgLen)                                    ::  TmpErrMsg           !< temporary error message
+   INTEGER(IntKi)                                          ::  ErrStatIO           !< temporary error for read commands
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);      if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Lidar version', TmpErrStat, TmpErrMsg );     if (Failed()) return;
-  
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);      if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'description', TmpErrStat, TmpErrMsg );       if (Failed()) return;
-    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);      if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, '-------------', TmpErrStat, TmpErrMsg );     if (Failed()) return;
+   TYPE (FileInfoType)                     :: FileInfo                      ! The derived type for holding the file information.
+   integer(IntKi)            :: i
+   integer(IntKi)            :: CurLine
+   real(ReKi),allocatable    :: TmpRe(:)
+   real(ReKi)                :: TmpRe2(2)
+   real(ReKi)                :: TmpRe3(3)
 
 
-    !-------------------------------------------------------------------------------------------------
-    ! General settings
-    !-------------------------------------------------------------------------------------------------    
+   ! Initialization
+   ErrStat        =  0
+   ErrMsg         =  ""
+   UnitEcho       = -1
+   UnitInput       = -1
 
-    ! Echo on/off
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);                     if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%Echo, 'Echo', &
-            ' Echo input data to <RootName>.ech (flag)', TmpErrStat, TmpErrMsg );                        if (Failed()) return;
-    
-    IF ( InputFileData%Echo ) THEN
-        CALL OpenEcho ( UnitEcho, TRIM(EchoFileName), TmpErrStat, TmpErrMsg );                           if (Failed()) return;
-    
-        REWIND(UnitInput)
-        REWIND(TemporaryFileUnit)
-    
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);       if (Failed()) return;
-        CALL ReadCom( UnitInput, InputInitFile, 'Lidar version', TmpErrStat, TmpErrMsg );                if (Failed()) return;
-    
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);       if (Failed()) return;
-        CALL ReadCom( UnitInput, InputInitFile, 'description', TmpErrStat, TmpErrMsg );                  if (Failed()) return;
-    
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);       if (Failed()) return;
-        CALL ReadCom( UnitInput, InputInitFile, '-------------', TmpErrStat, TmpErrMsg );                if (Failed()) return;
-    
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);       if (Failed()) return;
-        CALL ReadVar ( UnitInput, InputInitFile, InputFileData%Echo, 'Echo', &
-               'Echo input data to <RootName>.ech (flag)', TmpErrStat, TmpErrMsg);                       if (Failed()) return;
-    
-    END IF
-    
-    ! MAXDLLChainOutputs
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%MAXDLLChainOutputs, 'MAXDLLChainOutputs', &
-            'Number of entries in the avrSWAP reserved for the DLL chain', TmpErrStat, TmpErrMsg );      if (Failed()) return;
-    
+   ! Allocate OutList space
+   CALL AllocAry( InputFileData%OutList, 18, "InflowWind Input File's OutList", TmpErrStat, TmpErrMsg ) !Max additional output parameters = 18
+        if (Failed()) return;
 
-    !-------------------------------------------------------------------------------------------------
-    ! Lidar Configuration
-    !-------------------------------------------------------------------------------------------------
+   ! process the entire input file and strip out comment lines
+   call ProcessComFile( InputInitFile, FileInfo, TmpErrStat, TmpErrMsg )
+         if (Failed()) return;
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Lidar input file separator line', TmpErrStat, TmpErrMsg );  if (Failed()) return;
-    
-    ! Trajectory Type
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%TrajectoryType, 'TrajectoryType', &
-            'Switch : {0 = cartesian coordinates; 1 = spherical coordinates}', TmpErrStat, TmpErrMsg );  if (Failed()) return;
-    
-    ! Weighting Type
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%WeightingType, 'WeightingType', &
-            'Switch : {0 = single point; 1 = gaussian distribution}', TmpErrStat, TmpErrMsg );           if (Failed()) return;
-        
-    ! Position of the lidar system
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionX_N, 'LidarPositionX_N', &
-            'Position of the lidar system (X coordinate) [m]', TmpErrStat, TmpErrMsg );                  if (Failed()) return;
-    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionY_N, 'LidarPositionY_N', &
-            'Position of the lidar system (Y coordinate) [m]', TmpErrStat, TmpErrMsg );                  if (Failed()) return;
-    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%LidarPositionZ_N, 'LidarPositionZ_N', &
-            'Position of the lidar system (Z coordinate) [m]', TmpErrStat, TmpErrMsg );                  if (Failed()) return;
-    
-    ! Rotation of the lidar system    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%RollAngle_N, 'Roll_N', &
-            'Roll angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg );   if (Failed()) return;
-    InputFileData%RollAngle_N = InputFileData%RollAngle_N * (Pi_D/180)    
-    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%PitchAngle_N, 'Pitch_N', &
-            'Pitch angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg );  if (Failed()) return;
-    InputFileData%PitchAngle_N = InputFileData%PitchAngle_N * (Pi_D/180)
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%YawAngle_N, 'Yaw_N', &
-            'Yaw Pitch angle between the Nacelle and the lidar coordinate system', TmpErrStat, TmpErrMsg ); if (Failed()) return;
-    InputFileData%YawAngle_N = InputFileData%YawAngle_N * (Pi_D/180)
-    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%URef, 'URef', &
-            'Mean u-component wind speed at the reference height', TmpErrStat, TmpErrMsg );              if (Failed()) return;
-    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%GatesPerBeam, 'GatesPerBeam', &
-            'Amount of gates per point', TmpErrStat, TmpErrMsg );                                        if (Failed()) return;
-    
+   !-------------------------------------------------------------------------------------------------
+   ! General settings
+   !-------------------------------------------------------------------------------------------------
 
-    !-------------------------------------------------------------------------------------------------
-    ! Measurement settings
-    !-------------------------------------------------------------------------------------------------
+   CurLine = 4    ! Skip the first three lines as they are known to be header lines and separators
+   call ParseVar( FileInfo, CurLine, 'Echo', InputFileData%Echo, TmpErrStat, TmpErrMsg )
+         if (Failed()) return;
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg);                     if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%t_measurement_interval, &
-            't_measurement_interval', 'Time between each measurement [s]', TmpErrStat, TmpErrMsg );      if (Failed()) return;
-       
+   if ( InputFileData%Echo ) then
+      CALL OpenEcho ( UnitEcho, TRIM(EchoFileName), TmpErrStat, TmpErrMsg )
+         if (Failed()) return;
+      WRITE(UnitEcho, '(A)') 'Echo file for LidarSim input file: '//trim(InputInitFile)
+      ! Write the first three lines into the echo file
+      WRITE(UnitEcho, '(A)') FileInfo%Lines(1)
+      WRITE(UnitEcho, '(A)') FileInfo%Lines(2)
+      WRITE(UnitEcho, '(A)') FileInfo%Lines(3)
 
-    !-------------------------------------------------------------------------------------------------
-    ! Cartesian coordinates
-    !-------------------------------------------------------------------------------------------------
+      CurLine = 4
+      call ParseVar( FileInfo, CurLine, 'Echo', InputFileData%Echo, TmpErrStat, TmpErrMsg, UnitEcho )
+            if (Failed()) return
+   endif
 
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'cartesian coordinates', TmpErrStat, TmpErrMsg );            if (Failed()) return;
-    
-    ! Number of cartesian points
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%NumberOfPoints_Cartesian, &
-            'NumberOfPoints_Cartesian', 'Amount of Points [-]', TmpErrStat, TmpErrMsg );                 if (Failed()) return;
-    
-    ! Table header
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Table Header', TmpErrStat, TmpErrMsg );                     if (Failed()) return;
-    
-    CALL AllocAry( InputFileData%X_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'X Coordinate', TmpErrStat, TmpErrMsg );           if (Failed()) return;
-    CALL AllocAry( InputFileData%Y_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'Y Coordinate', TmpErrStat, TmpErrMsg );           if (Failed()) return;
-    CALL AllocAry( InputFileData%Z_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'Z Coordinate', TmpErrStat, TmpErrMsg );           if (Failed()) return;
-    
-    ! Loop through table
-    DO CounterNumberOfPoints_Cartesian = 1,InputFileData%NumberOfPoints_Cartesian
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);
+   call ParseVar( FileInfo, CurLine, 'MAXDLLChainOutputs', InputFileData%MAXDLLChainOutputs, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return;
+
+
+   !-------------------------------------------------------------------------------------------------
+   ! Lidar Configuration
+   !-------------------------------------------------------------------------------------------------
+
+   ! Section break
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+
+   call ParseVar( FileInfo, CurLine, 'TrajectoryType', InputFileData%TrajectoryType, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'WeightingType', InputFileData%WeightingType, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'LidarPositionX_N', InputFileData%LidarPositionX_N, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'LidarPositionY_N', InputFileData%LidarPositionY_N, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'LidarPositionZ_N', InputFileData%LidarPositionZ_N, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'RollAngle_N', InputFileData%RollAngle_N, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'PitchAngle_N', InputFileData%PitchAngle_N, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'YawAngle_N', InputFileData%YawAngle_N, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'URef', InputFileData%URef, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'GatesPerBeam', InputFileData%GatesPerBeam, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 't_measurement_interval', InputFileData%t_measurement_interval, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+
+
+   !-------------------------------------------------------------------------------------------------
+   ! Cartesian coordinates
+   !-------------------------------------------------------------------------------------------------
+
+   ! Section break
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+
+   call ParseVar( FileInfo, CurLine, 'NumberOfPoints_Cartesian', InputFileData%NumberOfPoints_Cartesian, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+
+   ! Section break --  X-Tab    Y-Tab    Z-Tab
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') '#TABLE: '//FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+
+   if (InputFileData%NumberOfPoints_Cartesian > 0) then
+      CALL AllocAry( InputFileData%X_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'X Coordinate', TmpErrStat, TmpErrMsg )
             if (Failed()) return;
-        READ(UnitInput,*,IOSTAT=ErrStatIO) InputFileData%X_Cartesian_L(CounterNumberOfPoints_Cartesian),&
-        InputFileData%Y_Cartesian_L(CounterNumberOfPoints_Cartesian),InputFileData%Z_Cartesian_L(CounterNumberOfPoints_Cartesian);
-        IF( ErrStatIO > 0 ) THEN
-            CALL SetErrStat(ErrID_Fatal,'Error reading cartesian coordinates',ErrStat,ErrMsg,RoutineName)
-            CALL Cleanup()
-            RETURN
-        END IF
-    END DO
-    
-    
-    !-------------------------------------------------------------------------------------------------
-    ! Spherical coordinates
-    !-------------------------------------------------------------------------------------------------
-
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'spherical coordinates', TmpErrStat, TmpErrMsg );            if (Failed()) return;
-    
-    ! Number of spherical points
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%NumberOfPoints_Spherical, &
-            'NumberOfPoints_Spherical', 'Amount of Points [-]', TmpErrStat, TmpErrMsg );                 if (Failed()) return;
-        
-    ! Table header
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);           if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Table Header', TmpErrStat, TmpErrMsg );                     if (Failed()) return;
-    
-    CALL AllocAry( InputFileData%Azimuth, InputFileData%NumberOfPoints_Spherical, 'Azimuth', TmpErrStat, TmpErrMsg );                           if (Failed()) return;
-    CALL AllocAry( InputFileData%Elevation, InputFileData%NumberOfPoints_Spherical, 'Elevation', TmpErrStat, TmpErrMsg );                       if (Failed()) return;
-    CALL AllocAry( InputFileData%Range, InputFileData%NumberOfPoints_Spherical,InputFileData%GatesPerBeam , 'Range', TmpErrStat, TmpErrMsg );   if (Failed()) return;
-    
-    ! Loop through spherical data table
-    DO CounterNumberOfPoints_Spherical = 1, InputFileData%NumberOfPoints_Spherical
-        ! Reading the number, azimuth and elevation in the corresponding variables.
-        ! The left over parameters (1..n) are read into the range variable
-        ! This allows multiple range measurements with the same azimuth / elevation
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);
+      CALL AllocAry( InputFileData%Y_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'Y Coordinate', TmpErrStat, TmpErrMsg )
             if (Failed()) return;
-        READ(UnitInput,*,IOSTAT=ErrStatIO) InputFileData%Azimuth(CounterNumberOfPoints_Spherical),&
-        InputFileData%Elevation(CounterNumberOfPoints_Spherical),InputFileData%Range(CounterNumberOfPoints_Spherical,:)
-        IF( ErrStatIO > 0 ) THEN
-            CALL SetErrStat(ErrID_Fatal,'Error reading spherical coordinates',ErrStat,ErrMsg,RoutineName)
-            CALL Cleanup()
-            RETURN
-        END IF
-    END DO
-    InputFileData%Azimuth   = InputFileData%Azimuth * (Pi_D/180)
-    InputFileData%Elevation = InputFileData%Elevation * (Pi_D/180)
+      CALL AllocAry( InputFileData%Z_Cartesian_L, InputFileData%NumberOfPoints_Cartesian, 'Z Coordinate', TmpErrStat, TmpErrMsg )
+            if (Failed()) return;
 
-    
+         ! TABLE read
+      do i=1,InputFileData%NumberOfPoints_Cartesian
+         call ParseAry ( FileInfo, CurLine, 'Coordinates', TmpRe3, 3, TmpErrStat, TmpErrMsg, UnitEcho )
+               if (Failed()) return;
+         InputFileData%X_Cartesian_L(i) = TmpRe3(1)
+         InputFileData%Y_Cartesian_L(i) = TmpRe3(2)
+         InputFileData%Z_Cartesian_L(i) = TmpRe3(3)
+      enddo
+   endif
+
+
+   !-------------------------------------------------------------------------------------------------
+   ! Spherical coordinates
+   !-------------------------------------------------------------------------------------------------
+
+   ! Section break
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+   call ParseVar( FileInfo, CurLine, 'NumberOfPoints_Spherical', InputFileData%NumberOfPoints_Spherical, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+
+   ! Table header -- Azimuth-Tab     Elevation-Tab   RangeGates-Tab
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') '#TABLE: '//FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+
+   if (InputFileData%NumberOfPoints_Spherical > 0 ) then
+      CALL AllocAry( InputFileData%Azimuth,   InputFileData%NumberOfPoints_Spherical, 'Azimuth', TmpErrStat, TmpErrMsg )
+            if (Failed()) return;
+      CALL AllocAry( InputFileData%Elevation, InputFileData%NumberOfPoints_Spherical, 'Elevation', TmpErrStat, TmpErrMsg )
+            if (Failed()) return;
+      CALL AllocAry( InputFileData%Range,     InputFileData%NumberOfPoints_Spherical,InputFileData%GatesPerBeam , 'Range', TmpErrStat, TmpErrMsg )
+            if (Failed()) return;
+
+      ! Temporary array for reading table
+      call AllocAry( TmpRe,  2+InputFileData%GatesPerBeam, 'TmpRe', TmpErrStat, TmpErrMsg )
+            if (Failed()) return;
+
+         ! TABLE read
+      do i=1,InputFileData%NumberOfPoints_Spherical
+         call ParseAry ( FileInfo, CurLine, 'Coordinates', TmpRe, 2+InputFileData%GatesPerBeam, TmpErrStat, TmpErrMsg, UnitEcho )
+               if (Failed()) return;
+         InputFileData%Azimuth(i) = TmpRe(1)
+         InputFileData%Elevation(i) = TmpRe(2)
+         InputFileData%Range(i,:) = TmpRe(3:size(TmpRe))
+      enddo
+
+      deallocate(TmpRe) ! Done with this temporary array
+   endif
+
+
+   !-------------------------------------------------------------------------------------------------
+   ! Gaussian distribution
+   !-------------------------------------------------------------------------------------------------
+
+   ! Section break -- Weighting function (gaussian distribution)
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+
+   call ParseVar( FileInfo, CurLine, 'FWHM', InputFileData%FWHM, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+   call ParseVar( FileInfo, CurLine, 'PointsToEvaluate', InputFileData%PointsToEvaluate, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+
+
+   !-------------------------------------------------------------------------------------------------
+   ! Manual distribution
+   !-------------------------------------------------------------------------------------------------
+
+   ! Section break -- Weighting function (manual weighting)
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+   call ParseVar( FileInfo, CurLine, 'ManualWeightingPoints', InputFileData%ManualWeightingPoints, TmpErrStat, TmpErrMsg, UnitEcho)
+         if (Failed()) return
+
+   ! Table header -- Distance-Tab   Weighting-Tab
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)')  '#TABLE: '//FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+
+   if (InputFileData%ManualWeightingPoints > 0) then
+      CALL AllocAry( InputFileData%ManualWeightingDistance, InputFileData%ManualWeightingPoints, 'ManualWeightingDistance', TmpErrStat, TmpErrMsg )
+            if (Failed()) return;
+      CALL AllocAry( InputFileData%ManualWeighting, InputFileData%ManualWeightingPoints, 'ManualWeighting', TmpErrStat, TmpErrMsg )
+            if (Failed()) return;
+         ! TABLE read
+      do i=1,InputFileData%NumberOfPoints_Cartesian
+         call ParseAry ( FileInfo, CurLine, 'Coordinates', TmpRe3, 3, TmpErrStat, TmpErrMsg, UnitEcho )
+               if (Failed()) return;
+         InputFileData%ManualWeightingDistance(i) = TmpRe2(1)
+         InputFileData%ManualWeighting(i) = TmpRe2(2)
+      enddo
+   endif
+
+
     !-------------------------------------------------------------------------------------------------
-    ! Gaussian distribution
-    !-------------------------------------------------------------------------------------------------    
-
-    ! Description
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                             if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Weighting function Gauss', TmpErrStat, TmpErrMsg );                           if (Failed()) return;
-
-    ! FWHM
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                             if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%FWHM, 'FWHM', 'Width of half maximum', TmpErrStat, TmpErrMsg ); if (Failed()) return;
-    
-    ! Number of points to evaluate
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                             if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%PointsToEvaluate, 'PointsToEvaluate', &
-            'points evaluated to "integrate" (odd number so there is a point in the peak', TmpErrStat, TmpErrMsg );        if (Failed()) return;
-    
-    
+    ! Read Outlist from FileInfo
     !-------------------------------------------------------------------------------------------------
-    ! Manual distribution
-    !-------------------------------------------------------------------------------------------------    
 
-    ! Description
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Weighting function Manual', TmpErrStat, TmpErrMsg );                    if (Failed()) return;
-    
-    ! Number of manual weighting points
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
-    CALL ReadVar ( UnitInput, InputInitFile, InputFileData%ManualWeightingPoints, 'ManualWeightingPoints', &
-            'Number manual weightingpoints', TmpErrStat, TmpErrMsg );                                                if (Failed()) return;
-    
-    ! Table header
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Table header', TmpErrStat, TmpErrMsg );                                 if (Failed()) return;
-    
-    CALL AllocAry( InputFileData%ManualWeightingDistance, InputFileData%ManualWeightingPoints, &
-            'ManualWeightingDistance', TmpErrStat, TmpErrMsg );                                                      if (Failed()) return;
-    CALL AllocAry( InputFileData%ManualWeighting, InputFileData%ManualWeightingPoints, &
-            'ManualWeighting', TmpErrStat, TmpErrMsg );                                                              if (Failed()) return;
-    
-    ! Loop through manual weighting data table
-    DO CounterNumberManualWeighting = 1, InputFileData%ManualWeightingPoints
-        CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                   if (Failed()) return;
-        READ(UnitInput,*,IOSTAT=ErrStatIO) InputFileData%ManualWeightingDistance(CounterNumberManualWeighting), InputFileData%ManualWeighting(CounterNumberManualWeighting)
-        IF( ErrStatIO > 0 ) THEN
-            CALL SetErrStat(ErrID_Fatal,'Error reading manual weighting',ErrStat,ErrMsg,RoutineName)
-            CALL Cleanup()
-            RETURN
-        END IF
-    END DO
-    
-    ! OutList
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Outlist headline', TmpErrStat, TmpErrMsg );                             if (Failed()) return;
-    
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho);                       if (Failed()) return;
-    CALL ReadCom( UnitInput, InputInitFile, 'Outlist', TmpErrStat, TmpErrMsg );                                      if (Failed()) return;
-    
-    ! Read OutputList
-    CALL LidarSim_ReadOutputList (TemporaryFileUnit, UnitInput, InputInitFile, InputFileData%OutList, &
-            InputFileData%NumOuts, 'OutList',"List of user-requested output channels", TmpErrStat, TmpErrMsg,-1 );   if (Failed()) return;
-    
-    CALL Cleanup()
-    
-    RETURN
+   ! Section break -- Output list
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+   if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') FileInfo%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
 
-    CONTAINS
-    logical function Failed()
+   call ReadOutputListFromFileInfo( FileInfo, CurLine, InputFileData%OutList, &
+            InputFileData%NumOuts, 'OutList', "List of user-requested output channels", TmpErrStat, TmpErrMsg, UnitEcho )
+         if (Failed()) return;
+
+   CALL Cleanup()
+
+   RETURN
+
+
+CONTAINS
+
+   !-------------------------------------------------------------------------------------------------
+   logical function Failed()
       CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName )
       Failed = ErrStat >= AbortErrLev
       if (Failed) call Cleanup()
-    end function Failed
-    !-------------------------------------------------------------------------------------------------
-    SUBROUTINE Cleanup()
-
-    if (UnitInput > -1_IntKi)          CLOSE ( UnitInput )
-    if (TemporaryFileUnit > -1_IntKi)  CLOSE ( TemporaryFileUnit )
-    IF ( InputFileData%Echo ) THEN
-       if (UnitEcho > -1_IntKi)        CLOSE(UnitEcho)
-    END IF
-
-    END SUBROUTINE Cleanup
+   end function Failed
    !-------------------------------------------------------------------------------------------------
-    
-    END SUBROUTINE LidarSim_ReadInputFile
-    
+   SUBROUTINE Cleanup()
+      if (UnitInput > -1_IntKi)     CLOSE( UnitInput )
+      if (UnitEcho  > -1_IntKi)     CLOSE( UnitEcho  )
+   END SUBROUTINE Cleanup
+   !-------------------------------------------------------------------------------------------------
+
+END SUBROUTINE LidarSim_ReadInputFile
+
 
 !#########################################################################################################################################################################
-   
-    SUBROUTINE LidarSim_ReadOutputList (TemporaryFileUnit, UnitInput, FileName, OutputArray, ReadNumberOutputs, VariableName, VariableDescribtion, ErrStat, ErrMsg, UnitEcho )
-    
-    IMPLICIT      NONE
-    CHARACTER(*), PARAMETER           ::  RoutineName="LidarSim_ReadOutputList"
-
-    INTEGER,      INTENT(  OUT)       :: ReadNumberOutputs                          !< Length of the array that was actually read.
-    INTEGER,      INTENT(IN   )       :: TemporaryFileUnit                          !< Temporary unit for skipping comments
-    INTEGER,      INTENT(IN   )       :: UnitInput                                  !< I/O unit for input file.
-    INTEGER,      INTENT(IN   )       :: UnitEcho                                   !< I/O unit for echo file (if > 0).
-    INTEGER,      INTENT(  OUT)       :: ErrStat                                    !< Error status
-    CHARACTER(*), INTENT(  OUT)       :: ErrMsg                                     !< Error message
-    CHARACTER(*), INTENT(  OUT)       :: OutputArray(:)                             !< Character array being read (calling routine dimensions it to max allowable size).
-    CHARACTER(*), INTENT(IN   )       :: FileName                                   !< Name of the input file.
-    CHARACTER(*), INTENT(IN   )       :: VariableDescribtion                        !< Text string describing the variable.
-    CHARACTER(*), INTENT(IN   )       :: VariableName                               !< Text string containing the variable name.
-
-    ! Local variables
-    INTEGER                           :: MaxOutputs                                  ! Maximum length of the array being read
-    INTEGER                           :: NumberWords                                 ! Number of words contained on a line
-    INTEGER(IntKi)                    :: TmpErrStat                                  !< Temporary error status
-    CHARACTER(ErrMsgLen)              :: TmpErrMsg                                   !< temporary error message
-    CHARACTER(1000)                   :: OutLine                                     ! Character string read from file, containing output list
-    CHARACTER(3)                      :: EndOfFile
-
-    ! Initialization
-    ErrStat = ErrID_None
-    ErrMsg  = ''
-    MaxOutputs  = SIZE(OutputArray)
-    ReadNumberOutputs = 0
-    OutputArray = ''
-
-    ! Read in all of the lines containing output parameters and store them in OutputArray(:).
-    ! The end of this list is specified with the line beginning with END.
-    DO
-    CALL LidarSim_SkipComments(TemporaryFileUnit, UnitInput, TmpErrStat, TmpErrMsg, UnitEcho)
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    IF (ErrStat >= AbortErrLev) THEN
-        RETURN
-    END IF
-    CALL ReadVar ( UnitInput, FileName, OutLine, VariableName, VariableDescribtion, ErrStat, ErrMsg )
-    IF ( ErrStat >= AbortErrLev ) RETURN
-
-    EndOfFile = OutLine(1:3)            ! EndOfFile is the 1st 3 characters of OutLine
-    CALL Conv2UC( EndOfFile )           ! Convert EndOfFile to upper case
-    IF ( EndOfFile == 'END' )  EXIT     ! End of OutList has been reached; therefore, exit this DO
-
-    NumberWords = CountWords( OutLine ) ! The number of words in OutLine.
-
-    ReadNumberOutputs = ReadNumberOutputs + NumberWords  ! The total number of output channels read in so far.
-
-    ! Check to see if the maximum # allowable in the array has been reached.
-    IF ( ReadNumberOutputs > MaxOutputs )  THEN
-
-    ErrStat = ErrID_Fatal
-    ErrMsg = 'ReadOutputList:The maximum number of output channels allowed is '//TRIM( Int2LStr(MaxOutputs) )//'.'
-    RETURN
-
-    ELSE
-
-    CALL GetWords ( OutLine, OutputArray((ReadNumberOutputs - NumberWords + 1):ReadNumberOutputs), NumberWords )
-
-    END IF
-    END DO
-
-    RETURN
-
-    END SUBROUTINE LidarSim_ReadOutputList
-    
-
-!#########################################################################################################################################################################    
-    
-    SUBROUTINE LidarSim_SkipComments(TemporaryFileUnit, UnitInput, ErrStat, ErrMsg, UnitEcho)
-
-    IMPLICIT            NONE
-    CHARACTER(*),       PARAMETER                   ::  RoutineName="LidarSim_SkipComments"
-
-    INTEGER(IntKi),     INTENT(IN   )               ::  TemporaryFileUnit   !Unit number to look ahead for comments in the input file
-    INTEGER(IntKi),     INTENT(IN   )               ::  UnitInput           !Unit number of the "normal" input file
-    INTEGER(IntKi),     INTENT(  OUT)               ::  ErrStat             !< Error status of the operation
-    CHARACTER(*),       INTENT(  OUT)               ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
-    INTEGER(IntKi),     INTENT(IN   ), OPTIONAL     ::  UnitEcho            !< The local unit number for this module's echo file
-
-    ! Local variables
-    INTEGER(IntKi)                                  ::  ErrStatIO           !Error Status of the read commands
-    CHARACTER(1024)                                 ::  TemporaryRead       !string to read a line in
-    LOGICAL                                         ::  Commented           ! true if line is commented, false otherwise
-    
-   ! Initialization
-    ErrStat = 0
-    ErrMsg = ''
-    
-    READ(TemporaryFileUnit,*, IOSTAT = ErrStatIO) TemporaryRead
-    IF(ErrStatIO > 0) THEN
-        CALL SetErrStat(ErrID_Fatal,'Error checking for comments in the temporary input file',ErrStat,ErrMsg,RoutineName)
-        return
-    ENDIF
-    
-    IF ( PRESENT(UnitEcho) )  THEN
-        IF ( UnitEcho > 0 ) &
-        WRITE (UnitEcho,'(A)')  TRIM(TemporaryRead) !Writes read line to Echo file
-    END IF
-    
-    IF(TemporaryRead(1:1) == '!') THEN
-        Commented = .TRUE.
-    ELSE
-        Commented = .FALSE.
-    ENDIF
-    
-    DO while( Commented .eqv. .TRUE. )
-        READ(UnitInput,*,IOSTAT = ErrStatIO)    !Skip commented line in unit Input
-        IF(ErrStatIO > 0) THEN
-            CALL SetErrStat(ErrID_Fatal,'Error checking for comments in the original input file',ErrStat,ErrMsg,RoutineName)
-            return
-        ENDIF
-        READ(TemporaryFileUnit,*, IOSTAT = ErrStatIO) TemporaryRead !Checks if next line is commented again
-        IF(ErrStatIO > 0) THEN
-            CALL SetErrStat(ErrID_Fatal,'Error checking for comments in the temporary input file',ErrStat,ErrMsg,RoutineName)
-            return
-        ENDIF
-        
-        IF ( PRESENT(UnitEcho) )  THEN
-            IF ( UnitEcho > 0 ) &
-            WRITE (UnitEcho,'(A)')  TRIM(TemporaryRead) !Writes read line to Echo file
-        END IF
-        
-        IF(TemporaryRead(1:1) == '!') THEN
-            Commented = .TRUE.
-        ELSE
-            Commented = .FALSE.
-        ENDIF
-    END DO
-        
-    END SUBROUTINE
-    
-
-!#########################################################################################################################################################################    
     
     SUBROUTINE LidarSim_CreateRotationMatrix(Roll_N, Pitch_N, Yaw_N, LidarOrientation_N)
 
