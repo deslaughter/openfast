@@ -405,10 +405,16 @@ typedef	^	^	Orca_InputType	Input	{:}	-	-	"Array of inputs associated with InputT
 typedef	^	^	DbKi	InputTimes	{:}	-	-	"Array of times associated with Input Array"
 
 # ..... LidarSim data ........................................................................................................
-typedef	FAST	LidarSim_Data	LidarSim_ParameterType	p		-	-	"Parameters"
-typedef	^	^	LidarSim_InputType						u		-	-	"System inputs"
-typedef	^	^	LidarSim_OutputType					y		-	-	"System outputs"
-typedef ^	^	LidarSim_InitInputType					InitInp	-	-	"Initial input data"
+typedef	FAST	LidarSim_Data	LidarSim_ContinuousStateType	x	{2}	-	-	"Continuous states"
+typedef	^	^	LidarSim_DiscreteStateType	xd	{2}	-	-	"Discrete states"
+typedef	^	^	LidarSim_ConstraintStateType	z	{2}	-	-	"Constraint states"
+typedef	^	^	LidarSim_OtherStateType	OtherSt	{2}	-	-	"Other states"
+typedef	^	^	LidarSim_ParameterType	p	-	-	-	"Parameters"
+typedef	^	^	LidarSim_InputType	u	-	-	-	"System inputs"
+typedef	^	^	LidarSim_OutputType	y	-	-	-	"System outputs"
+typedef	^	^	LidarSim_MiscVarType	m	-	-	-	"Misc/optimization variables"
+typedef	^	^	LidarSim_InputType	Input	{:}	-	-	"Array of inputs associated with InputTimes"
+typedef	^	^	DbKi	InputTimes	{:}	-	-	"Array of times associated with Input Array"
 
 # ..... FAST_ModuleMapType data .......................................................................................................
 # ! Data structures for mapping and coupling the various modules together

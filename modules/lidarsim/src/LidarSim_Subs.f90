@@ -578,13 +578,18 @@ END SUBROUTINE LidarSim_ReadInputFile
     IMPLICIT                                NONE
     CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_CalculateVlos"
     
-    TYPE(LidarSim_ParameterType),           INTENT(INOUT)   ::  p                           !parameter data of the lidar module
+    TYPE(LidarSim_ParameterType),           INTENT(IN   )   ::  p                           !parameter data of the lidar module
     REAL(ReKi),                             INTENT(IN   )   ::  UnitVector_I(3)             !Line of Sight Unit Vector
     REAL(ReKi),                             INTENT(INOUT)   ::  MeasuringPosition_I(3)      !Position of the measuring point
-    REAL(ReKi),                             INTENT(IN   )   ::  LidarPosition_I(3)      !Position of the measuring point
+    REAL(ReKi),                             INTENT(IN   )   ::  LidarPosition_I(3)          !Position of the measuring point
     REAL(ReKi),                             INTENT(  OUT)   ::  Vlos                        !Calculated speed in los direction
     REAL(DbKi),                             INTENT(IN   )   ::  Time                        !< Current simulation time in seconds
 
+    !Error Variables
+    INTEGER(IntKi),                         INTENT(  OUT)   ::  ErrStat                     !< Error status of the operation
+    CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg                      !< Error message if ErrStat /= ErrID_None
+    
+!FIXME: remove IfW completely from here
     !IfW Parameter
     TYPE(InflowWind_ParameterType),         INTENT(IN   )   ::  IfW_p                       !< Parameters
     TYPE(InflowWind_ContinuousStateType),   INTENT(IN   )   ::  IfW_ContStates              !< Continuous states at Time
@@ -592,10 +597,6 @@ END SUBROUTINE LidarSim_ReadInputFile
     TYPE(InflowWind_ConstraintStateType),   INTENT(IN   )   ::  IfW_ConstrStates            !< Constraint states at Time
     TYPE(InflowWind_OtherStateType),        INTENT(IN   )   ::  IfW_OtherStates             !< Other/optimization states at Time
     TYPE(InflowWind_MiscVarType),           INTENT(INOUT)   ::  IfW_m                       !< Misc variables for optimization (not copied in glue code)
-    
-    !Error Variables
-    INTEGER(IntKi),                         INTENT(  OUT)   ::  ErrStat                     !< Error status of the operation
-    CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg                      !< Error message if ErrStat /= ErrID_None
     
     !Local Variables
     TYPE(InflowWind_InputType)              ::  InputForCalculation                         ! input data field for the calculation in the InflowWind module
@@ -651,7 +652,7 @@ END SUBROUTINE LidarSim_ReadInputFile
     IMPLICIT                                   NONE
     CHARACTER(*),                              PARAMETER            ::  RoutineName="LidarSim_LidarSim_CalculateIMU"
     
-    TYPE(LidarSim_ParameterType),              INTENT(INOUT)        ::  p
+    TYPE(LidarSim_ParameterType),              INTENT(IN   )        ::  p
     TYPE(LidarSim_OutputType),                 INTENT(INOUT)        ::  y                       !Outputs computed at Time (IN for mesh reasons and data allocation)
     TYPE(LidarSim_InputType),                  INTENT(IN   )        ::  u   
     
@@ -903,13 +904,14 @@ END SUBROUTINE LidarSim_ReadInputFile
     
 !#########################################################################################################################################################################  
     
-    SUBROUTINE LidarSim_SetOutputs(y,p,Vlos,UnitVector,LoopGatesPerBeam,Time)
+    SUBROUTINE LidarSim_SetOutputs(y,p,m,Vlos,UnitVector,LoopGatesPerBeam,Time)
     
     IMPLICIT                                    NONE
     CHARACTER(*),                               PARAMETER       ::  RoutineName='LidarSim_SetOutputs'
     
     TYPE(LidarSim_OutputType),                  INTENT(INOUT)   ::  y
     TYPE(LidarSim_ParameterType),               INTENT(IN   )   ::  p
+    TYPE(LidarSim_MiscVarType),                 INTENT(IN   )   ::  m
     REAL(ReKi),                                 INTENT(IN   )   ::  Vlos
     REAL(ReKi),                                 INTENT(IN   )   ::  UnitVector(3)
     INTEGER(IntKi),                             INTENT(IN   )   ::  LoopGatesPerBeam                    !from 0 to p%GatesPerBeam-1
@@ -926,15 +928,15 @@ END SUBROUTINE LidarSim_ReadInputFile
     
     y%AllOutputs( 1 : 18 )  = y%IMUOutputs ( 1 : 18 )
     if (size(p%MeasuringPoints_Spherical_L,2) > 0) then
-       y%AllOutputs( 19 )      = p%MeasuringPoints_Spherical_L(2,p%LastMeasuringPoint+LoopGatesPerBeam)        !Azimuth
-       y%AllOutputs( 20 )      = p%MeasuringPoints_Spherical_L(3,p%LastMeasuringPoint+LoopGatesPerBeam)        !Elevation
+       y%AllOutputs( 19 )      = p%MeasuringPoints_Spherical_L(2,m%LastMeasuringPoint+LoopGatesPerBeam)        !Azimuth
+       y%AllOutputs( 20 )      = p%MeasuringPoints_Spherical_L(3,m%LastMeasuringPoint+LoopGatesPerBeam)        !Elevation
     endif
     y%AllOutputs( 21 )      = Time                                                                          !MeasTime
     y%AllOutputs( 22 )      = 1                                                                             !NewData
-    y%AllOutputs( 23 )      = REAL(p%NextBeamID)                                                            !BeamID
+    y%AllOutputs( 23 )      = REAL(m%NextBeamID)                                                            !BeamID
 
     if (size(p%MeasuringPoints_Spherical_L,2) > 0) then
-       y%AllOutputs( 24 + LoopGatesPerBeam ) = p%MeasuringPoints_Spherical_L(1,p%LastMeasuringPoint+LoopGatesPerBeam)   !Rangegates
+       y%AllOutputs( 24 + LoopGatesPerBeam ) = p%MeasuringPoints_Spherical_L(1,m%LastMeasuringPoint+LoopGatesPerBeam)   !Rangegates
     endif
     y%AllOutputs( 24 + p%GatesPerBeam + LoopGatesPerBeam ) = Vlos + (  DOT_PRODUCT(Dot_LidarPosition_I,UnitVector))  !Output the measured V_los. Consiting of the windspeed and the movement of the measuring system itself
     
