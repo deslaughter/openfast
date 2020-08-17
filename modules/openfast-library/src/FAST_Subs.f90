@@ -688,6 +688,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
    END IF
    
    
+!FIXME: move this to before InflowWind init.  Need size of arrays...
    ! ........................
    ! initialize LidarSim
    ! ........................
@@ -697,7 +698,8 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
          InitInData_LidSim%RootName  =   TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_LidSim))
          InitInData_LidSim%InputInitFile =   p_FAST%LidarFile
          InitInData_LidSim%DT            =   p_FAST%DT
-         CALL LidarSim_Init(InitInData_LidSim, LidSim%y, LidSim%p, InitOutData_LidSim, ErrStat2, ErrMsg2 )
+         CALL LidarSim_Init( InitInData_LidSim, LidSim%Input(1), LidSim%p, LidSim%x(STATE_CURR), LidSim%xd(STATE_CURR), LidSim%z(STATE_CURR), &
+                    LidSim%OtherSt(STATE_CURR), LidSim%y, LidSim%m, p_FAST%dt_module( MODULE_LidSim ), InitOutData_LidSim, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
       ELSE
          CALL SetErrStat(ErrID_Severe,"LidarSim dosen't work without InflowWind",ErrStat,ErrMsg,RoutineName)
@@ -6014,7 +6016,7 @@ SUBROUTINE ExitThisProgram( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW,
                   
       ! Destroy all data associated with FAST variables:
 
-   CALL FAST_DestroyAll( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat2, ErrMsg2 )
+   CALL FAST_DestroyAll( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim, MeshMapData, ErrStat2, ErrMsg2 )
       IF (ErrStat2 /= ErrID_None) THEN
          CALL WrScr( NewLine//RoutineName//':'//TRIM(ErrMsg2)//NewLine )
          ErrorLevel = MAX(ErrorLevel,ErrStat2)
@@ -6261,7 +6263,8 @@ SUBROUTINE FAST_EndMods( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, HD
    END IF   
                      
    IF (  p_FAST%ModuleInitialized(Module_LidSim) ) THEN
-      CALL LidarSim_End( LidSim%y, LidSim%p, LidSim%u, ErrStat, ErrMsg)
+      CALL LidarSim_End( LidSim%Input(1), LidSim%p, LidSim%x(STATE_CURR), LidSim%xd(STATE_CURR), LidSim%z(STATE_CURR), LidSim%OtherSt(STATE_CURR),   &
+                           LidSim%y, LidSim%m, ErrStat2, ErrMsg2 )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)            
    END IF
    
@@ -6269,7 +6272,7 @@ END SUBROUTINE FAST_EndMods
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine calls the destroy routines for each module. (It is basically a duplicate of FAST_DestroyTurbineType().)
 SUBROUTINE FAST_DestroyAll( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, &
-                            MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat, ErrMsg )
+                            MAPp, FEAM, MD, Orca, IceF, IceD, LidSim, MeshMapData, ErrStat, ErrMsg )
 
    TYPE(FAST_ParameterType), INTENT(INOUT) :: p_FAST              !< Parameters for the glue code
    TYPE(FAST_OutputFileType),INTENT(INOUT) :: y_FAST              !< Output variables for the glue code
@@ -6291,6 +6294,7 @@ SUBROUTINE FAST_DestroyAll( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW,
    TYPE(OrcaFlex_Data),      INTENT(INOUT) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(INOUT) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(INOUT) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< LidarSim data
 
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
       
@@ -6392,7 +6396,11 @@ SUBROUTINE FAST_DestroyAll( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW,
    CALL FAST_DestroyModuleMapType( MeshMapData, ErrStat2, ErrMsg2 )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)            
        
-      
+
+   ! LidarSim
+   CALL FAST_DestroyLidarSim_Data( LidSim, ErrStat2, ErrMsg2 )
+      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)            
+
    
    END SUBROUTINE FAST_DestroyAll
 !----------------------------------------------------------------------------------------------------------------------------------

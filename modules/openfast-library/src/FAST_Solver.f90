@@ -4388,7 +4388,7 @@ SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, ca
    TYPE(OrcaFlex_Data),      INTENT(INOUT) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(INOUT) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(INOUT) :: IceD                !< All the IceDyn data used in time-step loop
-   TYPE(LidarSim_Data),	     INTENT(INOUT) :: LidSim              !< Data for Lidar Simulator
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< Data for Lidar Simulator
 
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
    
@@ -4976,10 +4976,12 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
 
    IF ( p_FAST%CompLidar == Module_LidSim ) THEN
       LidSim%u%NacelleMotion = ED%Output(1)%NacelleMotion
-	  CALL LidarSim_CalcOutput(this_time, LidSim%y, LidSim%p, LidSim%u,&
+!FIXME: remove IfW, and add some above line to new routine for mapping over stuff?
+    CALL LidarSim_CalcOutput(this_time, LidSim%Input(1), LidSim%p, LidSim%x(this_state), LidSim%xd(this_state), &
+                           LidSim%z(this_state), LidSim%OtherSt(this_state), LidSim%y, LidSim%m,   &
                        IfW%p,IfW%x(this_state), IfW%xd(this_state), IfW%z(this_state), IfW%OtherSt(this_state), IfW%m,&
-					   ErrStat2, ErrMsg2)        
-	     CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+             ErrStat2, ErrMsg2)        
+       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ! Additional signals for avrSWAP array
       IF ( p_FAST%CompServo == Module_SrvD ) THEN
          SrvD%AddOuts%NewData    = NINT(LidSim%y%SwapOutputs(1))
@@ -5169,8 +5171,31 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED
             CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       END DO !j_ss
    END IF
-   
-   
+
+
+!!FIXME: Is this the right place for this?
+!    ! LidarSim: get predicted states
+!   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+!      CALL LidarSim_CopyContState   (LdSim%x( STATE_CURR), LdSim%x( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+!         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+!      CALL LidarSim_CopyDiscState   (LdSim%xd(STATE_CURR), LdSim%xd(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+!         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+!      CALL LidarSim_CopyConstrState (LdSim%z( STATE_CURR), LdSim%z( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+!         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+!      CALL LidarSim_CopyOtherState( LdSim%OtherSt(STATE_CURR), LdSim%OtherSt(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+!         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+!
+!      DO j_ss = 1, p_FAST%n_substeps( MODULE_LdSim )
+!         n_t_module = n_t_global*p_FAST%n_substeps( MODULE_LdSim ) + j_ss - 1
+!         t_module   = n_t_module*p_FAST%dt_module( MODULE_LdSim ) + t_initial
+!
+!         CALL LidarSim_UpdateStates( t_module, n_t_module, LdSim%Input, LdSim%InputTimes, LdSim%p, LdSim%x(STATE_PRED), LdSim%xd(STATE_PRED), &
+!                                       LdSim%z(STATE_PRED), LdSim%OtherSt(STATE_PRED), LdSim%m, ErrStat2, ErrMsg2 )
+!            CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+!      END DO !j_ss
+!   END IF
+
+
       ! because AeroDyn DBEMT states depend heavily on getting inputs correct, we are overwriting its inputs with updated inflow outputs here
    CALL SolveOption2c_Inp2AD_SrvD(t_global_next, STATE_PRED, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2, .false.)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )

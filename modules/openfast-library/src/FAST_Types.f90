@@ -478,10 +478,16 @@ IMPLICIT NONE
 ! =======================
 ! =========  LidarSim_Data  =======
   TYPE, PUBLIC :: LidarSim_Data
-    TYPE(LidarSim_ParameterType)  :: p 
-    TYPE(LidarSim_InputType)  :: u 
-    TYPE(LidarSim_OutputType)  :: y 
-    TYPE(LidarSim_InitInputType)  :: InitInp 
+    TYPE(LidarSim_ContinuousStateType) , DIMENSION(1:2)  :: x      !< Continuous states [-]
+    TYPE(LidarSim_DiscreteStateType) , DIMENSION(1:2)  :: xd      !< Discrete states [-]
+    TYPE(LidarSim_ConstraintStateType) , DIMENSION(1:2)  :: z      !< Constraint states [-]
+    TYPE(LidarSim_OtherStateType) , DIMENSION(1:2)  :: OtherSt      !< Other states [-]
+    TYPE(LidarSim_ParameterType)  :: p      !< Parameters [-]
+    TYPE(LidarSim_InputType)  :: u      !< System inputs [-]
+    TYPE(LidarSim_OutputType)  :: y      !< System outputs [-]
+    TYPE(LidarSim_MiscVarType)  :: m      !< Misc/optimization variables [-]
+    TYPE(LidarSim_InputType) , DIMENSION(:), ALLOCATABLE  :: Input      !< Array of inputs associated with InputTimes [-]
+    REAL(DbKi) , DIMENSION(:), ALLOCATABLE  :: InputTimes      !< Array of times associated with Input Array [-]
   END TYPE LidarSim_Data
 ! =======================
 ! =========  FAST_ModuleMapType  =======
@@ -23444,12 +23450,33 @@ ENDIF
    CHARACTER(*),    INTENT(  OUT) :: ErrMsg
 ! Local 
    INTEGER(IntKi)                 :: i,j,k
+   INTEGER(IntKi)                 :: i1, i1_l, i1_u  !  bounds (upper/lower) for an array dimension 1
    INTEGER(IntKi)                 :: ErrStat2
    CHARACTER(ErrMsgLen)           :: ErrMsg2
    CHARACTER(*), PARAMETER        :: RoutineName = 'FAST_CopyLidarSim_Data'
 ! 
    ErrStat = ErrID_None
    ErrMsg  = ""
+    DO i1 = LBOUND(SrcLidarSim_DataData%x,1), UBOUND(SrcLidarSim_DataData%x,1)
+      CALL LidarSim_CopyContState( SrcLidarSim_DataData%x(i1), DstLidarSim_DataData%x(i1), CtrlCode, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
+    ENDDO
+    DO i1 = LBOUND(SrcLidarSim_DataData%xd,1), UBOUND(SrcLidarSim_DataData%xd,1)
+      CALL LidarSim_CopyDiscState( SrcLidarSim_DataData%xd(i1), DstLidarSim_DataData%xd(i1), CtrlCode, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
+    ENDDO
+    DO i1 = LBOUND(SrcLidarSim_DataData%z,1), UBOUND(SrcLidarSim_DataData%z,1)
+      CALL LidarSim_CopyConstrState( SrcLidarSim_DataData%z(i1), DstLidarSim_DataData%z(i1), CtrlCode, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
+    ENDDO
+    DO i1 = LBOUND(SrcLidarSim_DataData%OtherSt,1), UBOUND(SrcLidarSim_DataData%OtherSt,1)
+      CALL LidarSim_CopyOtherState( SrcLidarSim_DataData%OtherSt(i1), DstLidarSim_DataData%OtherSt(i1), CtrlCode, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
+    ENDDO
       CALL LidarSim_CopyParam( SrcLidarSim_DataData%p, DstLidarSim_DataData%p, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
@@ -23459,9 +23486,37 @@ ENDIF
       CALL LidarSim_CopyOutput( SrcLidarSim_DataData%y, DstLidarSim_DataData%y, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
-      CALL LidarSim_CopyInitInput( SrcLidarSim_DataData%InitInp, DstLidarSim_DataData%InitInp, CtrlCode, ErrStat2, ErrMsg2 )
+      CALL LidarSim_CopyMisc( SrcLidarSim_DataData%m, DstLidarSim_DataData%m, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
+IF (ALLOCATED(SrcLidarSim_DataData%Input)) THEN
+  i1_l = LBOUND(SrcLidarSim_DataData%Input,1)
+  i1_u = UBOUND(SrcLidarSim_DataData%Input,1)
+  IF (.NOT. ALLOCATED(DstLidarSim_DataData%Input)) THEN 
+    ALLOCATE(DstLidarSim_DataData%Input(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstLidarSim_DataData%Input.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DO i1 = LBOUND(SrcLidarSim_DataData%Input,1), UBOUND(SrcLidarSim_DataData%Input,1)
+      CALL LidarSim_CopyInput( SrcLidarSim_DataData%Input(i1), DstLidarSim_DataData%Input(i1), CtrlCode, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
+    ENDDO
+ENDIF
+IF (ALLOCATED(SrcLidarSim_DataData%InputTimes)) THEN
+  i1_l = LBOUND(SrcLidarSim_DataData%InputTimes,1)
+  i1_u = UBOUND(SrcLidarSim_DataData%InputTimes,1)
+  IF (.NOT. ALLOCATED(DstLidarSim_DataData%InputTimes)) THEN 
+    ALLOCATE(DstLidarSim_DataData%InputTimes(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstLidarSim_DataData%InputTimes.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstLidarSim_DataData%InputTimes = SrcLidarSim_DataData%InputTimes
+ENDIF
  END SUBROUTINE FAST_CopyLidarSim_Data
 
  SUBROUTINE FAST_DestroyLidarSim_Data( LidarSim_DataData, ErrStat, ErrMsg )
@@ -23473,10 +23528,31 @@ ENDIF
 ! 
   ErrStat = ErrID_None
   ErrMsg  = ""
+DO i1 = LBOUND(LidarSim_DataData%x,1), UBOUND(LidarSim_DataData%x,1)
+  CALL LidarSim_DestroyContState( LidarSim_DataData%x(i1), ErrStat, ErrMsg )
+ENDDO
+DO i1 = LBOUND(LidarSim_DataData%xd,1), UBOUND(LidarSim_DataData%xd,1)
+  CALL LidarSim_DestroyDiscState( LidarSim_DataData%xd(i1), ErrStat, ErrMsg )
+ENDDO
+DO i1 = LBOUND(LidarSim_DataData%z,1), UBOUND(LidarSim_DataData%z,1)
+  CALL LidarSim_DestroyConstrState( LidarSim_DataData%z(i1), ErrStat, ErrMsg )
+ENDDO
+DO i1 = LBOUND(LidarSim_DataData%OtherSt,1), UBOUND(LidarSim_DataData%OtherSt,1)
+  CALL LidarSim_DestroyOtherState( LidarSim_DataData%OtherSt(i1), ErrStat, ErrMsg )
+ENDDO
   CALL LidarSim_DestroyParam( LidarSim_DataData%p, ErrStat, ErrMsg )
   CALL LidarSim_DestroyInput( LidarSim_DataData%u, ErrStat, ErrMsg )
   CALL LidarSim_DestroyOutput( LidarSim_DataData%y, ErrStat, ErrMsg )
-  CALL LidarSim_DestroyInitInput( LidarSim_DataData%InitInp, ErrStat, ErrMsg )
+  CALL LidarSim_DestroyMisc( LidarSim_DataData%m, ErrStat, ErrMsg )
+IF (ALLOCATED(LidarSim_DataData%Input)) THEN
+DO i1 = LBOUND(LidarSim_DataData%Input,1), UBOUND(LidarSim_DataData%Input,1)
+  CALL LidarSim_DestroyInput( LidarSim_DataData%Input(i1), ErrStat, ErrMsg )
+ENDDO
+  DEALLOCATE(LidarSim_DataData%Input)
+ENDIF
+IF (ALLOCATED(LidarSim_DataData%InputTimes)) THEN
+  DEALLOCATE(LidarSim_DataData%InputTimes)
+ENDIF
  END SUBROUTINE FAST_DestroyLidarSim_Data
 
  SUBROUTINE FAST_PackLidarSim_Data( ReKiBuf, DbKiBuf, IntKiBuf, Indata, ErrStat, ErrMsg, SizeOnly )
@@ -23515,6 +23591,82 @@ ENDIF
   Db_BufSz  = 0
   Int_BufSz  = 0
    ! Allocate buffers for subtypes, if any (we'll get sizes from these) 
+    DO i1 = LBOUND(InData%x,1), UBOUND(InData%x,1)
+      Int_BufSz   = Int_BufSz + 3  ! x: size of buffers for each call to pack subtype
+      CALL LidarSim_PackContState( Re_Buf, Db_Buf, Int_Buf, InData%x(i1), ErrStat2, ErrMsg2, .TRUE. ) ! x 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN ! x
+         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
+         DEALLOCATE(Re_Buf)
+      END IF
+      IF(ALLOCATED(Db_Buf)) THEN ! x
+         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
+         DEALLOCATE(Db_Buf)
+      END IF
+      IF(ALLOCATED(Int_Buf)) THEN ! x
+         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
+         DEALLOCATE(Int_Buf)
+      END IF
+    END DO
+    DO i1 = LBOUND(InData%xd,1), UBOUND(InData%xd,1)
+      Int_BufSz   = Int_BufSz + 3  ! xd: size of buffers for each call to pack subtype
+      CALL LidarSim_PackDiscState( Re_Buf, Db_Buf, Int_Buf, InData%xd(i1), ErrStat2, ErrMsg2, .TRUE. ) ! xd 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN ! xd
+         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
+         DEALLOCATE(Re_Buf)
+      END IF
+      IF(ALLOCATED(Db_Buf)) THEN ! xd
+         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
+         DEALLOCATE(Db_Buf)
+      END IF
+      IF(ALLOCATED(Int_Buf)) THEN ! xd
+         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
+         DEALLOCATE(Int_Buf)
+      END IF
+    END DO
+    DO i1 = LBOUND(InData%z,1), UBOUND(InData%z,1)
+      Int_BufSz   = Int_BufSz + 3  ! z: size of buffers for each call to pack subtype
+      CALL LidarSim_PackConstrState( Re_Buf, Db_Buf, Int_Buf, InData%z(i1), ErrStat2, ErrMsg2, .TRUE. ) ! z 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN ! z
+         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
+         DEALLOCATE(Re_Buf)
+      END IF
+      IF(ALLOCATED(Db_Buf)) THEN ! z
+         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
+         DEALLOCATE(Db_Buf)
+      END IF
+      IF(ALLOCATED(Int_Buf)) THEN ! z
+         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
+         DEALLOCATE(Int_Buf)
+      END IF
+    END DO
+    DO i1 = LBOUND(InData%OtherSt,1), UBOUND(InData%OtherSt,1)
+      Int_BufSz   = Int_BufSz + 3  ! OtherSt: size of buffers for each call to pack subtype
+      CALL LidarSim_PackOtherState( Re_Buf, Db_Buf, Int_Buf, InData%OtherSt(i1), ErrStat2, ErrMsg2, .TRUE. ) ! OtherSt 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN ! OtherSt
+         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
+         DEALLOCATE(Re_Buf)
+      END IF
+      IF(ALLOCATED(Db_Buf)) THEN ! OtherSt
+         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
+         DEALLOCATE(Db_Buf)
+      END IF
+      IF(ALLOCATED(Int_Buf)) THEN ! OtherSt
+         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
+         DEALLOCATE(Int_Buf)
+      END IF
+    END DO
       Int_BufSz   = Int_BufSz + 3  ! p: size of buffers for each call to pack subtype
       CALL LidarSim_PackParam( Re_Buf, Db_Buf, Int_Buf, InData%p, ErrStat2, ErrMsg2, .TRUE. ) ! p 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -23566,23 +23718,51 @@ ENDIF
          Int_BufSz = Int_BufSz + SIZE( Int_Buf )
          DEALLOCATE(Int_Buf)
       END IF
-      Int_BufSz   = Int_BufSz + 3  ! InitInp: size of buffers for each call to pack subtype
-      CALL LidarSim_PackInitInput( Re_Buf, Db_Buf, Int_Buf, InData%InitInp, ErrStat2, ErrMsg2, .TRUE. ) ! InitInp 
+      Int_BufSz   = Int_BufSz + 3  ! m: size of buffers for each call to pack subtype
+      CALL LidarSim_PackMisc( Re_Buf, Db_Buf, Int_Buf, InData%m, ErrStat2, ErrMsg2, .TRUE. ) ! m 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
         IF (ErrStat >= AbortErrLev) RETURN
 
-      IF(ALLOCATED(Re_Buf)) THEN ! InitInp
+      IF(ALLOCATED(Re_Buf)) THEN ! m
          Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
          DEALLOCATE(Re_Buf)
       END IF
-      IF(ALLOCATED(Db_Buf)) THEN ! InitInp
+      IF(ALLOCATED(Db_Buf)) THEN ! m
          Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
          DEALLOCATE(Db_Buf)
       END IF
-      IF(ALLOCATED(Int_Buf)) THEN ! InitInp
+      IF(ALLOCATED(Int_Buf)) THEN ! m
          Int_BufSz = Int_BufSz + SIZE( Int_Buf )
          DEALLOCATE(Int_Buf)
       END IF
+  Int_BufSz   = Int_BufSz   + 1     ! Input allocated yes/no
+  IF ( ALLOCATED(InData%Input) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*1  ! Input upper/lower bounds for each dimension
+    DO i1 = LBOUND(InData%Input,1), UBOUND(InData%Input,1)
+      Int_BufSz   = Int_BufSz + 3  ! Input: size of buffers for each call to pack subtype
+      CALL LidarSim_PackInput( Re_Buf, Db_Buf, Int_Buf, InData%Input(i1), ErrStat2, ErrMsg2, .TRUE. ) ! Input 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN ! Input
+         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
+         DEALLOCATE(Re_Buf)
+      END IF
+      IF(ALLOCATED(Db_Buf)) THEN ! Input
+         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
+         DEALLOCATE(Db_Buf)
+      END IF
+      IF(ALLOCATED(Int_Buf)) THEN ! Input
+         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
+         DEALLOCATE(Int_Buf)
+      END IF
+    END DO
+  END IF
+  Int_BufSz   = Int_BufSz   + 1     ! InputTimes allocated yes/no
+  IF ( ALLOCATED(InData%InputTimes) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*1  ! InputTimes upper/lower bounds for each dimension
+      Db_BufSz   = Db_BufSz   + SIZE(InData%InputTimes)  ! InputTimes
+  END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -23610,6 +23790,126 @@ ENDIF
   Db_Xferred  = 1
   Int_Xferred = 1
 
+    DO i1 = LBOUND(InData%x,1), UBOUND(InData%x,1)
+      CALL LidarSim_PackContState( Re_Buf, Db_Buf, Int_Buf, InData%x(i1), ErrStat2, ErrMsg2, OnlySize ) ! x 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
+        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
+        DEALLOCATE(Re_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Db_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
+        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
+        DEALLOCATE(Db_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Int_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
+        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
+        DEALLOCATE(Int_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+    END DO
+    DO i1 = LBOUND(InData%xd,1), UBOUND(InData%xd,1)
+      CALL LidarSim_PackDiscState( Re_Buf, Db_Buf, Int_Buf, InData%xd(i1), ErrStat2, ErrMsg2, OnlySize ) ! xd 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
+        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
+        DEALLOCATE(Re_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Db_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
+        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
+        DEALLOCATE(Db_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Int_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
+        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
+        DEALLOCATE(Int_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+    END DO
+    DO i1 = LBOUND(InData%z,1), UBOUND(InData%z,1)
+      CALL LidarSim_PackConstrState( Re_Buf, Db_Buf, Int_Buf, InData%z(i1), ErrStat2, ErrMsg2, OnlySize ) ! z 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
+        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
+        DEALLOCATE(Re_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Db_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
+        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
+        DEALLOCATE(Db_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Int_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
+        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
+        DEALLOCATE(Int_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+    END DO
+    DO i1 = LBOUND(InData%OtherSt,1), UBOUND(InData%OtherSt,1)
+      CALL LidarSim_PackOtherState( Re_Buf, Db_Buf, Int_Buf, InData%OtherSt(i1), ErrStat2, ErrMsg2, OnlySize ) ! OtherSt 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
+        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
+        DEALLOCATE(Re_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Db_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
+        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
+        DEALLOCATE(Db_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Int_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
+        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
+        DEALLOCATE(Int_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+    END DO
       CALL LidarSim_PackParam( Re_Buf, Db_Buf, Int_Buf, InData%p, ErrStat2, ErrMsg2, OnlySize ) ! p 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
         IF (ErrStat >= AbortErrLev) RETURN
@@ -23694,7 +23994,7 @@ ENDIF
       ELSE
         IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
       ENDIF
-      CALL LidarSim_PackInitInput( Re_Buf, Db_Buf, Int_Buf, InData%InitInp, ErrStat2, ErrMsg2, OnlySize ) ! InitInp 
+      CALL LidarSim_PackMisc( Re_Buf, Db_Buf, Int_Buf, InData%m, ErrStat2, ErrMsg2, OnlySize ) ! m 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
         IF (ErrStat >= AbortErrLev) RETURN
 
@@ -23722,6 +24022,60 @@ ENDIF
       ELSE
         IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
       ENDIF
+  IF ( .NOT. ALLOCATED(InData%Input) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%Input,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%Input,1)
+    Int_Xferred = Int_Xferred + 2
+
+    DO i1 = LBOUND(InData%Input,1), UBOUND(InData%Input,1)
+      CALL LidarSim_PackInput( Re_Buf, Db_Buf, Int_Buf, InData%Input(i1), ErrStat2, ErrMsg2, OnlySize ) ! Input 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
+        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
+        DEALLOCATE(Re_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Db_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
+        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
+        DEALLOCATE(Db_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Int_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
+        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
+        DEALLOCATE(Int_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+    END DO
+  END IF
+  IF ( .NOT. ALLOCATED(InData%InputTimes) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%InputTimes,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%InputTimes,1)
+    Int_Xferred = Int_Xferred + 2
+
+      IF (SIZE(InData%InputTimes)>0) DbKiBuf ( Db_Xferred:Db_Xferred+(SIZE(InData%InputTimes))-1 ) = PACK(InData%InputTimes,.TRUE.)
+      Db_Xferred   = Db_Xferred   + SIZE(InData%InputTimes)
+  END IF
  END SUBROUTINE FAST_PackLidarSim_Data
 
  SUBROUTINE FAST_UnPackLidarSim_Data( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -23743,6 +24097,7 @@ ENDIF
   LOGICAL, ALLOCATABLE           :: mask3(:,:,:)
   LOGICAL, ALLOCATABLE           :: mask4(:,:,:,:)
   LOGICAL, ALLOCATABLE           :: mask5(:,:,:,:,:)
+  INTEGER(IntKi)                 :: i1, i1_l, i1_u  !  bounds (upper/lower) for an array dimension 1
   INTEGER(IntKi)                 :: ErrStat2
   CHARACTER(ErrMsgLen)           :: ErrMsg2
   CHARACTER(*), PARAMETER        :: RoutineName = 'FAST_UnPackLidarSim_Data'
@@ -23756,6 +24111,182 @@ ENDIF
   Re_Xferred  = 1
   Db_Xferred  = 1
   Int_Xferred  = 1
+    i1_l = LBOUND(OutData%x,1)
+    i1_u = UBOUND(OutData%x,1)
+    DO i1 = LBOUND(OutData%x,1), UBOUND(OutData%x,1)
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
+        Re_Xferred = Re_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
+        Db_Xferred = Db_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
+        Int_Xferred = Int_Xferred + Buf_size
+      END IF
+      CALL LidarSim_UnpackContState( Re_Buf, Db_Buf, Int_Buf, OutData%x(i1), ErrStat2, ErrMsg2 ) ! x 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
+      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
+      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+    END DO
+    i1_l = LBOUND(OutData%xd,1)
+    i1_u = UBOUND(OutData%xd,1)
+    DO i1 = LBOUND(OutData%xd,1), UBOUND(OutData%xd,1)
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
+        Re_Xferred = Re_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
+        Db_Xferred = Db_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
+        Int_Xferred = Int_Xferred + Buf_size
+      END IF
+      CALL LidarSim_UnpackDiscState( Re_Buf, Db_Buf, Int_Buf, OutData%xd(i1), ErrStat2, ErrMsg2 ) ! xd 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
+      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
+      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+    END DO
+    i1_l = LBOUND(OutData%z,1)
+    i1_u = UBOUND(OutData%z,1)
+    DO i1 = LBOUND(OutData%z,1), UBOUND(OutData%z,1)
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
+        Re_Xferred = Re_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
+        Db_Xferred = Db_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
+        Int_Xferred = Int_Xferred + Buf_size
+      END IF
+      CALL LidarSim_UnpackConstrState( Re_Buf, Db_Buf, Int_Buf, OutData%z(i1), ErrStat2, ErrMsg2 ) ! z 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
+      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
+      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+    END DO
+    i1_l = LBOUND(OutData%OtherSt,1)
+    i1_u = UBOUND(OutData%OtherSt,1)
+    DO i1 = LBOUND(OutData%OtherSt,1), UBOUND(OutData%OtherSt,1)
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
+        Re_Xferred = Re_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
+        Db_Xferred = Db_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
+        Int_Xferred = Int_Xferred + Buf_size
+      END IF
+      CALL LidarSim_UnpackOtherState( Re_Buf, Db_Buf, Int_Buf, OutData%OtherSt(i1), ErrStat2, ErrMsg2 ) ! OtherSt 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
+      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
+      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+    END DO
       Buf_size=IntKiBuf( Int_Xferred )
       Int_Xferred = Int_Xferred + 1
       IF(Buf_size > 0) THEN
@@ -23909,13 +24440,92 @@ ENDIF
         Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
         Int_Xferred = Int_Xferred + Buf_size
       END IF
-      CALL LidarSim_UnpackInitInput( Re_Buf, Db_Buf, Int_Buf, OutData%InitInp, ErrStat2, ErrMsg2 ) ! InitInp 
+      CALL LidarSim_UnpackMisc( Re_Buf, Db_Buf, Int_Buf, OutData%m, ErrStat2, ErrMsg2 ) ! m 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
         IF (ErrStat >= AbortErrLev) RETURN
 
       IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
       IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
       IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! Input not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%Input)) DEALLOCATE(OutData%Input)
+    ALLOCATE(OutData%Input(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%Input.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    DO i1 = LBOUND(OutData%Input,1), UBOUND(OutData%Input,1)
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
+        Re_Xferred = Re_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
+        Db_Xferred = Db_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
+        Int_Xferred = Int_Xferred + Buf_size
+      END IF
+      CALL LidarSim_UnpackInput( Re_Buf, Db_Buf, Int_Buf, OutData%Input(i1), ErrStat2, ErrMsg2 ) ! Input 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
+      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
+      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+    END DO
+  END IF
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! InputTimes not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%InputTimes)) DEALLOCATE(OutData%InputTimes)
+    ALLOCATE(OutData%InputTimes(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%InputTimes.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    ALLOCATE(mask1(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating mask1.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    mask1 = .TRUE. 
+      IF (SIZE(OutData%InputTimes)>0) OutData%InputTimes = UNPACK(DbKiBuf( Db_Xferred:Db_Xferred+(SIZE(OutData%InputTimes))-1 ), mask1, 0.0_DbKi )
+      Db_Xferred   = Db_Xferred   + SIZE(OutData%InputTimes)
+    DEALLOCATE(mask1)
+  END IF
  END SUBROUTINE FAST_UnPackLidarSim_Data
 
  SUBROUTINE FAST_CopyModuleMapType( SrcModuleMapTypeData, DstModuleMapTypeData, CtrlCode, ErrStat, ErrMsg )
