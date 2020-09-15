@@ -265,6 +265,7 @@ SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD
 END SUBROUTINE ED_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine determines the points in space where InflowWind needs to compute wind speeds.
+!FIXME: add LidarSim points
 SUBROUTINE IfW_InputSolve( p_FAST, m_FAST, u_IfW, p_IfW, u_AD14, u_AD, y_ED, ErrStat, ErrMsg )
 
    TYPE(InflowWind_InputType),     INTENT(INOUT)   :: u_IfW       !< The inputs to InflowWind
@@ -3625,7 +3626,7 @@ SUBROUTINE Perturb_u_FullOpt1( p_FAST, Jac_u_indx, n, u_perturb, u_ED_perturb, u
 END SUBROUTINE Perturb_u_FullOpt1
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine resets the remap flags on all of the meshes
-SUBROUTINE ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD )
+SUBROUTINE ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim )
 !...............................................................................................................................
 
    TYPE(FAST_ParameterType), INTENT(IN   ) :: p_FAST              !< Parameters for the glue code
@@ -3644,6 +3645,7 @@ SUBROUTINE ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp
    TYPE(OrcaFlex_Data),      INTENT(INOUT) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(INOUT) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(INOUT) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< Data for Lidar Simulator
 
    !local variable(s)
 
@@ -3796,14 +3798,21 @@ SUBROUTINE ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp
          IF (IceD%Input(1,i)%PointMesh%Committed) THEN
             IceD%Input(1,i)%PointMesh%RemapFlag = .FALSE.
                   IceD%y(i)%PointMesh%RemapFlag = .FALSE.
-         END IF    
-      END DO         
+         END IF
+      END DO
    END IF
-      
+
+   ! LidarSim
+   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+      IF (LidSim%Input(1)%LidarMesh%Committed) THEN
+         LidSim%Input(1)%LidarMesh%RemapFlag = .FALSE.
+      END IF
+   END IF
+
 END SUBROUTINE ResetRemapFlags  
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine initializes all of the mapping data structures needed between the various modules.
-SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat, ErrMsg)
+SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim, MeshMapData, ErrStat, ErrMsg)
 !...............................................................................................................................
    
    TYPE(FAST_ParameterType), INTENT(INOUT) :: p_FAST              !< Parameters for the glue code
@@ -3822,6 +3831,7 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, M
    TYPE(OrcaFlex_Data),      INTENT(INOUT) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(INOUT) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(INOUT) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< Data for Lidar Simulator
 
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
    
@@ -4237,11 +4247,24 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, M
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':SD_P_2_IceD_P('//TRIM(num2LStr(i))//')' )                  
                
       END DO
-                        
+
    END IF   ! SubDyn-IceFloe
       
    IF (ErrStat >= AbortErrLev ) RETURN   
       
+!-------------------------
+!  ElastoDyn <-> LidarSim
+!-------------------------
+   ! If we choose a hub mounted lidar, add that mesh option here
+   IF ( LidSim%Input(1)%LidarMesh%Committed .and. LidSim%p%LidarOnNacelle ) THEN ! ED-LD
+      CALL MeshMapCreate( ED%Output(1)%NacelleMotion, LidSim%Input(1)%NacelleMotion, MeshMapData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2 )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_2_LD_LidarMotion' )
+      CALL MeshMapCreate( ED%Output(1)%NacelleMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LidSim_P_N, ErrStat2, ErrMsg2 )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_2_LD_LidarMotion' )
+   END IF
+   IF (ErrStat >= AbortErrLev ) RETURN
+
+
    !............................................................................................................................
    ! Initialize the Jacobian structures:
    !............................................................................................................................
@@ -4266,7 +4289,7 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, M
    !............................................................................................................................
    ! reset the remap flags (do this before making the copies else the copies will always have remap = true)
    !............................................................................................................................
-   CALL ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD )      
+   CALL ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim )
             
    !............................................................................................................................
    ! initialize the temporary input meshes (for input-output solves):
@@ -4489,6 +4512,7 @@ end if
 
    END IF
 
+!FIXME: add the LidarSim points here
    IF ( p_FAST%CompInflow == Module_IfW ) THEN
       CALL IfW_InputSolve( p_FAST, m_FAST, IfW%Input(1), IfW%p, AD14%Input(1), AD%Input(1), ED%Output(1), ErrStat2, ErrMsg2 )       
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )  
@@ -4517,7 +4541,7 @@ end if
    ! Reset each mesh's RemapFlag (after calling all InputSolve routines):
    !.....................................................................              
          
-   CALL ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)         
+   CALL ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim)
          
                         
 END SUBROUTINE CalcOutputs_And_SolveForInputs
@@ -4901,6 +4925,8 @@ SUBROUTINE SolveOption2c_Inp2AD_SrvD(this_time, this_state, p_FAST, m_FAST, ED, 
 
    END IF
    
+!FIXME: add LidSim section here
+
 END SUBROUTINE SolveOption2c_Inp2AD_SrvD
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine implements the "option 2" solve for all inputs without direct links to HD, SD, MAP, or the ED platform reference 
@@ -4951,6 +4977,7 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
       CALL SolveOption2a_Inp2BD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ! compute AD position inputs; compute all of IfW inputs from ED/BD outputs: 
+!FIXME: add LidarSim wind points here:
       CALL SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ! call IfW's CalcOutput; transfer wind-inflow inputs to AD; compute all of SrvD inputs: 
@@ -4975,7 +5002,10 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
    
 
    IF ( p_FAST%CompLidar == Module_LidSim ) THEN
-      LidSim%u%NacelleMotion = ED%Output(1)%NacelleMotion
+      CALL Transfer_Point_to_Point( ED%Output(1)%NacelleMotion, LidSim%Input(1)%NacelleMotion, MeshMapData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2 )
+         call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+      CALL Transfer_Point_to_Point( ED%Output(1)%NacelleMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LidSim_P_N, ErrStat2, ErrMsg2 )
+         call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 !FIXME: remove IfW, and add some above line to new routine for mapping over stuff?
     CALL LidarSim_CalcOutput(this_time, LidSim%Input(1), LidSim%p, LidSim%x(this_state), LidSim%xd(this_state), &
                            LidSim%z(this_state), LidSim%OtherSt(this_state), LidSim%y, LidSim%m,   &
