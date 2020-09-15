@@ -692,12 +692,22 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
    ! ........................
    ! initialize LidarSim
    ! ........................
+   ALLOCATE( LidSim%Input( p_FAST%InterpOrder+1 ), LidSim%InputTimes( p_FAST%InterpOrder+1 ), STAT = ErrStat2 )
+      IF (ErrStat2 /= 0) THEN
+         CALL SetErrStat(ErrID_Fatal,"Error allocating LidSim%Input and LidSim%InputTimes.",ErrStat,ErrMsg,RoutineName)
+         CALL Cleanup()
+         RETURN
+      END IF
+
    IF ( p_FAST%CompLidar == Module_LidSim ) THEN 
       IF ( p_FAST%CompInflow == Module_IfW ) THEN
+!FIXME: IfW should not be here!!!!
          p_FAST%ModuleInitialized(Module_LidSim) = .TRUE.
          InitInData_LidSim%RootName  =   TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_LidSim))
          InitInData_LidSim%InputInitFile =   p_FAST%LidarFile
          InitInData_LidSim%DT            =   p_FAST%DT
+         InitInData_LidSim%LidarRefPosition(1:3)        = ED%Input(1)%NacelleLoads%Position(1:3,1)
+         InitInData_LidSim%LidarRefOrientation(1:3,1:3) = ED%Input(1)%NacelleLoads%RefOrientation(1:3,1:3,1)  ! R8Ki
          CALL LidarSim_Init( InitInData_LidSim, LidSim%Input(1), LidSim%p, LidSim%x(STATE_CURR), LidSim%xd(STATE_CURR), LidSim%z(STATE_CURR), &
                     LidSim%OtherSt(STATE_CURR), LidSim%y, LidSim%m, p_FAST%dt_module( MODULE_LidSim ), InitOutData_LidSim, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
@@ -1196,7 +1206,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
    ! Initialize mesh-mapping data
    ! -------------------------------------------------------------------------
 
-   CALL InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat2, ErrMsg2)
+   CALL InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim, MeshMapData, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
       IF (ErrStat >= AbortErrLev) THEN
@@ -3889,7 +3899,7 @@ SUBROUTINE FAST_Solution0(p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, O
       ELSE IF ( p_FAST%VTK_Type == VTK_Basic ) THEN
          CALL WrVTK_BasicMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)            
       ELSE IF ( p_FAST%VTK_Type == VTK_All ) THEN
-         CALL WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)                                 
+         CALL WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim)
       ELSE IF (p_FAST%VTK_Type==VTK_Old) THEN
          CALL WriteInputMeshesToFile( ED%Input(1), AD%Input(1), SD%Input(1), HD%Input(1), MAPp%Input(1), BD%Input(1,:), TRIM(p_FAST%OutFileRoot)//'.InputMeshes.bin', ErrStat2, ErrMsg2)                                    
    !unOut = -1
@@ -4796,7 +4806,7 @@ SUBROUTINE WriteOutputToFile(n_t_global, t_global, p_FAST, y_FAST, ED, BD, AD14,
          ELSE IF ( p_FAST%VTK_Type == VTK_Basic ) THEN
             CALL WrVTK_BasicMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)            
          ELSE IF ( p_FAST%VTK_Type == VTK_All ) THEN
-            CALL WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)                                 
+            CALL WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim)
          ELSE IF (p_FAST%VTK_Type==VTK_Old) THEN                           
             CALL WriteMotionMeshesToFile(t_global, ED%Output(1), SD%Input(1), SD%y, HD%Input(1), MAPp%Input(1), BD%y, BD%Input(1,:), y_FAST%UnGra, ErrStat2, ErrMsg2, TRIM(p_FAST%OutFileRoot)//'.gra') 
          END IF
@@ -5045,7 +5055,7 @@ SUBROUTINE FillOutputAry(p_FAST, y_FAST, IfWOutput, OpFMOutput, EDOutput, ADOutp
 END SUBROUTINE FillOutputAry
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine writes all the committed meshes to VTK-formatted files. It doesn't bother with returning an error code.
-SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim)
 
    TYPE(FAST_ParameterType), INTENT(IN   ) :: p_FAST              !< Parameters for the glue code
    TYPE(FAST_OutputFileType),INTENT(IN   ) :: y_FAST              !< Output variables for the glue code
@@ -5067,6 +5077,7 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, O
    TYPE(OrcaFlex_Data),      INTENT(IN   ) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(IN   ) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(IN   ) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(LidarSim_Data),      INTENT(IN   ) :: LidSim              !< Data for Lidar Simulator
 
 
    logical                                 :: outputFields        ! flag to determine if we want to output the HD mesh fields
@@ -5173,8 +5184,14 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, O
          call MeshWrVTK(p_FAST%TurbinePos, SrvD%y%TTMD%Mesh, trim(VTK_path)//'.SrvD_TTMD', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, Twidth, SrvD%Input(1)%TTMD%Mesh )         
       END IF   
    end if
-   
-      
+
+!  LidarSim
+   if (allocated(LidSim%Input)) then
+      IF ( LidSim%Input(1)%LidarMesh%Committed ) THEN
+         call MeshWrVTK(p_FAST%TurbinePos, LidSim%Input(1)%LidarMesh, trim(VTK_path)//'.LidSim', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, Twidth )
+      END IF
+   end if
+
 !  AeroDyn   
    IF ( p_FAST%CompAero == Module_AD .and. allocated(AD%Input)) THEN 
                
@@ -6001,7 +6018,7 @@ SUBROUTINE ExitThisProgram( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW,
       TmpOutFileRoot = p_FAST%OutFileRoot
       p_FAST%OutFileRoot = trim(p_FAST%OutFileRoot)//'.DebugError'
       p_FAST%VTK_fields = .true.
-      CALL WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)                                 
+      CALL WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, LidSim)
       p_FAST%OutFileRoot = TmpOutFileRoot
    end if
    

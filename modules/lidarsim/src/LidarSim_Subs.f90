@@ -45,7 +45,6 @@ SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, Er
    CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
 
    ! Local variables
-   INTEGER(IntKi)                                          ::  UnitInput           !< Unit number for the input file
    INTEGER(IntKi)                                          ::  UnitEcho            !< The local unit number for this module's echo file
 
    INTEGER(IntKi)                                          ::  TmpErrStat
@@ -64,10 +63,9 @@ SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, Er
    ErrStat        =  0
    ErrMsg         =  ""
    UnitEcho       = -1
-   UnitInput       = -1
 
    ! Allocate OutList space
-   CALL AllocAry( InputFileData%OutList, 18, "InflowWind Input File's OutList", TmpErrStat, TmpErrMsg ) !Max additional output parameters = 18
+   CALL AllocAry( InputFileData%OutList, 18, "LidarSim Input File's OutList", TmpErrStat, TmpErrMsg ) !Max additional output parameters = 18
         if (Failed()) return;
 
    ! Read the entire input file, minus any comment lines, into the FileInfo
@@ -77,7 +75,7 @@ SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, Er
 
    ! For diagnostic purposes, the following can be used to display the contents
    ! of the FileInfo data structure.
-   !   call Print_FileInfo( CU, FileInfo ) ! CU is the screen -- different number on different systems.
+   !   call Print_FileInfo_Struct( CU, FileInfo ) ! CU is the screen -- different number on different systems.
 
    !-------------------------------------------------------------------------------------------------
    ! General settings
@@ -282,7 +280,6 @@ CONTAINS
    end function Failed
    !-------------------------------------------------------------------------------------------------
    SUBROUTINE Cleanup()
-      if (UnitInput > -1_IntKi)     CLOSE( UnitInput )
       if (UnitEcho  > -1_IntKi)     CLOSE( UnitEcho  )
    END SUBROUTINE Cleanup
    !-------------------------------------------------------------------------------------------------
@@ -296,10 +293,10 @@ END SUBROUTINE LidarSim_ReadInputFile
     IMPLICIT         NONE
     CHARACTER(*),    PARAMETER       ::  RoutineName="LidarSim_CreateRotationMatrix"
 
-    REAL(ReKi),      INTENT(IN   )   ::  Roll_N                      !Roll Rotation
-    REAL(ReKi),      INTENT(IN   )   ::  Pitch_N                     !Pitch Rotation
-    REAL(ReKi),      INTENT(IN   )   ::  Yaw_N                       !Yaw Rotation
-    REAL(ReKi),      INTENT(INOUT)   ::  LidarOrientation_N(3,3)     !Output Rotation matrix
+    REAL(R8Ki),      INTENT(IN   )   ::  Roll_N                      !Roll Rotation
+    REAL(R8Ki),      INTENT(IN   )   ::  Pitch_N                     !Pitch Rotation
+    REAL(R8Ki),      INTENT(IN   )   ::  Yaw_N                       !Yaw Rotation
+    REAL(DbKi),      INTENT(INOUT)   ::  LidarOrientation_N(3,3)     !Output Rotation matrix
     
     ! Local variables
     REAL(ReKi)                       ::  Rotations(3,3,3)            !Temporary Rotation matrices
@@ -343,7 +340,7 @@ END SUBROUTINE LidarSim_ReadInputFile
     Rotations(3,2,3) = 0
     Rotations(3,3,3) = 1
     
-    ! Combining rotations
+    ! Combining rotations -- All rotation in OpenFAST are stored as double precision
     LidarOrientation_N = MATMUL( MATMUL( Rotations(:,:,3),Rotations(:,:,2) ), Rotations(:,:,1) )
     
     END SUBROUTINE LidarSim_CreateRotationMatrix
@@ -487,20 +484,21 @@ END SUBROUTINE LidarSim_ReadInputFile
     FUNCTION LidarSim_TransformLidarToInertial(NacelleMotion, p, MeasuringPoint_L)
 
     IMPLICIT        NONE
-    CHARACTER(*),   PARAMETER           ::  RoutineName="LidarSim_TransformLidarToInertial"
+    CHARACTER(*),   PARAMETER                      ::  RoutineName="LidarSim_TransformLidarToInertial"
 
-    REAL(ReKi)                          ::  LidarSim_TransformLidarToInertial(3)    !Output calculated transformation from the lidar coord. sys. to the inertial system
-    TYPE(MeshType)                      ::  NacelleMotion                           !Data describing the motion of the nacelle coord. sys.
-    TYPE(LidarSim_ParameterType)        ::  p                                       !Parameter data 
-    REAL(ReKi)                          ::  MeasuringPoint_L(3)                     !point which needs to be transformed
+    REAL(ReKi)                                     ::  LidarSim_TransformLidarToInertial(3)  !Output calculated transformation from the lidar coord. sys. to the inertial system
+    TYPE(MeshType),                 intent(in   )  ::  NacelleMotion                         !Data describing the motion of the nacelle coord. sys.
+    TYPE(LidarSim_ParameterType),   intent(in   )  ::  p                                     !Parameter data 
+    REAL(ReKi),                     intent(in   )  ::  MeasuringPoint_L(3)                   !point which needs to be transformed
     
     ! local variables
-    REAL(ReKi)                          :: PositionNacelle_I(3)                     !local variable to save the current Nacelle position (in the inerital cord. sys.)
+    REAL(ReKi)                                     :: PositionNacelle_I(3)                   !local variable to save the current Nacelle position (in the inerital cord. sys.)
     
     PositionNacelle_I = NacelleMotion%Position(:,1) + NacelleMotion%TranslationDisp(:,1)
-       
-    LidarSim_TransformLidarToInertial = PositionNacelle_I +  MATMUL(TRANSPOSE(NacelleMotion%Orientation(:,:,1)),(p%LidarPosition_N + MATMUL( p%LidarOrientation_N,MeasuringPoint_L ) ) )
-  
+
+      ! NOTE: LidarOrientation follows the Nacelle orientation and will carry the negative signs for the rotation. This routine will change shortly.
+    LidarSim_TransformLidarToInertial = PositionNacelle_I - MATMUL(TRANSPOSE(NacelleMotion%Orientation(:,:,1)),(p%LidarPosition_N + MATMUL( p%LidarOrientation_N,MeasuringPoint_L ) ) )
+ 
     END FUNCTION LidarSim_TransformLidarToInertial
     
 
@@ -623,6 +621,7 @@ END SUBROUTINE LidarSim_ReadInputFile
         MeasuringPosition_I(1) = MeasuringPosition_I(1)-LidarPosition_I(1)  !In the uniform wind case. the wind hits the turbine at the same time indepentend of the x shift
         DO Counter = 1, SIZE(p%Weighting)
             InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I                                                    !position of the weighted measuring point
+!FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
             CALL CalculateOutput(Time + DBLE(-InputForCalculation%PositionXYZ(1,1)/p%Uref),&                                                                            !X vector to timeshift! X/Uref
             InputForCalculation, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, OutputForCalculation, IfW_m, .FALSE., ErrStat2, ErrMsg2 )    !Calculation of the windspeed
             Vlos_tmp(Counter) = - DOT_PRODUCT(OutputForCalculation%VelocityUVW(:,1),UnitVector_I)
@@ -631,6 +630,7 @@ END SUBROUTINE LidarSim_ReadInputFile
         DO Counter = 1, SIZE(p%Weighting)
             
             InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I                                                    !position of the weighted measuring point
+!FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
             CALL CalculateOutput(Time,&                                                                            !X vector to timeshift! X/Uref
             InputForCalculation, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, OutputForCalculation, IfW_m, .FALSE., ErrStat2, ErrMsg2 )    !Calculation of the windspeed
             Vlos_tmp(Counter) = - DOT_PRODUCT(OutputForCalculation%VelocityUVW(:,1),UnitVector_I)
@@ -921,7 +921,7 @@ END SUBROUTINE LidarSim_ReadInputFile
     INTEGER(IntKi)                                              ::  LoopCounter
     REAL(ReKi)                                                  ::  Dot_LidarPosition_I(3)
     
-!FIXME: change to refer by name
+!FIXME: change to refer by name???
     Dot_LidarPosition_I(1) = y%IMUOutputs(11)
     Dot_LidarPosition_I(2) = y%IMUOutputs(14)
     Dot_LidarPosition_I(3) = y%IMUOutputs(17)

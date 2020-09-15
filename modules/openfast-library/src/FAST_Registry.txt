@@ -445,6 +445,9 @@ typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_SrvD_P_N	-	-	-	"Map ElastoDyn Na
 typedef	^	FAST_ModuleMapType	MeshMapType	SrvD_P_2_ED_P_N	-	-	-	"Map ServoDyn nacelle point mesh to ElastoDyn point mesh on the nacelle"
 typedef	^	FAST_ModuleMapType	MeshMapType	ED_L_2_SrvD_P_T	-	-	-	"Map ElastoDyn tower line2 mesh to ServoDyn/TTMD point mesh"
 typedef	^	FAST_ModuleMapType	MeshMapType	SrvD_P_2_ED_P_T	-	-	-	"Map ServoDyn tower point mesh to ElastoDyn point load mesh on the tower"
+# ED <-> LidarSim
+typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_LidSim_P_Nac	-	-	-	"Map ElastoDyn Nacelle point mesh to LidSim NacelleMotion point mesh (this will go away)"
+typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_LidSim_P_N	-	-	-	"Map ElastoDyn Nacelle point mesh to Lidar point mesh"
 # ED/BD <-> AD (blades)
 typedef	^	FAST_ModuleMapType	MeshMapType	BDED_L_2_AD_L_B	{:}	-	-	"Map ElastoDyn BladeLn2Mesh point meshes OR BeamDyn BldMotion line2 meshes to AeroDyn14 InputMarkers OR AeroDyn BladeMotion line2 meshes"
 typedef	^	FAST_ModuleMapType	MeshMapType	AD_L_2_BDED_B	{:}	-	-	"Map AeroDyn14 InputMarkers or AeroDyn BladeLoad line2 meshes to ElastoDyn BladePtLoad point meshes or BeamDyn BldMotion line2 meshes"
