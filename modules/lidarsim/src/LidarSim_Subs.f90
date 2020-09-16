@@ -12,7 +12,7 @@
     PUBLIC  ::  LidarSim_InitMeasuringPoints_Cartesian
     PUBLIC  ::  LidarSim_TransformLidarToInertial
     PUBLIC  ::  LidarSim_InitMeasuringPoints_Spherical
-    PUBLIC  ::  LidarSim_CreateRotationMatrix
+!    PUBLIC  ::  LidarSim_CreateRotationMatrix
     PUBLIC  ::  LidarSim_InitializeWeightingGauss
     PUBLIC  ::  LidarSim_InitializeWeightingManual
     PUBLIC  ::  LidarSim_CalculateVlos
@@ -287,65 +287,65 @@ CONTAINS
 END SUBROUTINE LidarSim_ReadInputFile
 
 !#########################################################################################################################################################################
-    
-    SUBROUTINE LidarSim_CreateRotationMatrix(Roll_N, Pitch_N, Yaw_N, LidarOrientation_N)
-
-    IMPLICIT         NONE
-    CHARACTER(*),    PARAMETER       ::  RoutineName="LidarSim_CreateRotationMatrix"
-
-    REAL(R8Ki),      INTENT(IN   )   ::  Roll_N                      !Roll Rotation
-    REAL(R8Ki),      INTENT(IN   )   ::  Pitch_N                     !Pitch Rotation
-    REAL(R8Ki),      INTENT(IN   )   ::  Yaw_N                       !Yaw Rotation
-    REAL(DbKi),      INTENT(INOUT)   ::  LidarOrientation_N(3,3)     !Output Rotation matrix
-    
-    ! Local variables
-    REAL(ReKi)                       ::  Rotations(3,3,3)            !Temporary Rotation matrices
-    
-    ! Roll Rotation
-    Rotations(1,1,1) = 1
-    Rotations(1,2,1) = 0
-    Rotations(1,3,1) = 0
-    
-    Rotations(2,1,1) = 0
-    Rotations(2,2,1) = COS(Roll_N)
-    Rotations(2,3,1) = SIN(Roll_N)
-    
-    Rotations(3,1,1) = 0
-    Rotations(3,2,1) = - SIN(Roll_N)
-    Rotations(3,3,1) =   COS(Roll_N)
-    
-    ! Pitch Rotation
-    Rotations(1,1,2) =   COS(Pitch_N)
-    Rotations(1,2,2) = 0
-    Rotations(1,3,2) = - SIN(Pitch_N)
-    
-    Rotations(2,1,2) = 0
-    Rotations(2,2,2) = 1
-    Rotations(2,3,2) = 0
-    
-    Rotations(3,1,2) = SIN(Pitch_N)
-    Rotations(3,2,2) = 0
-    Rotations(3,3,2) = COS(Pitch_N)
-    
-    ! Yaw Rotation
-    Rotations(1,1,3) = COS(Yaw_N)
-    Rotations(1,2,3) = SIN(Yaw_N)
-    Rotations(1,3,3) = 0
-    
-    Rotations(2,1,3) = - SIN(Yaw_N)
-    Rotations(2,2,3) =   COS(Yaw_N)
-    Rotations(2,3,3) = 0
-    
-    Rotations(3,1,3) = 0
-    Rotations(3,2,3) = 0
-    Rotations(3,3,3) = 1
-    
-    ! Combining rotations -- All rotation in OpenFAST are stored as double precision
-    LidarOrientation_N = MATMUL( MATMUL( Rotations(:,:,3),Rotations(:,:,2) ), Rotations(:,:,1) )
-    
-    END SUBROUTINE LidarSim_CreateRotationMatrix
-    
-
+!   
+!   SUBROUTINE LidarSim_CreateRotationMatrix(Roll_N, Pitch_N, Yaw_N, LidarOrientation_N)
+!
+!   IMPLICIT         NONE
+!   CHARACTER(*),    PARAMETER       ::  RoutineName="LidarSim_CreateRotationMatrix"
+!
+!   REAL(R8Ki),      INTENT(IN   )   ::  Roll_N                      !Roll Rotation
+!   REAL(R8Ki),      INTENT(IN   )   ::  Pitch_N                     !Pitch Rotation
+!   REAL(R8Ki),      INTENT(IN   )   ::  Yaw_N                       !Yaw Rotation
+!   REAL(DbKi),      INTENT(INOUT)   ::  LidarOrientation_N(3,3)     !Output Rotation matrix
+!   
+!   ! Local variables
+!   REAL(ReKi)                       ::  Rotations(3,3,3)            !Temporary Rotation matrices
+!   
+!   ! Roll Rotation
+!   Rotations(1,1,1) = 1
+!   Rotations(1,2,1) = 0
+!   Rotations(1,3,1) = 0
+!   
+!   Rotations(2,1,1) = 0
+!   Rotations(2,2,1) = COS(Roll_N)
+!   Rotations(2,3,1) = SIN(Roll_N)
+!   
+!   Rotations(3,1,1) = 0
+!   Rotations(3,2,1) = - SIN(Roll_N)
+!   Rotations(3,3,1) =   COS(Roll_N)
+!   
+!   ! Pitch Rotation
+!   Rotations(1,1,2) =   COS(Pitch_N)
+!   Rotations(1,2,2) = 0
+!   Rotations(1,3,2) = - SIN(Pitch_N)
+!   
+!   Rotations(2,1,2) = 0
+!   Rotations(2,2,2) = 1
+!   Rotations(2,3,2) = 0
+!   
+!   Rotations(3,1,2) = SIN(Pitch_N)
+!   Rotations(3,2,2) = 0
+!   Rotations(3,3,2) = COS(Pitch_N)
+!   
+!   ! Yaw Rotation
+!   Rotations(1,1,3) = COS(Yaw_N)
+!   Rotations(1,2,3) = SIN(Yaw_N)
+!   Rotations(1,3,3) = 0
+!   
+!   Rotations(2,1,3) = - SIN(Yaw_N)
+!   Rotations(2,2,3) =   COS(Yaw_N)
+!   Rotations(2,3,3) = 0
+!   
+!   Rotations(3,1,3) = 0
+!   Rotations(3,2,3) = 0
+!   Rotations(3,3,3) = 1
+!   
+!   ! Combining rotations -- All rotation in OpenFAST are stored as double precision
+!   LidarOrientation_N = MATMUL( MATMUL( Rotations(:,:,3),Rotations(:,:,2) ), Rotations(:,:,1) )
+!   
+!   END SUBROUTINE LidarSim_CreateRotationMatrix
+!   
+!
 !#########################################################################################################################################################################
     
     SUBROUTINE LidarSim_InitMeasuringPoints_Cartesian(p, InputFileData, ErrStat, ErrMsg)
@@ -481,23 +481,20 @@ END SUBROUTINE LidarSim_ReadInputFile
 
 !#########################################################################################################################################################################
     
-    FUNCTION LidarSim_TransformLidarToInertial(NacelleMotion, p, MeasuringPoint_L)
+    FUNCTION LidarSim_TransformLidarToInertial(LidarUnitMotion, p, MeasuringPoint_L)
 
     IMPLICIT        NONE
     CHARACTER(*),   PARAMETER                      ::  RoutineName="LidarSim_TransformLidarToInertial"
 
     REAL(ReKi)                                     ::  LidarSim_TransformLidarToInertial(3)  !Output calculated transformation from the lidar coord. sys. to the inertial system
-    TYPE(MeshType),                 intent(in   )  ::  NacelleMotion                         !Data describing the motion of the nacelle coord. sys.
+    TYPE(MeshType),                 intent(in   )  ::  LidarUnitMotion                         !Data describing the motion of the nacelle coord. sys.
     TYPE(LidarSim_ParameterType),   intent(in   )  ::  p                                     !Parameter data 
     REAL(ReKi),                     intent(in   )  ::  MeasuringPoint_L(3)                   !point which needs to be transformed
     
-    ! local variables
-    REAL(ReKi)                                     :: PositionNacelle_I(3)                   !local variable to save the current Nacelle position (in the inerital cord. sys.)
-    
-    PositionNacelle_I = NacelleMotion%Position(:,1) + NacelleMotion%TranslationDisp(:,1)
-
-      ! NOTE: LidarOrientation follows the Nacelle orientation and will carry the negative signs for the rotation. This routine will change shortly.
-    LidarSim_TransformLidarToInertial = PositionNacelle_I - MATMUL(TRANSPOSE(NacelleMotion%Orientation(:,:,1)),(p%LidarPosition_N + MATMUL( p%LidarOrientation_N,MeasuringPoint_L ) ) )
+      ! NOTE:  LidarOrientation follows all orientation and position changes of what it is attached to.  This mesh already includes
+      !        the orientation relative to what it is attached to
+    LidarSim_TransformLidarToInertial = LidarUnitMotion%Position(:,1) + LidarUnitMotion%TranslationDisp(:,1) &
+                                       + MATMUL(TRANSPOSE(LidarUnitMotion%Orientation(:,:,1)),(MeasuringPoint_L ) )
  
     END FUNCTION LidarSim_TransformLidarToInertial
     
@@ -620,6 +617,7 @@ END SUBROUTINE LidarSim_ReadInputFile
     IF(IfW_p%WindType == 1 .OR. IfW_p%WindType == 2)Then !Uniform Wind 2 (und steady 1)
         MeasuringPosition_I(1) = MeasuringPosition_I(1)-LidarPosition_I(1)  !In the uniform wind case. the wind hits the turbine at the same time indepentend of the x shift
         DO Counter = 1, SIZE(p%Weighting)
+!QUESTION: is the p%WeightingDistance aout the measurement position, or from the lidar?? If the latter, there is a problem with the below calculations
             InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I                                                    !position of the weighted measuring point
 !FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
             CALL CalculateOutput(Time + DBLE(-InputForCalculation%PositionXYZ(1,1)/p%Uref),&                                                                            !X vector to timeshift! X/Uref
@@ -657,72 +655,102 @@ END SUBROUTINE LidarSim_ReadInputFile
     TYPE(LidarSim_InputType),                  INTENT(IN   )        ::  u   
     
     ! local variables
-    REAL(ReKi)                                                      ::  CrossProduct(3)         !Variable for the crossproduct of the rotation and the lidar position ( in the nacelle coord. system)
-    REAL(ReKi)                                                      ::  Rotation_L_I(3,3)
-    REAL(ReKi)                                                      ::  Roll
-    REAL(ReKi)                                                      ::  Pitch
-    REAL(ReKi)                                                      ::  Yaw
-    REAL(ReKi)                                                      ::  DisplacementNacelle(3)
-    REAL(ReKi)                                                      ::  DisplacementLidar(3)
-    REAL(ReKi)                                                      ::  LidarPosition_I(3)
+   real(R8Ki)        :: theta(3)       ! roll, pitch, yaw
+   real(R8Ki)                                                      ::  Rotation_L_I(3,3)
+!    REAL(ReKi)                                                      ::  CrossProduct(3)         !Variable for the crossproduct of the rotation and the lidar position ( in the nacelle coord. system)
+!    REAL(ReKi)                                                      ::  Roll
+!    REAL(ReKi)                                                      ::  Pitch
+!    REAL(ReKi)                                                      ::  Yaw
+!    REAL(ReKi)                                                      ::  DisplacementNacelle(3)
+!    REAL(ReKi)                                                      ::  DisplacementLidar(3)
+!    REAL(ReKi)                                                      ::  LidarPosition_I(3)
+
     
-    Rotation_L_I = MATMUL(TRANSPOSE(u%NacelleMotion%Orientation(:,:,1)),p%LidarOrientation_N)
-    IF(.NOT.(Rotation_L_I(3,1) == 1 .OR. Rotation_L_I(3,1) == -1)) THEN
-        Pitch = -ASIN(Rotation_L_I(3,1))
-        Roll = ATAN2(Rotation_L_I(3,2)/cos(Pitch),Rotation_L_I(3,3)/cos(Pitch))
-        Yaw = ATAN2(Rotation_L_I(2,1)/cos(Pitch), Rotation_L_I(1,1)/cos(Pitch))  
-    ELSE
-        Yaw = 0
-        IF(Rotation_L_I(3,1) == 1) THEN
-            Pitch = PiBy2_D
-            Roll = Yaw + ATAN2(Rotation_L_I(1,2),Rotation_L_I(1,3))
-        ELSE
-            Pitch = -PiBy2_D
-            Roll = -Yaw + ATAN2(-Rotation_L_I(1,2),-Rotation_L_I(1,3))
-        END IF
-    END IF
-    
-    LidarPosition_I = MATMUL(TRANSPOSE(u%NacelleMotion%Orientation(:,:,1)),p%LidarPosition_N) !Rotates the position vector to the orientation of the inertial coord. system
-    
-    y%IMUOutputs(1)     = Roll                              !Roll Angle
-    y%IMUOutputs(2)     = u%NacelleMotion%RotationVel(1,1)  !Roll Angle Velocity
-    y%IMUOutputs(3)     = u%NacelleMotion%RotationAcc(1,1)  !Roll Angle Acceleration
-    y%IMUOutputs(4)     = Pitch                             !Pitch Angle
-    y%IMUOutputs(5)     = u%NacelleMotion%RotationVel(2,1)  !Pitch Angle Velocity
-    y%IMUOutputs(6)     = u%NacelleMotion%RotationAcc(2,1)  !Pitch Angle Acceleration
-    y%IMUOutputs(7)     = Yaw                               !Yaw Angle
-    y%IMUOutputs(8)     = u%NacelleMotion%RotationVel(3,1)  !Yaw Angle Velocity
-    y%IMUOutputs(9)     = u%NacelleMotion%RotationAcc(3,1)  !Yaw Angle Acceleration
-    
-    y%IMUOutputs(10)    = u%NacelleMotion%TranslationDisp(1,1)  !Displacement x 
-    y%IMUOutputs(13)    = u%NacelleMotion%TranslationDisp(2,1)  !Displacement y
-    y%IMUOutputs(16)    = u%NacelleMotion%TranslationDisp(3,1)  !Displacement z
-    
-    DisplacementNacelle(1) = u%NacelleMotion%TranslationDisp(1,1)
-    DisplacementNacelle(2) = u%NacelleMotion%TranslationDisp(2,1)
-    DisplacementNacelle(3) = u%NacelleMotion%TranslationDisp(3,1)
-    
-    DisplacementLidar   = LidarPosition_I + DisplacementNacelle
-    
-    y%IMUOutputs(10)    = DisplacementLidar(1)
-    y%IMUOutputs(13)    = DisplacementLidar(2)
-    y%IMUOutputs(16)    = DisplacementLidar(3)
-    
-    CrossProduct(1)     = u%NacelleMotion%RotationVel(2,1)*LidarPosition_I(3) - u%NacelleMotion%RotationVel(3,1)*LidarPosition_I(2)
-    CrossProduct(2)     = u%NacelleMotion%RotationVel(3,1)*LidarPosition_I(1) - u%NacelleMotion%RotationVel(1,1)*LidarPosition_I(3)
-    CrossProduct(3)     = u%NacelleMotion%RotationVel(1,1)*LidarPosition_I(2) - u%NacelleMotion%RotationVel(2,1)*LidarPosition_I(1)
-    
-    y%IMUOutputs(11)    = u%NacelleMotion%TranslationVel(1,1) + CrossProduct(1)    !Velocity x
-    y%IMUOutputs(14)    = u%NacelleMotion%TranslationVel(2,1) + CrossProduct(2)    !Velocity y
-    y%IMUOutputs(17)    = u%NacelleMotion%TranslationVel(3,1) + CrossProduct(3)    !Velocity z
-    
-    CrossProduct(1)     = u%NacelleMotion%RotationAcc(2,1)*LidarPosition_I(3) - u%NacelleMotion%RotationAcc(3,1)*LidarPosition_I(2)
-    CrossProduct(2)     = u%NacelleMotion%RotationAcc(3,1)*LidarPosition_I(1) - u%NacelleMotion%RotationAcc(1,1)*LidarPosition_I(3)
-    CrossProduct(3)     = u%NacelleMotion%RotationAcc(1,1)*LidarPosition_I(2) - u%NacelleMotion%RotationAcc(2,1)*LidarPosition_I(1)    
-    
-    y%IMUOutputs(12)    = u%NacelleMotion%TranslationAcc(1,1) + CrossProduct(1)     !Acceleration x
-    y%IMUOutputs(15)    = u%NacelleMotion%TranslationAcc(2,1) + CrossProduct(2)     !Acceleration y
-    y%IMUOutputs(18)    = u%NacelleMotion%TranslationAcc(3,1) + CrossProduct(3)     !Acceleration z
+   Rotation_L_I = MATMUL(u%LidarMesh%Orientation(:,:,1),transpose(u%LidarMesh%RefOrientation(:,:,1)))
+
+   theta = EulerExtract( Rotation_L_I )
+
+!FIXME: check which coordinate system the outputs from this should be in
+!NOTE: if we want this in the coordinate system of the Lidar module, we will need to multiply by the u%LidarMesh%Orientation matrix
+   y%IMUOutputs(1)     = theta(1)                      !Roll Angle
+   y%IMUOutputs(2)     = u%LidarMesh%RotationVel(1,1)  !Roll Angle Velocity
+   y%IMUOutputs(3)     = u%LidarMesh%RotationAcc(1,1)  !Roll Angle Acceleration
+   y%IMUOutputs(4)     = theta(2)                      !Pitch Angle
+   y%IMUOutputs(5)     = u%LidarMesh%RotationVel(2,1)  !Pitch Angle Velocity
+   y%IMUOutputs(6)     = u%LidarMesh%RotationAcc(2,1)  !Pitch Angle Acceleration
+   y%IMUOutputs(7)     = theta(3)                      !Yaw Angle
+   y%IMUOutputs(8)     = u%LidarMesh%RotationVel(3,1)  !Yaw Angle Velocity
+   y%IMUOutputs(9)     = u%LidarMesh%RotationAcc(3,1)  !Yaw Angle Acceleration
+
+   y%IMUOutputs(10)    = u%LidarMesh%TranslationDisp(1,1)   !Displacement x 
+   y%IMUOutputs(13)    = u%LidarMesh%TranslationDisp(2,1)   !Displacement y
+   y%IMUOutputs(16)    = u%LidarMesh%TranslationDisp(3,1)   !Displacement z
+
+   y%IMUOutputs(11)    = u%LidarMesh%TranslationVel(1,1)    !Velocity x
+   y%IMUOutputs(14)    = u%LidarMesh%TranslationVel(2,1)    !Velocity y
+   y%IMUOutputs(17)    = u%LidarMesh%TranslationVel(3,1)    !Velocity z
+
+   y%IMUOutputs(12)    = u%LidarMesh%TranslationAcc(1,1)    !Acceleration x
+   y%IMUOutputs(15)    = u%LidarMesh%TranslationAcc(2,1)    !Acceleration y
+   y%IMUOutputs(18)    = u%LidarMesh%TranslationAcc(3,1)    !Acceleration z
+
+   
+!   IF(.NOT.(Rotation_L_I(3,1) == 1 .OR. Rotation_L_I(3,1) == -1)) THEN
+!       Pitch = -ASIN(Rotation_L_I(3,1))
+!       Roll = ATAN2(Rotation_L_I(3,2)/cos(Pitch),Rotation_L_I(3,3)/cos(Pitch))
+!       Yaw = ATAN2(Rotation_L_I(2,1)/cos(Pitch), Rotation_L_I(1,1)/cos(Pitch))  
+!   ELSE
+!       Yaw = 0
+!       IF(Rotation_L_I(3,1) == 1) THEN
+!           Pitch = PiBy2_D
+!           Roll = Yaw + ATAN2(Rotation_L_I(1,2),Rotation_L_I(1,3))
+!       ELSE
+!           Pitch = -PiBy2_D
+!           Roll = -Yaw + ATAN2(-Rotation_L_I(1,2),-Rotation_L_I(1,3))
+!       END IF
+!   END IF
+!
+!    LidarPosition_I = MATMUL(TRANSPOSE(u%NacelleMotion%Orientation(:,:,1)),p%LidarPosition_N) !Rotates the position vector to the orientation of the inertial coord. system
+!
+!   y%IMUOutputs(1)     = Roll                              !Roll Angle
+!   y%IMUOutputs(2)     = u%NacelleMotion%RotationVel(1,1)  !Roll Angle Velocity
+!   y%IMUOutputs(3)     = u%NacelleMotion%RotationAcc(1,1)  !Roll Angle Acceleration
+!   y%IMUOutputs(4)     = Pitch                             !Pitch Angle
+!   y%IMUOutputs(5)     = u%NacelleMotion%RotationVel(2,1)  !Pitch Angle Velocity
+!   y%IMUOutputs(6)     = u%NacelleMotion%RotationAcc(2,1)  !Pitch Angle Acceleration
+!   y%IMUOutputs(7)     = Yaw                               !Yaw Angle
+!   y%IMUOutputs(8)     = u%NacelleMotion%RotationVel(3,1)  !Yaw Angle Velocity
+!   y%IMUOutputs(9)     = u%NacelleMotion%RotationAcc(3,1)  !Yaw Angle Acceleration
+!   
+!   y%IMUOutputs(10)    = u%NacelleMotion%TranslationDisp(1,1)  !Displacement x 
+!   y%IMUOutputs(13)    = u%NacelleMotion%TranslationDisp(2,1)  !Displacement y
+!   y%IMUOutputs(16)    = u%NacelleMotion%TranslationDisp(3,1)  !Displacement z
+!   
+!   DisplacementNacelle(1) = u%NacelleMotion%TranslationDisp(1,1)
+!   DisplacementNacelle(2) = u%NacelleMotion%TranslationDisp(2,1)
+!   DisplacementNacelle(3) = u%NacelleMotion%TranslationDisp(3,1)
+!   
+!   DisplacementLidar   = LidarPosition_I + DisplacementNacelle
+!   
+!   y%IMUOutputs(10)    = DisplacementLidar(1)
+!   y%IMUOutputs(13)    = DisplacementLidar(2)
+!   y%IMUOutputs(16)    = DisplacementLidar(3)
+!   
+!   CrossProduct(1)     = u%NacelleMotion%RotationVel(2,1)*LidarPosition_I(3) - u%NacelleMotion%RotationVel(3,1)*LidarPosition_I(2)
+!   CrossProduct(2)     = u%NacelleMotion%RotationVel(3,1)*LidarPosition_I(1) - u%NacelleMotion%RotationVel(1,1)*LidarPosition_I(3)
+!   CrossProduct(3)     = u%NacelleMotion%RotationVel(1,1)*LidarPosition_I(2) - u%NacelleMotion%RotationVel(2,1)*LidarPosition_I(1)
+!   
+!   y%IMUOutputs(11)    = u%NacelleMotion%TranslationVel(1,1) + CrossProduct(1)    !Velocity x
+!   y%IMUOutputs(14)    = u%NacelleMotion%TranslationVel(2,1) + CrossProduct(2)    !Velocity y
+!   y%IMUOutputs(17)    = u%NacelleMotion%TranslationVel(3,1) + CrossProduct(3)    !Velocity z
+!   
+!   CrossProduct(1)     = u%NacelleMotion%RotationAcc(2,1)*LidarPosition_I(3) - u%NacelleMotion%RotationAcc(3,1)*LidarPosition_I(2)
+!   CrossProduct(2)     = u%NacelleMotion%RotationAcc(3,1)*LidarPosition_I(1) - u%NacelleMotion%RotationAcc(1,1)*LidarPosition_I(3)
+!   CrossProduct(3)     = u%NacelleMotion%RotationAcc(1,1)*LidarPosition_I(2) - u%NacelleMotion%RotationAcc(2,1)*LidarPosition_I(1)    
+!   
+!   y%IMUOutputs(12)    = u%NacelleMotion%TranslationAcc(1,1) + CrossProduct(1)     !Acceleration x
+!   y%IMUOutputs(15)    = u%NacelleMotion%TranslationAcc(2,1) + CrossProduct(2)     !Acceleration y
+!   y%IMUOutputs(18)    = u%NacelleMotion%TranslationAcc(3,1) + CrossProduct(3)     !Acceleration z
 
     END SUBROUTINE
     

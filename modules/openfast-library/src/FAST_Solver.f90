@@ -4256,9 +4256,9 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, M
 !  ElastoDyn <-> LidarSim
 !-------------------------
    ! If we choose a hub mounted lidar, add that mesh option here
-   IF ( LidSim%Input(1)%LidarMesh%Committed .and. LidSim%p%LidarOnNacelle ) THEN ! ED-LD
-      CALL MeshMapCreate( ED%Output(1)%NacelleMotion, LidSim%Input(1)%NacelleMotion, MeshMapData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2 )
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_2_LD_LidarMotion' )
+   IF ( LidSim%Input(1)%LidarMesh%Committed ) THEN ! ED-LD
+!      CALL MeshMapCreate( ED%Output(1)%NacelleMotion, LidSim%Input(1)%NacelleMotion, MeshMapData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2 )
+!         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_2_LD_LidarMotion' )
       CALL MeshMapCreate( ED%Output(1)%NacelleMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LidSim_P_N, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_2_LD_LidarMotion' )
    END IF
@@ -5002,8 +5002,8 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
    
 
    IF ( p_FAST%CompLidar == Module_LidSim ) THEN
-      CALL Transfer_Point_to_Point( ED%Output(1)%NacelleMotion, LidSim%Input(1)%NacelleMotion, MeshMapData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2 )
-         call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+!      CALL Transfer_Point_to_Point( ED%Output(1)%NacelleMotion, LidSim%Input(1)%NacelleMotion, MeshMapData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2 )
+!         call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
       CALL Transfer_Point_to_Point( ED%Output(1)%NacelleMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LidSim_P_N, ErrStat2, ErrMsg2 )
          call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 !FIXME: remove IfW, and add some above line to new routine for mapping over stuff?

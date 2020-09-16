@@ -1748,6 +1748,7 @@ SUBROUTINE ValidateInputData(p, ErrStat, ErrMsg)
    IF (p%CompSub     == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompSub must be 0 (None), 1 (SubDyn), or 2 (ExtPtfm_MCKF).', ErrStat, ErrMsg, RoutineName )
    IF (p%CompMooring == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompMooring must be 0 (None), 1 (MAP), 2 (FEAMooring), 3 (MoorDyn), or 4 (OrcaFlex).', ErrStat, ErrMsg, RoutineName )
    IF (p%CompIce     == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompIce must be 0 (None) or 1 (IceFloe).', ErrStat, ErrMsg, RoutineName )
+   IF (p%CompLidar   == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompLidar must be 0 (None), 1 (nacelle mounted), 2 (hub mounted), 3 (ground mounted), or 4 (platform mounted).', ErrStat, ErrMsg, RoutineName )
    IF (p%CompHydro /= Module_HD) THEN
       IF (p%CompMooring == Module_MAP) THEN
          CALL SetErrStat( ErrID_Fatal, 'HydroDyn must be used when MAP is used. Set CompHydro > 0 or CompMooring = 0 in the FAST input file.', ErrStat, ErrMsg, RoutineName )
@@ -1769,6 +1770,12 @@ SUBROUTINE ValidateInputData(p, ErrStat, ErrMsg)
    END IF
    
    IF (p%CompElast == Module_BD .and. p%CompAero == Module_AD14 ) CALL SetErrStat( ErrID_Fatal, 'AeroDyn14 cannot be used when BeamDyn is used. Change CompAero or CompElast in the FAST input file.', ErrStat, ErrMsg, RoutineName )
+
+   IF (p%CompLidar == Module_LidSim) then
+      if (p%LidarMountLocation == LidarMount_Platform .and. p%CompHydro /= Module_HD) CALL SetErrStat( ErrID_Fatal, 'Nacelle cannot be mounted on the platform without HydroDyn.', ErrStat, ErrMsg, RoutineName )
+!Temporary warning until mesh mapping completed:
+      if (p%LidarMountLocation /= LidarMount_Nacelle) CALL SetErrStat( ErrID_Fatal, 'Lidar (CompLidar) mounting to hub (2), ground (3), or Platform (4) not supported yet. Only nacelle mounting (CompLidar == 1) is supported at this time.', ErrStat, ErrMsg, RoutineName )
+   END IF
    
 !   IF ( p%InterpOrder < 0 .OR. p%InterpOrder > 2 ) THEN
    IF ( p%InterpOrder < 1 .OR. p%InterpOrder > 2 ) THEN
@@ -2574,21 +2581,33 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, OverrideAbortErrLev, ErrStat, Err
                
 
    ! CompLidar - 
-    CALL ReadVar( UnIn, InputFile, p%CompLidar, "CompLidar", "Compute LidarSim module (switch) {0 = Off, 1 = On}}", ErrStat2, ErrMsg2, UnEc)
-    CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-    if ( ErrStat >= AbortErrLev ) then
-        call cleanup()
-        RETURN        
-    end if
-    
-    IF ( p%CompLidar == 0 ) THEN
-        p%CompLidar = Module_NONE
-    ELSEIF ( p%CompLidar == 1) THEN
-        p%CompLidar = Module_LidSim
-    ELSE
-        p%CompLidar = Module_Unknown
-    END IF
-               
+   CALL ReadVar( UnIn, InputFile, p%CompLidar, "CompLidar", "Compute LidarSim module (switch) {LidarMount_None=0, LidarMount_Nacelle=1, LidarMount_Hub=2, LidarMount_Ground=3, LidarMount_Platform=4}}", ErrStat2, ErrMsg2, UnEc)
+   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if ( ErrStat >= AbortErrLev ) then
+      call cleanup()
+      RETURN        
+   end if
+   
+   IF (       p%CompLidar == LidarMount_None       ) THEN
+      p%CompLidar          = Module_NONE
+      p%LidarMountLocation = LidarMount_None
+   ELSEIF ( p%CompLidar   == LidarMount_Nacelle    ) THEN
+      p%CompLidar          = Module_LidSim
+      p%LidarMountLocation = LidarMount_Nacelle
+   ELSEIF ( p%CompLidar   == LidarMount_Hub        ) THEN
+      p%CompLidar          = Module_LidSim
+      p%LidarMountLocation = LidarMount_Hub
+   ELSEIF ( p%CompLidar   == LidarMount_Ground     ) THEN
+      p%CompLidar          = Module_LidSim
+      p%LidarMountLocation = LidarMount_Ground
+   ELSEIF ( p%CompLidar   == LidarMount_Platform   ) THEN
+      p%CompLidar          = Module_LidSim
+      p%LidarMountLocation = LidarMount_Platform
+   ELSE
+      p%CompLidar          = Module_Unknown
+      p%LidarMountLocation = LidarMount_None
+   END IF
+
 
    !---------------------- INPUT FILES ---------------------------------------------
    CALL ReadCom( UnIn, InputFile, 'Section Header: Input Files', ErrStat2, ErrMsg2, UnEc )
@@ -3667,6 +3686,16 @@ SUBROUTINE FAST_WrSum( p_FAST, y_FAST, MeshMapData, ErrStat, ErrMsg )
    
    DescStr = GetNVD( y_FAST%Module_Ver( Module_IceD ) )
    IF ( p_FAST%CompIce /= Module_IceD ) DescStr = TRIM(DescStr)//NotUsedTxt
+   WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
+   
+   DescStr = GetNVD( y_FAST%Module_Ver( Module_IceD ) )
+   IF ( p_FAST%CompLidar == Module_LidSim ) then
+      if (p_FAST%LidarMountLocation == LidarMount_Nacelle ) DescStr= TRIM( DescStr )//' (mounted on nacelle)'
+      if (p_FAST%LidarMountLocation == LidarMount_Hub     ) DescStr= TRIM( DescStr )//' (mounted on hub)'
+      if (p_FAST%LidarMountLocation == LidarMount_Ground  ) DescStr= TRIM( DescStr )//' (mounted on ground)'
+      if (p_FAST%LidarMountLocation == LidarMount_Platform) DescStr= TRIM( DescStr )//' (mounted on platform)'
+   END IF
+   IF ( p_FAST%CompLidar /= Module_LidSim ) DescStr = TRIM(DescStr)//NotUsedTxt
    WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
    
    

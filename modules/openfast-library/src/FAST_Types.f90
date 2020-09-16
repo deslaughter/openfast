@@ -94,6 +94,11 @@ IMPLICIT NONE
     INTEGER(IntKi), PUBLIC, PARAMETER  :: NumModules = 17      ! The number of modules available in FAST [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: MaxNBlades = 3      ! Maximum number of blades allowed on a turbine [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: IceD_MaxLegs = 4      ! because I don't know how many legs there are before calling IceD_Init and I don't want to copy the data because of sibling mesh issues, I'm going to allocate IceD based on this number [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: LidarMount_None = 0      ! Lidar is not used [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: LidarMount_Nacelle = 1      ! Lidar is mounted on nacelle.  All referencing from nacelle motion mesh and follows nacelle motion [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: LidarMount_Hub = 2      ! Lidar is mounted on hub.      All referencing from hub     motion mesh and follows hub     motion [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: LidarMount_Ground = 3      ! Lidar is mounted on ground.   All referencing from tower base mesh at T=0 (does not move with tower base, i.e. with soil dynamcis) [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: LidarMount_Platform = 4      ! Lidar is mounted on platform. All referencing from tower base mesh and follows tower base motion. [-]
 ! =========  FAST_VTK_BLSurfaceType  =======
   TYPE, PUBLIC :: FAST_VTK_BLSurfaceType
     REAL(SiKi) , DIMENSION(:,:,:), ALLOCATABLE  :: AirfoilCoords      !< x,y coordinates for airfoil around each blade node on a blade (relative to reference) [-]
@@ -139,6 +144,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: CompMooring      !< Compute mooring system (switch) {Module_None; Module_MAP; Module_FEAM; Module_MD; Module_Orca} [-]
     INTEGER(IntKi)  :: CompIce      !< Compute ice loading (switch) {Module_None; Module_IceF, Module_IceD} [-]
     INTEGER(IntKi)  :: CompLidar 
+    INTEGER(IntKi)  :: LidarMountLocation = LidarMount_None      !< Lidar mounting location -- for mesh transfers {Lidar_None, LidarMount_Nacelle, LidarMount_Hub, LidarMount_Ground, LidarMount_Platform} [-]
     LOGICAL  :: UseDWM      !< Use the DWM module in AeroDyn [-]
     LOGICAL  :: Linearize      !< Linearization analysis (flag) [-]
     CHARACTER(1024)  :: EDFile      !< The name of the ElastoDyn input file [-]
@@ -513,7 +519,6 @@ IMPLICIT NONE
     TYPE(MeshMapType)  :: SrvD_P_2_ED_P_N      !< Map ServoDyn nacelle point mesh to ElastoDyn point mesh on the nacelle [-]
     TYPE(MeshMapType)  :: ED_L_2_SrvD_P_T      !< Map ElastoDyn tower line2 mesh to ServoDyn/TTMD point mesh [-]
     TYPE(MeshMapType)  :: SrvD_P_2_ED_P_T      !< Map ServoDyn tower point mesh to ElastoDyn point load mesh on the tower [-]
-    TYPE(MeshMapType)  :: ED_P_2_LidSim_P_Nac      !< Map ElastoDyn Nacelle point mesh to LidSim NacelleMotion point mesh (this will go away) [-]
     TYPE(MeshMapType)  :: ED_P_2_LidSim_P_N      !< Map ElastoDyn Nacelle point mesh to Lidar point mesh [-]
     TYPE(MeshMapType) , DIMENSION(:), ALLOCATABLE  :: BDED_L_2_AD_L_B      !< Map ElastoDyn BladeLn2Mesh point meshes OR BeamDyn BldMotion line2 meshes to AeroDyn14 InputMarkers OR AeroDyn BladeMotion line2 meshes [-]
     TYPE(MeshMapType) , DIMENSION(:), ALLOCATABLE  :: AD_L_2_BDED_B      !< Map AeroDyn14 InputMarkers or AeroDyn BladeLoad line2 meshes to ElastoDyn BladePtLoad point meshes or BeamDyn BldMotion line2 meshes [-]
@@ -1421,6 +1426,7 @@ ENDIF
     DstParamData%CompMooring = SrcParamData%CompMooring
     DstParamData%CompIce = SrcParamData%CompIce
     DstParamData%CompLidar = SrcParamData%CompLidar
+    DstParamData%LidarMountLocation = SrcParamData%LidarMountLocation
     DstParamData%UseDWM = SrcParamData%UseDWM
     DstParamData%Linearize = SrcParamData%Linearize
     DstParamData%EDFile = SrcParamData%EDFile
@@ -1553,6 +1559,7 @@ ENDIF
       Int_BufSz  = Int_BufSz  + 1  ! CompMooring
       Int_BufSz  = Int_BufSz  + 1  ! CompIce
       Int_BufSz  = Int_BufSz  + 1  ! CompLidar
+      Int_BufSz  = Int_BufSz  + 1  ! LidarMountLocation
       Int_BufSz  = Int_BufSz  + 1  ! UseDWM
       Int_BufSz  = Int_BufSz  + 1  ! Linearize
       Int_BufSz  = Int_BufSz  + 1*LEN(InData%EDFile)  ! EDFile
@@ -1691,6 +1698,8 @@ ENDIF
       IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%CompIce
       Int_Xferred   = Int_Xferred   + 1
       IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%CompLidar
+      Int_Xferred   = Int_Xferred   + 1
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%LidarMountLocation
       Int_Xferred   = Int_Xferred   + 1
       IntKiBuf ( Int_Xferred:Int_Xferred+1-1 ) = TRANSFER( InData%UseDWM , IntKiBuf(1), 1)
       Int_Xferred   = Int_Xferred   + 1
@@ -1967,6 +1976,8 @@ ENDIF
       OutData%CompIce = IntKiBuf( Int_Xferred ) 
       Int_Xferred   = Int_Xferred + 1
       OutData%CompLidar = IntKiBuf( Int_Xferred ) 
+      Int_Xferred   = Int_Xferred + 1
+      OutData%LidarMountLocation = IntKiBuf( Int_Xferred ) 
       Int_Xferred   = Int_Xferred + 1
       OutData%UseDWM = TRANSFER( IntKiBuf( Int_Xferred ), mask0 )
       Int_Xferred   = Int_Xferred + 1
@@ -24648,9 +24659,6 @@ ENDIF
       CALL NWTC_Library_Copymeshmaptype( SrcModuleMapTypeData%SrvD_P_2_ED_P_T, DstModuleMapTypeData%SrvD_P_2_ED_P_T, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
-      CALL NWTC_Library_Copymeshmaptype( SrcModuleMapTypeData%ED_P_2_LidSim_P_Nac, DstModuleMapTypeData%ED_P_2_LidSim_P_Nac, CtrlCode, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
-         IF (ErrStat>=AbortErrLev) RETURN
       CALL NWTC_Library_Copymeshmaptype( SrcModuleMapTypeData%ED_P_2_LidSim_P_N, DstModuleMapTypeData%ED_P_2_LidSim_P_N, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
@@ -24920,7 +24928,6 @@ ENDIF
   CALL NWTC_Library_Destroymeshmaptype( ModuleMapTypeData%SrvD_P_2_ED_P_N, ErrStat, ErrMsg )
   CALL NWTC_Library_Destroymeshmaptype( ModuleMapTypeData%ED_L_2_SrvD_P_T, ErrStat, ErrMsg )
   CALL NWTC_Library_Destroymeshmaptype( ModuleMapTypeData%SrvD_P_2_ED_P_T, ErrStat, ErrMsg )
-  CALL NWTC_Library_Destroymeshmaptype( ModuleMapTypeData%ED_P_2_LidSim_P_Nac, ErrStat, ErrMsg )
   CALL NWTC_Library_Destroymeshmaptype( ModuleMapTypeData%ED_P_2_LidSim_P_N, ErrStat, ErrMsg )
 IF (ALLOCATED(ModuleMapTypeData%BDED_L_2_AD_L_B)) THEN
 DO i1 = LBOUND(ModuleMapTypeData%BDED_L_2_AD_L_B,1), UBOUND(ModuleMapTypeData%BDED_L_2_AD_L_B,1)
@@ -25406,23 +25413,6 @@ ENDIF
          DEALLOCATE(Db_Buf)
       END IF
       IF(ALLOCATED(Int_Buf)) THEN ! SrvD_P_2_ED_P_T
-         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
-         DEALLOCATE(Int_Buf)
-      END IF
-      Int_BufSz   = Int_BufSz + 3  ! ED_P_2_LidSim_P_Nac: size of buffers for each call to pack subtype
-      CALL NWTC_Library_Packmeshmaptype( Re_Buf, Db_Buf, Int_Buf, InData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2, .TRUE. ) ! ED_P_2_LidSim_P_Nac 
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-        IF (ErrStat >= AbortErrLev) RETURN
-
-      IF(ALLOCATED(Re_Buf)) THEN ! ED_P_2_LidSim_P_Nac
-         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
-         DEALLOCATE(Re_Buf)
-      END IF
-      IF(ALLOCATED(Db_Buf)) THEN ! ED_P_2_LidSim_P_Nac
-         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
-         DEALLOCATE(Db_Buf)
-      END IF
-      IF(ALLOCATED(Int_Buf)) THEN ! ED_P_2_LidSim_P_Nac
          Int_BufSz = Int_BufSz + SIZE( Int_Buf )
          DEALLOCATE(Int_Buf)
       END IF
@@ -26558,34 +26548,6 @@ ENDIF
         IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
       ENDIF
       CALL NWTC_Library_Packmeshmaptype( Re_Buf, Db_Buf, Int_Buf, InData%SrvD_P_2_ED_P_T, ErrStat2, ErrMsg2, OnlySize ) ! SrvD_P_2_ED_P_T 
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-        IF (ErrStat >= AbortErrLev) RETURN
-
-      IF(ALLOCATED(Re_Buf)) THEN
-        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
-        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
-        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
-        DEALLOCATE(Re_Buf)
-      ELSE
-        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
-      ENDIF
-      IF(ALLOCATED(Db_Buf)) THEN
-        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
-        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
-        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
-        DEALLOCATE(Db_Buf)
-      ELSE
-        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
-      ENDIF
-      IF(ALLOCATED(Int_Buf)) THEN
-        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
-        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
-        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
-        DEALLOCATE(Int_Buf)
-      ELSE
-        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
-      ENDIF
-      CALL NWTC_Library_Packmeshmaptype( Re_Buf, Db_Buf, Int_Buf, InData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2, OnlySize ) ! ED_P_2_LidSim_P_Nac 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
         IF (ErrStat >= AbortErrLev) RETURN
 
@@ -28408,46 +28370,6 @@ ENDIF
         Int_Xferred = Int_Xferred + Buf_size
       END IF
       CALL NWTC_Library_Unpackmeshmaptype( Re_Buf, Db_Buf, Int_Buf, OutData%SrvD_P_2_ED_P_T, ErrStat2, ErrMsg2 ) ! SrvD_P_2_ED_P_T 
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-        IF (ErrStat >= AbortErrLev) RETURN
-
-      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
-      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
-      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
-      Buf_size=IntKiBuf( Int_Xferred )
-      Int_Xferred = Int_Xferred + 1
-      IF(Buf_size > 0) THEN
-        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
-        IF (ErrStat2 /= 0) THEN 
-           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
-           RETURN
-        END IF
-        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
-        Re_Xferred = Re_Xferred + Buf_size
-      END IF
-      Buf_size=IntKiBuf( Int_Xferred )
-      Int_Xferred = Int_Xferred + 1
-      IF(Buf_size > 0) THEN
-        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
-        IF (ErrStat2 /= 0) THEN 
-           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
-           RETURN
-        END IF
-        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
-        Db_Xferred = Db_Xferred + Buf_size
-      END IF
-      Buf_size=IntKiBuf( Int_Xferred )
-      Int_Xferred = Int_Xferred + 1
-      IF(Buf_size > 0) THEN
-        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
-        IF (ErrStat2 /= 0) THEN 
-           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
-           RETURN
-        END IF
-        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
-        Int_Xferred = Int_Xferred + Buf_size
-      END IF
-      CALL NWTC_Library_Unpackmeshmaptype( Re_Buf, Db_Buf, Int_Buf, OutData%ED_P_2_LidSim_P_Nac, ErrStat2, ErrMsg2 ) ! ED_P_2_LidSim_P_Nac 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
         IF (ErrStat >= AbortErrLev) RETURN
 

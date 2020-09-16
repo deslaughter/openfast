@@ -38,8 +38,8 @@ IMPLICIT NONE
     CHARACTER(1024)  :: RootName      !< Root of the file name -- for summary or echo [-]
     CHARACTER(1024)  :: InputInitFile      !< Name of the Input file [-]
     REAL(DbKi)  :: DT      !< Step size [s]
-    REAL(ReKi) , DIMENSION(1:3)  :: LidarRefPosition      !< X-Y-Z reference position  of Lidar reference point (reference may be Nacelle or ground -- depends on calling code) [m]
-    REAL(R8Ki) , DIMENSION(1:3,1:3)  :: LidarRefOrientation      !< DCM reference orientation of Lidar reference point (reference may be Nacelle or ground -- depends on calling code) [-]
+    REAL(ReKi) , DIMENSION(1:3)  :: LidarRefPosition      !< X-Y-Z reference position  of Lidar reference point (reference may be Nacelle, hub, ground, or platform -- depends on calling code) [m]
+    REAL(R8Ki) , DIMENSION(1:3,1:3)  :: LidarRefOrientation      !< DCM reference orientation of Lidar reference point (reference may be Nacelle, hub, ground, or platform -- depends on calling code) [-]
   END TYPE LidarSim_InitInputType
 ! =======================
 ! =========  LidarSim_InitOutputType  =======
@@ -69,12 +69,10 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: GatesPerBeam      !< Amount of gates per point [-]
     INTEGER(IntKi)  :: MAXDLLChainOutputs      !< Number of entries in the avrSWAP reserved for the DLL chain [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: ValidOutputs      !< List of valid output channels [-]
-    LOGICAL  :: LidarOnNacelle = .true.      !< Lidar is mounted on Nacelle [-]
   END TYPE LidarSim_ParameterType
 ! =======================
 ! =========  LidarSim_InputType  =======
   TYPE, PUBLIC :: LidarSim_InputType
-    TYPE(MeshType)  :: NacelleMotion      !< . [-]
     TYPE(MeshType)  :: LidarMesh      !< Lidar motion mesh (includes the orientation and position relative to the mounting point) [-]
   END TYPE LidarSim_InputType
 ! =======================
@@ -1017,7 +1015,6 @@ IF (ALLOCATED(SrcParamData%ValidOutputs)) THEN
   END IF
     DstParamData%ValidOutputs = SrcParamData%ValidOutputs
 ENDIF
-    DstParamData%LidarOnNacelle = SrcParamData%LidarOnNacelle
  END SUBROUTINE LidarSim_CopyParam
 
  SUBROUTINE LidarSim_DestroyParam( ParamData, ErrStat, ErrMsg )
@@ -1112,7 +1109,6 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*1  ! ValidOutputs upper/lower bounds for each dimension
       Int_BufSz  = Int_BufSz  + SIZE(InData%ValidOutputs)  ! ValidOutputs
   END IF
-      Int_BufSz  = Int_BufSz  + 1  ! LidarOnNacelle
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -1223,8 +1219,6 @@ ENDIF
       IF (SIZE(InData%ValidOutputs)>0) IntKiBuf ( Int_Xferred:Int_Xferred+(SIZE(InData%ValidOutputs))-1 ) = PACK(InData%ValidOutputs,.TRUE.)
       Int_Xferred   = Int_Xferred   + SIZE(InData%ValidOutputs)
   END IF
-      IntKiBuf ( Int_Xferred:Int_Xferred+1-1 ) = TRANSFER( InData%LidarOnNacelle , IntKiBuf(1), 1)
-      Int_Xferred   = Int_Xferred   + 1
  END SUBROUTINE LidarSim_PackParam
 
  SUBROUTINE LidarSim_UnPackParam( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -1394,8 +1388,6 @@ ENDIF
       Int_Xferred   = Int_Xferred   + SIZE(OutData%ValidOutputs)
     DEALLOCATE(mask1)
   END IF
-      OutData%LidarOnNacelle = TRANSFER( IntKiBuf( Int_Xferred ), mask0 )
-      Int_Xferred   = Int_Xferred + 1
  END SUBROUTINE LidarSim_UnPackParam
 
  SUBROUTINE LidarSim_CopyInput( SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg )
@@ -1412,9 +1404,6 @@ ENDIF
 ! 
    ErrStat = ErrID_None
    ErrMsg  = ""
-      CALL MeshCopy( SrcInputData%NacelleMotion, DstInputData%NacelleMotion, CtrlCode, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-         IF (ErrStat>=AbortErrLev) RETURN
       CALL MeshCopy( SrcInputData%LidarMesh, DstInputData%LidarMesh, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
@@ -1429,7 +1418,6 @@ ENDIF
 ! 
   ErrStat = ErrID_None
   ErrMsg  = ""
-  CALL MeshDestroy( InputData%NacelleMotion, ErrStat, ErrMsg )
   CALL MeshDestroy( InputData%LidarMesh, ErrStat, ErrMsg )
  END SUBROUTINE LidarSim_DestroyInput
 
@@ -1469,23 +1457,6 @@ ENDIF
   Db_BufSz  = 0
   Int_BufSz  = 0
    ! Allocate buffers for subtypes, if any (we'll get sizes from these) 
-      Int_BufSz   = Int_BufSz + 3  ! NacelleMotion: size of buffers for each call to pack subtype
-      CALL MeshPack( InData%NacelleMotion, Re_Buf, Db_Buf, Int_Buf, ErrStat2, ErrMsg2, .TRUE. ) ! NacelleMotion 
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-        IF (ErrStat >= AbortErrLev) RETURN
-
-      IF(ALLOCATED(Re_Buf)) THEN ! NacelleMotion
-         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
-         DEALLOCATE(Re_Buf)
-      END IF
-      IF(ALLOCATED(Db_Buf)) THEN ! NacelleMotion
-         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
-         DEALLOCATE(Db_Buf)
-      END IF
-      IF(ALLOCATED(Int_Buf)) THEN ! NacelleMotion
-         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
-         DEALLOCATE(Int_Buf)
-      END IF
       Int_BufSz   = Int_BufSz + 3  ! LidarMesh: size of buffers for each call to pack subtype
       CALL MeshPack( InData%LidarMesh, Re_Buf, Db_Buf, Int_Buf, ErrStat2, ErrMsg2, .TRUE. ) ! LidarMesh 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -1530,34 +1501,6 @@ ENDIF
   Db_Xferred  = 1
   Int_Xferred = 1
 
-      CALL MeshPack( InData%NacelleMotion, Re_Buf, Db_Buf, Int_Buf, ErrStat2, ErrMsg2, OnlySize ) ! NacelleMotion 
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-        IF (ErrStat >= AbortErrLev) RETURN
-
-      IF(ALLOCATED(Re_Buf)) THEN
-        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
-        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
-        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
-        DEALLOCATE(Re_Buf)
-      ELSE
-        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
-      ENDIF
-      IF(ALLOCATED(Db_Buf)) THEN
-        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
-        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
-        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
-        DEALLOCATE(Db_Buf)
-      ELSE
-        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
-      ENDIF
-      IF(ALLOCATED(Int_Buf)) THEN
-        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
-        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
-        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
-        DEALLOCATE(Int_Buf)
-      ELSE
-        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
-      ENDIF
       CALL MeshPack( InData%LidarMesh, Re_Buf, Db_Buf, Int_Buf, ErrStat2, ErrMsg2, OnlySize ) ! LidarMesh 
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
         IF (ErrStat >= AbortErrLev) RETURN
@@ -1620,46 +1563,6 @@ ENDIF
   Re_Xferred  = 1
   Db_Xferred  = 1
   Int_Xferred  = 1
-      Buf_size=IntKiBuf( Int_Xferred )
-      Int_Xferred = Int_Xferred + 1
-      IF(Buf_size > 0) THEN
-        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
-        IF (ErrStat2 /= 0) THEN 
-           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
-           RETURN
-        END IF
-        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
-        Re_Xferred = Re_Xferred + Buf_size
-      END IF
-      Buf_size=IntKiBuf( Int_Xferred )
-      Int_Xferred = Int_Xferred + 1
-      IF(Buf_size > 0) THEN
-        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
-        IF (ErrStat2 /= 0) THEN 
-           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
-           RETURN
-        END IF
-        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
-        Db_Xferred = Db_Xferred + Buf_size
-      END IF
-      Buf_size=IntKiBuf( Int_Xferred )
-      Int_Xferred = Int_Xferred + 1
-      IF(Buf_size > 0) THEN
-        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
-        IF (ErrStat2 /= 0) THEN 
-           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
-           RETURN
-        END IF
-        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
-        Int_Xferred = Int_Xferred + Buf_size
-      END IF
-      CALL MeshUnpack( OutData%NacelleMotion, Re_Buf, Db_Buf, Int_Buf, ErrStat2, ErrMsg2 ) ! NacelleMotion 
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-        IF (ErrStat >= AbortErrLev) RETURN
-
-      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
-      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
-      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
       Buf_size=IntKiBuf( Int_Xferred )
       Int_Xferred = Int_Xferred + 1
       IF(Buf_size > 0) THEN
@@ -3223,8 +3126,6 @@ ENDIF
      CALL SetErrStat(ErrID_Fatal, 't(1) must not equal t(2) to avoid a division-by-zero error.', ErrStat, ErrMsg,RoutineName)
      RETURN
    END IF
-      CALL MeshExtrapInterp1(u1%NacelleMotion, u2%NacelleMotion, tin, u_out%NacelleMotion, tin_out, ErrStat2, ErrMsg2 )
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
       CALL MeshExtrapInterp1(u1%LidarMesh, u2%LidarMesh, tin, u_out%LidarMesh, tin_out, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
  END SUBROUTINE LidarSim_Input_ExtrapInterp1
@@ -3279,8 +3180,6 @@ ENDIF
      CALL SetErrStat(ErrID_Fatal, 't(1) must not equal t(3) to avoid a division-by-zero error.', ErrStat, ErrMsg,RoutineName)
      RETURN
    END IF
-      CALL MeshExtrapInterp2(u1%NacelleMotion, u2%NacelleMotion, u3%NacelleMotion, tin, u_out%NacelleMotion, tin_out, ErrStat2, ErrMsg2 )
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
       CALL MeshExtrapInterp2(u1%LidarMesh, u2%LidarMesh, u3%LidarMesh, tin, u_out%LidarMesh, tin_out, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
  END SUBROUTINE LidarSim_Input_ExtrapInterp2

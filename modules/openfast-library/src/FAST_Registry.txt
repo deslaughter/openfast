@@ -58,6 +58,12 @@ param	^	-	INTEGER	NumModules	-	17	-	"The number of modules available in FAST"	-
 # Other Constants
 param	^	-	INTEGER	MaxNBlades	-	3	-	"Maximum number of blades allowed on a turbine"	-
 param	^	-	INTEGER	IceD_MaxLegs	-	4	-	"because I don't know how many legs there are before calling IceD_Init and I don't want to copy the data because of sibling mesh issues, I'm going to allocate IceD based on this number"	-
+## Lidar mesh location
+param ^  -  INTEGER  LidarMount_None      -  0  -  "Lidar is not used" - 
+param ^  -  INTEGER  LidarMount_Nacelle   -  1  -  "Lidar is mounted on nacelle.  All referencing from nacelle motion mesh and follows nacelle motion"   -
+param ^  -  INTEGER  LidarMount_Hub       -  2  -  "Lidar is mounted on hub.      All referencing from hub     motion mesh and follows hub     motion"   -
+param ^  -  INTEGER  LidarMount_Ground    -  3  -  "Lidar is mounted on ground.   All referencing from tower base mesh at T=0 (does not move with tower base, i.e. with soil dynamcis)"   -
+param ^  -  INTEGER  LidarMount_Platform  -  4  -  "Lidar is mounted on platform. All referencing from tower base mesh and follows tower base motion."   -
 # ...... Data for VTK surface visualization ............................................................................
 typedef	^	FAST_VTK_BLSurfaceType	SiKi	AirfoilCoords	{:}{:}{:}	-	-	"x,y coordinates for airfoil around each blade node on a blade (relative to reference)"	-
 # ...... Data for VTK surface visualization ............................................................................
@@ -100,6 +106,7 @@ typedef	^	FAST_ParameterType	IntKi	CompSub	-	-	-	"Compute sub-structural dynamic
 typedef	^	FAST_ParameterType	IntKi	CompMooring	-	-	-	"Compute mooring system (switch) {Module_None; Module_MAP; Module_FEAM; Module_MD; Module_Orca}"	-
 typedef	^	FAST_ParameterType	IntKi	CompIce	-	-	-	"Compute ice loading (switch) {Module_None; Module_IceF, Module_IceD}"	-
 typedef	^	FAST_ParameterType	IntKi	CompLidar	-	-	"Compute LidarSim Module (switch) {0 = Off, 1 = On}}"	-	
+typedef	^	FAST_ParameterType	IntKi	LidarMountLocation	-	LidarMount_None	-	"Lidar mounting location -- for mesh transfers {Lidar_None, LidarMount_Nacelle, LidarMount_Hub, LidarMount_Ground, LidarMount_Platform}"	-	
 typedef	^	FAST_ParameterType	LOGICAL	UseDWM	-	-	-	"Use the DWM module in AeroDyn"	-
 typedef	^	FAST_ParameterType	LOGICAL	Linearize	-	-	-	"Linearization analysis (flag)"	-
 # Input file names:
@@ -446,7 +453,7 @@ typedef	^	FAST_ModuleMapType	MeshMapType	SrvD_P_2_ED_P_N	-	-	-	"Map ServoDyn nac
 typedef	^	FAST_ModuleMapType	MeshMapType	ED_L_2_SrvD_P_T	-	-	-	"Map ElastoDyn tower line2 mesh to ServoDyn/TTMD point mesh"
 typedef	^	FAST_ModuleMapType	MeshMapType	SrvD_P_2_ED_P_T	-	-	-	"Map ServoDyn tower point mesh to ElastoDyn point load mesh on the tower"
 # ED <-> LidarSim
-typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_LidSim_P_Nac	-	-	-	"Map ElastoDyn Nacelle point mesh to LidSim NacelleMotion point mesh (this will go away)"
+#typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_LidSim_P_Nac	-	-	-	"Map ElastoDyn Nacelle point mesh to LidSim NacelleMotion point mesh (this will go away)"
 typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_LidSim_P_N	-	-	-	"Map ElastoDyn Nacelle point mesh to Lidar point mesh"
 # ED/BD <-> AD (blades)
 typedef	^	FAST_ModuleMapType	MeshMapType	BDED_L_2_AD_L_B	{:}	-	-	"Map ElastoDyn BladeLn2Mesh point meshes OR BeamDyn BldMotion line2 meshes to AeroDyn14 InputMarkers OR AeroDyn BladeMotion line2 meshes"

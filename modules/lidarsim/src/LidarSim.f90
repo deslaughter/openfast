@@ -50,7 +50,7 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
     TYPE(LidarSim_InputFile)                                ::  InputFileData      !< Structure to load the input file data into
     CHARACTER(1024)                                         ::  RootFileName
     CHARACTER(1024)                                         ::  EchoFileName
-   real(ReKi)                                               :: LidarPosition(3)
+   integer(IntKi)                                           :: i                    !< Generic counter
 
     ! Temporary variables for error handling
     INTEGER(IntKi)                                          ::  TmpErrStat          !< temporary error message
@@ -155,66 +155,22 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       CHARACTER(ErrMsgLen)                                  :: TmpErrMsg
       real(ReKi)                                            :: Pos(3)            ! Position    of the lidar unit (global coords)
       real(DbKi)                                            :: Orient(3,3)       ! Orientation of the lidar unit (global coords)
+      real(DbKi)                                            :: theta(3)          ! Euler angles input
       ! Initial error values
       ErrStat     =  ErrID_None
       ErrMsg      = ""
 
 
-!FIXME: remove once the LidarMesh is working correctly
       !  Creates the static rotationmatrix from the lidar system to the reference system
-      !  Note: reference system could be the ground, a hub, or the nacelle.  Depends what point is passed in
-      !        for where the Lidar is mounted
-      CALL LidarSim_CreateRotationMatrix(InputFileData%RollAngle_N,InputFileData%PitchAngle_N,&
-         InputFileData%YawAngle_N, p%LidarOrientation_N)
-
-
-      !---------------------------------------
-      ! Nacelle Mesh -- This is temporary until mesh LidarMesh is working correctly
-      !---------------------------------------
-      ! Position of the lidar module in global coordinates
-      Pos      =  p%LidarPosition_N
-      Orient   =  p%LidarOrientation_N
-
-      ! Create the input mesh for the Lidar unit
-      CALL MeshCreate( BlankMesh        = u%NacelleMotion   &
-                     ,IOS               = COMPONENT_INPUT   &
-                     ,Nnodes            = 1                 &
-                     ,ErrStat           = TmpErrStat        &
-                     ,ErrMess           = TmpErrMsg         &
-                     ,TranslationDisp   = .TRUE.            &
-                     ,Orientation       = .TRUE.            &
-                     ,TranslationVel    = .TRUE.            &
-                     ,RotationVel       = .TRUE.            &
-                     ,TranslationAcc    = .TRUE.            &
-                     ,RotationAcc       = .TRUE.)
-         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName)
-
-      ! Create the node on the mesh
-      CALL MeshPositionNode ( u%NacelleMotion,1, Pos, TmpErrStat, TmpErrMsg, Orient )
-         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName)
-
-      ! Create the mesh element
-      CALL MeshConstructElement (  u%NacelleMotion         &
-                                  , ELEMENT_POINT      &
-                                  , TmpErrStat         &
-                                  , TmpErrMsg          &
-                                  , 1                  )
-         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName)
-      CALL MeshCommit ( u%NacelleMotion         &
-                      , TmpErrStat          &
-                      , TmpErrMsg           )
-         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName)
-
-      u%NacelleMotion%RemapFlag  = .TRUE.
-
-
-
+      !  Note: reference system could be the nacelle, hub, ground, or floating platform.  Depends what point is passed in
+      !        for where the Lidar is mounted.  The calling code decides this.
 
       !---------------------------------------
       ! Position of the lidar module in global coordinates
       Pos      =  p%LidarPosition_N + InitInp%LidarRefPosition
-!FIXME: check that this is what is intended
-      Orient   =  MATMUL( InitInp%LidarRefOrientation, p%LidarOrientation_N )
+      theta    = (/ InputFileData%RollAngle_N, InputFileData%PitchAngle_N, InputFileData%YawAngle_N /)
+      Orient   = EulerConstruct(theta)
+      Orient   =  MATMUL( transpose(Orient), InitInp%LidarRefOrientation )
 
       ! Create the input mesh for the Lidar unit
       CALL MeshCreate( BlankMesh        = u%LidarMesh       &
@@ -302,14 +258,12 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
     
     IF(m%MeasurementCurrentStep>=p%MeasurementMaxSteps .OR. m%MeasurementCurrentStep == -1)THEN         !Check if there must be a new measurement     !(NINT(Time*1000)-NINT(p%t_last_measurement*1000)) >= NINT(p%t_measurement_interval*1000)
         m%MeasurementCurrentStep = 0
-        LidarPosition_I = LidarSim_TransformLidarToInertial( u%NacelleMotion,p, (/0.0,0.0,0.0/) )                               !Calculation of the lidar positon ( 0 / 0 / 0 ) in the lidar coordinate system
-!        LidarPosition_I = LidarSim_TransformLidarToInertial( u%LidarMesh,p, (/0.0,0.0,0.0/) )                               !Calculation of the lidar positon ( 0 / 0 / 0 ) in the lidar coordinate system
+        LidarPosition_I =  u%LidarMesh%Position(1:3,1) + u%LidarMesh%TranslationDisp(1:3,1)
 
         CALL LidarSim_CalculateIMU(p, y, u)
         DO LoopGatesPerBeam = 0,p%GatesPerBeam-1
-            !Transform measuring and lidar position to the inertial system
-            MeasuringPosition_I = LidarSim_TransformLidarToInertial(u%NacelleMotion,p,p%MeasuringPoints_L(:,m%LastMeasuringPoint+LoopGatesPerBeam)) ! Calculate the Measuringpoint coordinate in the initial system
-!            MeasuringPosition_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,m%LastMeasuringPoint+LoopGatesPerBeam)) ! Calculate the Measuringpoint coordinate in the initial system
+            !Transform measuring and lidar measurement position to the inertial system
+            MeasuringPosition_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,m%LastMeasuringPoint+LoopGatesPerBeam)) ! Calculate the Measuringpoint coordinate in the initial system
 
             !Line of Sight
             UnitVector    =   MeasuringPosition_I - LidarPosition_I             !Calculation of the Line of Sight Vector          
