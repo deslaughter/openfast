@@ -69,10 +69,15 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
     ! Reads the Config from the Input file and writes it into the LidarSim_InputFile data 
     CALL LidarSim_ReadInputFile(InitInp%InputInitFile,EchoFileName , InputFileData, TmpErrStat, TmpErrMsg)!EchoFileName
       if (Failed()) return
+
+   ! Convert angles read in degrees to radians
    InputFileData%RollAngle_N  =  InputFileData%RollAngle_N  *  D2R_D
    InputFileData%PitchAngle_N =  InputFileData%PitchAngle_N *  D2R_D
    InputFileData%YawAngle_N   =  InputFileData%YawAngle_N   *  D2R_D
-
+   do i=1,InputFileData%NumberOfPoints_Spherical
+      InputFileData%Azimuth(i)   = InputFileData%Azimuth(i)   * D2R_D
+      InputFileData%Elevation(i) = InputFileData%Elevation(i) * D2R_D
+   enddo
  
     !Transfering InputFileData to the p
     p%MeasurementMaxSteps   =   CEILING(REAL(NINT(InputFileData%t_measurement_interval*100000))/REAL(NINT(InitInp%DT*100000))) !NINT to remove float precision errors. Back to REAL, otherwise the divion ignores everything behind the decima point. Ceiling to round up to next integer
