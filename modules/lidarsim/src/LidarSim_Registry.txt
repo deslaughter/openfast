@@ -4,9 +4,8 @@ include Registry_NWTC_Library.txt
 typedef  LidarSim/LidarSim InitInputType     CHARACTER(1024)      RootName       -  -  -  "Root of the file name -- for summary or echo" -
 typedef  ^                 InitInputType     CHARACTER(1024)      InputInitFile  -  -  -  "Name of the Input file" -
 typedef  ^                 InitInputType     DbKi                 DT             -  -  -  "Step size" s
-typedef  ^                 InitInputType     ReKi                 LidarRefPosition      {3}      -   -   "X-Y-Z reference position  of Lidar reference point (reference may be Nacelle or ground -- depends on calling code)"    m
-typedef  ^                 InitInputType     R8Ki                 LidarRefOrientation   {3}{3}   -   -   "DCM reference orientation of Lidar reference point (reference may be Nacelle or ground -- depends on calling code)"    -
-
+typedef  ^                 InitInputType     ReKi                 LidarRefPosition      {3}      -   -   "X-Y-Z reference position  of Lidar reference point (reference may be Nacelle, hub, ground, or platform -- depends on calling code)"    m
+typedef  ^                 InitInputType     R8Ki                 LidarRefOrientation   {3}{3}   -   -   "DCM reference orientation of Lidar reference point (reference may be Nacelle, hub, ground, or platform -- depends on calling code)"    -
 
  ..... LidarSim_InitOutputType data .......................................................................................................
 typedef  LidarSim/LidarSim InitOutputType    CHARACTER(ChanLen)   WriteOutputHdr   :   -   -   "Names of output-to-file channels"   -
@@ -20,6 +19,7 @@ typedef  ^                 OutputType     ReKi     IMUOutputs           :   -   
 
  ..... LidarSim_ParameterType data .......................................................................................................
 typedef  LidarSim/LidarSim ParameterType  IntKi    MeasurementMaxSteps           -        -   -   "Time steps between lidar measurements" -
+#FIXME: remove the next two lines!!!!
 typedef  ^                 ParameterType  ReKi     LidarPosition_N(3)            -        -   -   "Lidar position in the nacelle coordinates"   m
 typedef  ^                 ParameterType  DbKi     LidarOrientation_N(3,3)       -        -   -   "orientation of the lidar system in the nacelle coordinate system"   -
 typedef  ^                 ParameterType  ReKi     MeasuringPoints_L             {:}{:}   -   -   "2D Array of all measuringpoints, first dimension is always 3"   m
@@ -30,11 +30,9 @@ typedef  ^                 ParameterType  ReKi     URef                         
 typedef  ^                 ParameterType  IntKi    GatesPerBeam                  -        -   -   "Amount of gates per point" -
 typedef  ^                 ParameterType  IntKi    MAXDLLChainOutputs            -        -   -   "Number of entries in the avrSWAP reserved for the DLL chain" -
 typedef  ^                 ParameterType  IntKi    ValidOutputs                  {:}      -   -   "List of valid output channels" -
-typedef  ^                 ParameterType  LOGICAL  LidarOnNacelle                -     .true. -   "Lidar is mounted on Nacelle" -
 
  ..... LidarSim_InputType data .......................................................................................................
 #FIXME: change this to LidarMotion
-typedef  LidarSim/LidarSim InputType   MeshType   NacelleMotion         -  -  -  "."   -
 typedef  LidarSim/LidarSim InputType   MeshType   LidarMesh             -  -  -  "Lidar motion mesh (includes the orientation and position relative to the mounting point)" -
 #FIXME: add velocity info from IfW here
  
