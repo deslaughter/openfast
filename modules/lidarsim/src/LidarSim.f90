@@ -154,8 +154,8 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       INTEGER(IntKi)                                        :: TmpErrStat
       CHARACTER(ErrMsgLen)                                  :: TmpErrMsg
       real(ReKi)                                            :: Pos(3)            ! Position    of the lidar unit (global coords)
-      real(DbKi)                                            :: Orient(3,3)       ! Orientation of the lidar unit (global coords)
-      real(DbKi)                                            :: theta(3)          ! Euler angles input
+      real(R8Ki)                                            :: Orient(3,3)       ! Orientation of the lidar unit (global coords)
+      real(R8Ki)                                            :: theta(3)          ! Euler angles input
       ! Initial error values
       ErrStat     =  ErrID_None
       ErrMsg      = ""
