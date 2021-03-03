@@ -139,7 +139,7 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
    end function Failed
 
    subroutine Cleanup()
-      CALL LidarSim_DestroyInputFile(InputFileData, TmpErrStat, TmpErrMsg)                              ! Calls to destory the data from the inputfile. Important data has to be transfered to the parameter data before
+      CALL LidarSim_DestroyInputFile(InputFileData, TmpErrStat, TmpErrMsg)
       CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
    end subroutine Cleanup
 

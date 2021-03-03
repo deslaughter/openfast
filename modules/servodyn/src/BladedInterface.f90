@@ -444,7 +444,7 @@ SUBROUTINE Fill_avrSWAP( t, u, p, AddOuts, ErrMsgSz, dll_data )
    REAL(DbKi),                     INTENT(IN   )  :: t           !< Current simulation time in seconds
    TYPE(SrvD_InputType),           INTENT(IN   )  :: u           !< Inputs at t
    TYPE(SrvD_ParameterType),       INTENT(IN   )  :: p           !< Parameters
-   TYPE(SrvD_AddOutsType),		     INTENT(IN   )  :: AddOuts     !< Additional outputs for the avrSWAP array
+   TYPE(SrvD_AddOutsType),         INTENT(IN   )  :: AddOuts     !< Additional outputs for the avrSWAP array
    INTEGER(IntKi),                 INTENT(IN   )  :: ErrMsgSz    !< Allowed size of the DLL-returned error message (-)
 !   REAL(SiKi),                     INTENT(INOUT)  :: avrSWAP(:)  ! the SWAP array for the Bladed DLL Interface
    TYPE(BladedDLLType),            INTENT(INOUT)  :: dll_data    !< data for the Bladed DLL
