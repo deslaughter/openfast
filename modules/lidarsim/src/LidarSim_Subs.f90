@@ -287,66 +287,6 @@ CONTAINS
 END SUBROUTINE LidarSim_ReadInputFile
 
 !#########################################################################################################################################################################
-!   
-!   SUBROUTINE LidarSim_CreateRotationMatrix(Roll_N, Pitch_N, Yaw_N, LidarOrientation_N)
-!
-!   IMPLICIT         NONE
-!   CHARACTER(*),    PARAMETER       ::  RoutineName="LidarSim_CreateRotationMatrix"
-!
-!   REAL(R8Ki),      INTENT(IN   )   ::  Roll_N                      !Roll Rotation
-!   REAL(R8Ki),      INTENT(IN   )   ::  Pitch_N                     !Pitch Rotation
-!   REAL(R8Ki),      INTENT(IN   )   ::  Yaw_N                       !Yaw Rotation
-!   REAL(DbKi),      INTENT(INOUT)   ::  LidarOrientation_N(3,3)     !Output Rotation matrix
-!   
-!   ! Local variables
-!   REAL(ReKi)                       ::  Rotations(3,3,3)            !Temporary Rotation matrices
-!   
-!   ! Roll Rotation
-!   Rotations(1,1,1) = 1
-!   Rotations(1,2,1) = 0
-!   Rotations(1,3,1) = 0
-!   
-!   Rotations(2,1,1) = 0
-!   Rotations(2,2,1) = COS(Roll_N)
-!   Rotations(2,3,1) = SIN(Roll_N)
-!   
-!   Rotations(3,1,1) = 0
-!   Rotations(3,2,1) = - SIN(Roll_N)
-!   Rotations(3,3,1) =   COS(Roll_N)
-!   
-!   ! Pitch Rotation
-!   Rotations(1,1,2) =   COS(Pitch_N)
-!   Rotations(1,2,2) = 0
-!   Rotations(1,3,2) = - SIN(Pitch_N)
-!   
-!   Rotations(2,1,2) = 0
-!   Rotations(2,2,2) = 1
-!   Rotations(2,3,2) = 0
-!   
-!   Rotations(3,1,2) = SIN(Pitch_N)
-!   Rotations(3,2,2) = 0
-!   Rotations(3,3,2) = COS(Pitch_N)
-!   
-!   ! Yaw Rotation
-!   Rotations(1,1,3) = COS(Yaw_N)
-!   Rotations(1,2,3) = SIN(Yaw_N)
-!   Rotations(1,3,3) = 0
-!   
-!   Rotations(2,1,3) = - SIN(Yaw_N)
-!   Rotations(2,2,3) =   COS(Yaw_N)
-!   Rotations(2,3,3) = 0
-!   
-!   Rotations(3,1,3) = 0
-!   Rotations(3,2,3) = 0
-!   Rotations(3,3,3) = 1
-!   
-!   ! Combining rotations -- All rotation in OpenFAST are stored as double precision
-!   LidarOrientation_N = MATMUL( MATMUL( Rotations(:,:,3),Rotations(:,:,2) ), Rotations(:,:,1) )
-!   
-!   END SUBROUTINE LidarSim_CreateRotationMatrix
-!   
-!
-!#########################################################################################################################################################################
     
     SUBROUTINE LidarSim_InitMeasuringPoints_Cartesian(p, InputFileData, ErrStat, ErrMsg)
 
