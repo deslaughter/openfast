@@ -6,6 +6,8 @@ typedef  ^                 InitInputType     CHARACTER(1024)      InputInitFile 
 typedef  ^                 InitInputType     DbKi                 DT             -  -  -  "Step size" s
 typedef  ^                 InitInputType     ReKi                 LidarRefPosition      {3}      -   -   "X-Y-Z reference position  of Lidar reference point (reference may be Nacelle, hub, ground, or platform -- depends on calling code)"    m
 typedef  ^                 InitInputType     R8Ki                 LidarRefOrientation   {3}{3}   -   -   "DCM reference orientation of Lidar reference point (reference may be Nacelle, hub, ground, or platform -- depends on calling code)"    -
+typedef  ^                 InitInputType     LOGICAL              UsePrimaryInputFile     -  .TRUE.   -  "Read input file instead of passed input data"  -
+typedef  ^                 InitInputtype     FileInfoType         PassedFileData          -     -     -  "Primary input file as FileInfoType (set by driver/glue code when UsePrimaryInputFile==.false.)"   -
 
  ..... LidarSim_InitOutputType data .......................................................................................................
 typedef  LidarSim/LidarSim InitOutputType    CHARACTER(ChanLen)   WriteOutputHdr   :   -   -   "Names of output-to-file channels"   -
@@ -19,6 +21,7 @@ typedef  ^                 OutputType     ReKi     IMUOutputs           :   -   
 
  ..... LidarSim_ParameterType data .......................................................................................................
 typedef  LidarSim/LidarSim ParameterType  IntKi    MeasurementMaxSteps           -        -   -   "Time steps between lidar measurements" -
+typedef	^	               ParameterType	CHARACTER(1024)	RootName	            -	      -	 -	  "RootName for writing output files"	-
 #FIXME: remove the next two lines!!!!
 typedef  ^                 ParameterType  ReKi     LidarPosition_N(3)            -        -   -   "Lidar position in the nacelle coordinates"   m
 typedef  ^                 ParameterType  DbKi     LidarOrientation_N(3,3)       -        -   -   "orientation of the lidar system in the nacelle coordinate system"   -

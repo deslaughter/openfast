@@ -40,6 +40,8 @@ IMPLICIT NONE
     REAL(DbKi)  :: DT      !< Step size [s]
     REAL(ReKi) , DIMENSION(1:3)  :: LidarRefPosition      !< X-Y-Z reference position  of Lidar reference point (reference may be Nacelle, hub, ground, or platform -- depends on calling code) [m]
     REAL(R8Ki) , DIMENSION(1:3,1:3)  :: LidarRefOrientation      !< DCM reference orientation of Lidar reference point (reference may be Nacelle, hub, ground, or platform -- depends on calling code) [-]
+    LOGICAL  :: UsePrimaryInputFile = .TRUE.      !< Read input file instead of passed input data [-]
+    TYPE(FileInfoType)  :: PassedFileData      !< Primary input file as FileInfoType (set by driver/glue code when UsePrimaryInputFile==.false.) [-]
   END TYPE LidarSim_InitInputType
 ! =======================
 ! =========  LidarSim_InitOutputType  =======
@@ -59,6 +61,7 @@ IMPLICIT NONE
 ! =========  LidarSim_ParameterType  =======
   TYPE, PUBLIC :: LidarSim_ParameterType
     INTEGER(IntKi)  :: MeasurementMaxSteps      !< Time steps between lidar measurements [-]
+    CHARACTER(1024)  :: RootName      !< RootName for writing output files [-]
     REAL(ReKi)  :: LidarPosition_N(3)      !< Lidar position in the nacelle coordinates [m]
     REAL(DbKi)  :: LidarOrientation_N(3,3)      !< orientation of the lidar system in the nacelle coordinate system [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: MeasuringPoints_L      !< 2D Array of all measuringpoints, first dimension is always 3 [m]
@@ -157,6 +160,10 @@ CONTAINS
     DstInitInputData%DT = SrcInitInputData%DT
     DstInitInputData%LidarRefPosition = SrcInitInputData%LidarRefPosition
     DstInitInputData%LidarRefOrientation = SrcInitInputData%LidarRefOrientation
+    DstInitInputData%UsePrimaryInputFile = SrcInitInputData%UsePrimaryInputFile
+      CALL NWTC_Library_Copyfileinfotype( SrcInitInputData%PassedFileData, DstInitInputData%PassedFileData, CtrlCode, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
  END SUBROUTINE LidarSim_CopyInitInput
 
  SUBROUTINE LidarSim_DestroyInitInput( InitInputData, ErrStat, ErrMsg )
@@ -168,6 +175,7 @@ CONTAINS
 ! 
   ErrStat = ErrID_None
   ErrMsg  = ""
+  CALL NWTC_Library_Destroyfileinfotype( InitInputData%PassedFileData, ErrStat, ErrMsg )
  END SUBROUTINE LidarSim_DestroyInitInput
 
  SUBROUTINE LidarSim_PackInitInput( ReKiBuf, DbKiBuf, IntKiBuf, Indata, ErrStat, ErrMsg, SizeOnly )
@@ -210,6 +218,25 @@ CONTAINS
       Db_BufSz   = Db_BufSz   + 1  ! DT
       Re_BufSz   = Re_BufSz   + SIZE(InData%LidarRefPosition)  ! LidarRefPosition
       Db_BufSz   = Db_BufSz   + SIZE(InData%LidarRefOrientation)  ! LidarRefOrientation
+      Int_BufSz  = Int_BufSz  + 1  ! UsePrimaryInputFile
+   ! Allocate buffers for subtypes, if any (we'll get sizes from these) 
+      Int_BufSz   = Int_BufSz + 3  ! PassedFileData: size of buffers for each call to pack subtype
+      CALL NWTC_Library_Packfileinfotype( Re_Buf, Db_Buf, Int_Buf, InData%PassedFileData, ErrStat2, ErrMsg2, .TRUE. ) ! PassedFileData 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN ! PassedFileData
+         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
+         DEALLOCATE(Re_Buf)
+      END IF
+      IF(ALLOCATED(Db_Buf)) THEN ! PassedFileData
+         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
+         DEALLOCATE(Db_Buf)
+      END IF
+      IF(ALLOCATED(Int_Buf)) THEN ! PassedFileData
+         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
+         DEALLOCATE(Int_Buf)
+      END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -251,6 +278,36 @@ CONTAINS
       Re_Xferred   = Re_Xferred   + SIZE(InData%LidarRefPosition)
       DbKiBuf ( Db_Xferred:Db_Xferred+(SIZE(InData%LidarRefOrientation))-1 ) = PACK(InData%LidarRefOrientation,.TRUE.)
       Db_Xferred   = Db_Xferred   + SIZE(InData%LidarRefOrientation)
+      IntKiBuf ( Int_Xferred:Int_Xferred+1-1 ) = TRANSFER( InData%UsePrimaryInputFile , IntKiBuf(1), 1)
+      Int_Xferred   = Int_Xferred   + 1
+      CALL NWTC_Library_Packfileinfotype( Re_Buf, Db_Buf, Int_Buf, InData%PassedFileData, ErrStat2, ErrMsg2, OnlySize ) ! PassedFileData 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
+        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
+        DEALLOCATE(Re_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Db_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
+        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
+        DEALLOCATE(Db_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Int_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
+        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
+        DEALLOCATE(Int_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
  END SUBROUTINE LidarSim_PackInitInput
 
  SUBROUTINE LidarSim_UnPackInitInput( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -321,6 +378,48 @@ CONTAINS
       OutData%LidarRefOrientation = REAL( UNPACK(DbKiBuf( Db_Xferred:Db_Xferred+(SIZE(OutData%LidarRefOrientation))-1 ), mask2, 0.0_DbKi ), R8Ki)
       Db_Xferred   = Db_Xferred   + SIZE(OutData%LidarRefOrientation)
     DEALLOCATE(mask2)
+      OutData%UsePrimaryInputFile = TRANSFER( IntKiBuf( Int_Xferred ), mask0 )
+      Int_Xferred   = Int_Xferred + 1
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
+        Re_Xferred = Re_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
+        Db_Xferred = Db_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
+        Int_Xferred = Int_Xferred + Buf_size
+      END IF
+      CALL NWTC_Library_Unpackfileinfotype( Re_Buf, Db_Buf, Int_Buf, OutData%PassedFileData, ErrStat2, ErrMsg2 ) ! PassedFileData 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
+      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
+      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
  END SUBROUTINE LidarSim_UnPackInitInput
 
  SUBROUTINE LidarSim_CopyInitOutput( SrcInitOutputData, DstInitOutputData, CtrlCode, ErrStat, ErrMsg )
@@ -946,6 +1045,7 @@ ENDIF
    ErrStat = ErrID_None
    ErrMsg  = ""
     DstParamData%MeasurementMaxSteps = SrcParamData%MeasurementMaxSteps
+    DstParamData%RootName = SrcParamData%RootName
     DstParamData%LidarPosition_N(3) = SrcParamData%LidarPosition_N(3)
     DstParamData%LidarOrientation_N(3,3) = SrcParamData%LidarOrientation_N(3,3)
 IF (ALLOCATED(SrcParamData%MeasuringPoints_L)) THEN
@@ -1079,6 +1179,7 @@ ENDIF
   Db_BufSz  = 0
   Int_BufSz  = 0
       Int_BufSz  = Int_BufSz  + 1  ! MeasurementMaxSteps
+      Int_BufSz  = Int_BufSz  + 1*LEN(InData%RootName)  ! RootName
       Re_BufSz   = Re_BufSz   + 1  ! LidarPosition_N(3)
       Db_BufSz   = Db_BufSz   + 1  ! LidarOrientation_N(3,3)
   Int_BufSz   = Int_BufSz   + 1     ! MeasuringPoints_L allocated yes/no
@@ -1138,6 +1239,10 @@ ENDIF
 
       IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%MeasurementMaxSteps
       Int_Xferred   = Int_Xferred   + 1
+        DO I = 1, LEN(InData%RootName)
+          IntKiBuf(Int_Xferred) = ICHAR(InData%RootName(I:I), IntKi)
+          Int_Xferred = Int_Xferred   + 1
+        END DO ! I
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%LidarPosition_N(3)
       Re_Xferred   = Re_Xferred   + 1
       DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) = InData%LidarOrientation_N(3,3)
@@ -1257,6 +1362,10 @@ ENDIF
   Int_Xferred  = 1
       OutData%MeasurementMaxSteps = IntKiBuf( Int_Xferred ) 
       Int_Xferred   = Int_Xferred + 1
+      DO I = 1, LEN(OutData%RootName)
+        OutData%RootName(I:I) = CHAR(IntKiBuf(Int_Xferred))
+        Int_Xferred = Int_Xferred   + 1
+      END DO ! I
       OutData%LidarPosition_N(3) = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
       OutData%LidarOrientation_N(3,3) = DbKiBuf( Db_Xferred ) 
