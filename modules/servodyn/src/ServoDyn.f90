@@ -178,7 +178,7 @@ CONTAINS
 !> This routine is called at the start of the simulation to perform initialization steps.
 !! The parameters are set here and not changed during the simulation.
 !! The initial states and initial guess for the input are defined.
-SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, AddOuts, Interval, InitOut, ErrStat, ErrMsg )
+SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut, ErrStat, ErrMsg )
 !..................................................................................................................................
 
    TYPE(SrvD_InitInputType),       INTENT(IN   )  :: InitInp     !< Input data for initialization routine
@@ -191,7 +191,6 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, AddOuts, Interv
    TYPE(SrvD_OutputType),          INTENT(  OUT)  :: y           !< Initial system outputs (outputs are not calculated;
                                                                  !!   only the output mesh is initialized)
    TYPE(SrvD_MiscVarType),         INTENT(  OUT)  :: m           !< Initial misc (optimization) variables
-   TYPE(SrvD_AddOutsType),         INTENT(  OUT)  :: AddOuts     !< Additional outputs for the avrSWAP array
    REAL(DbKi),                     INTENT(INOUT)  :: Interval    !< Coupling interval in seconds: the rate that
                                                                  !!   (1) SrvD_UpdateStates() is called in loose coupling &
                                                                  !!   (2) SrvD_UpdateDiscState() is called in tight coupling.
@@ -480,7 +479,7 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, AddOuts, Interv
       
    p%GatesPerBeam = InitInp%GatesPerBeam
    p%MAXDLLChainOutputs = InitInp%MAXDLLChainOutputs
-   CALL AllocAry( AddOuts%Vlos, p%GatesPerBeam, 'Line-of-sight velocities, m/s', ErrStat2, ErrMsg2 )
+   CALL AllocAry( u%LidarMeas%Vlos, p%GatesPerBeam, 'Line-of-sight velocities, m/s', ErrStat2, ErrMsg2 )
          CALL CheckError( ErrStat2, ErrMsg2 )
          IF (ErrStat >= AbortErrLev) RETURN 
       
@@ -659,7 +658,7 @@ CONTAINS
 END SUBROUTINE SrvD_Init
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine is called at the end of the simulation.
-SUBROUTINE SrvD_End( u, p, x, xd, z, OtherState, y, m, AddOuts, ErrStat, ErrMsg )
+SUBROUTINE SrvD_End( u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
 !..................................................................................................................................
 
       TYPE(SrvD_InputType),           INTENT(INOUT)  :: u           !< System inputs
@@ -670,7 +669,6 @@ SUBROUTINE SrvD_End( u, p, x, xd, z, OtherState, y, m, AddOuts, ErrStat, ErrMsg 
       TYPE(SrvD_OtherStateType),      INTENT(INOUT)  :: OtherState  !< Other states
       TYPE(SrvD_OutputType),          INTENT(INOUT)  :: y           !< System outputs
       TYPE(SrvD_MiscVarType),         INTENT(INOUT)  :: m           !< Initial misc (optimization) variables
-	   TYPE(SrvD_AddOutsType),		     INTENT(INOUT)  :: AddOuts     !< Additional outputs for the avrSWAP array
       INTEGER(IntKi),                 INTENT(  OUT)  :: ErrStat     !< Error status of the operation
       CHARACTER(*),                   INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
@@ -700,11 +698,6 @@ SUBROUTINE SrvD_End( u, p, x, xd, z, OtherState, y, m, AddOuts, ErrStat, ErrMsg 
          ! Close files here:
          
       
-         ! Destroy the AddOuts data
-         
-	   CALL SrvD_DestroyAddOutsType( AddOuts, ErrStat, ErrMsg )
-      
-
          ! Destroy the input data:
 
       CALL SrvD_DestroyInput( u, ErrStat, ErrMsg )
@@ -905,7 +898,7 @@ CONTAINS
 END SUBROUTINE SrvD_UpdateStates
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine for computing outputs, used in both loose and tight coupling.
-SUBROUTINE SrvD_CalcOutput( t, u, p, x, xd, z, OtherState, AddOuts, y, m, ErrStat, ErrMsg )
+SUBROUTINE SrvD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
 !..................................................................................................................................
 
    REAL(DbKi),                     INTENT(IN   )  :: t           !< Current simulation time in seconds
@@ -915,7 +908,6 @@ SUBROUTINE SrvD_CalcOutput( t, u, p, x, xd, z, OtherState, AddOuts, y, m, ErrSta
    TYPE(SrvD_DiscreteStateType),   INTENT(IN   )  :: xd          !< Discrete states at t
    TYPE(SrvD_ConstraintStateType), INTENT(IN   )  :: z           !< Constraint states at t
    TYPE(SrvD_OtherStateType),      INTENT(IN   )  :: OtherState  !< Other states at t
-   TYPE(SrvD_AddOutsType),         INTENT(IN   )  :: AddOuts     !< Additional outputs for the avrSWAP array
    TYPE(SrvD_OutputType),          INTENT(INOUT)  :: y           !< Outputs computed at t (Input only so that mesh con-
                                                                  !!   nectivity information does not have to be recalculated)
    TYPE(SrvD_MiscVarType),         INTENT(INOUT)  :: m           !< Misc (optimization) variables
@@ -966,7 +958,7 @@ SUBROUTINE SrvD_CalcOutput( t, u, p, x, xd, z, OtherState, AddOuts, y, m, ErrSta
       ELSE
          m%dll_data%PrevBlPitch(1:p%NumBl) = m%dll_data%BlPitchCom ! used for linear ramp of delayed signal
          m%LastTimeCalled = t
-         CALL BladedInterface_CalcOutput( t, u, p, AddOuts, m, ErrStat2, ErrMsg2 )
+         CALL BladedInterface_CalcOutput( t, u, p, m, ErrStat2, ErrMsg2 )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       END IF
       

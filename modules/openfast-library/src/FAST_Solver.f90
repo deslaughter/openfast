@@ -5032,27 +5032,31 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
        CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ! Additional signals for avrSWAP array
       IF ( p_FAST%CompServo == Module_SrvD ) THEN
-         SrvD%AddOuts%NewData    = NINT(LidSim%y%SwapOutputs(1))
-         SrvD%AddOuts%BeamID     = NINT(LidSim%y%SwapOutputs(2))
-         SrvD%AddOuts%Vlos( 1:SrvD%p%GatesPerBeam ) = LidSim%y%SwapOutputs( 3:(2 + SrvD%p%GatesPerBeam) )
-         SrvD%AddOuts%LdrRoll    = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 1 )
-         SrvD%AddOuts%LdrPitch   = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 2 )
-         SrvD%AddOuts%LdrYaw     = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 3 )
-         SrvD%AddOuts%LdrXd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 4 )
-         SrvD%AddOuts%LdrYd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 5 )
-         SrvD%AddOuts%LdrZd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 6 )
+         SrvD%u%LidarMeas%NewData    = NINT(LidSim%y%SwapOutputs(1))
+         SrvD%u%LidarMeas%BeamID     = NINT(LidSim%y%SwapOutputs(2))
+         SrvD%u%LidarMeas%LdrRoll    = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 1 )
+         SrvD%u%LidarMeas%LdrPitch   = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 2 )
+         SrvD%u%LidarMeas%LdrYaw     = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 3 )
+         SrvD%u%LidarMeas%LdrXd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 4 )
+         SrvD%u%LidarMeas%LdrYd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 5 )
+         SrvD%u%LidarMeas%LdrZd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 6 )
+         if (allocated(SrvD%u%LidarMeas%Vlos)) then   ! Shouldn't be necessary here, but just in case
+            SrvD%u%LidarMeas%Vlos( 1:SrvD%p%GatesPerBeam ) = LidSim%y%SwapOutputs( 3:(2 + SrvD%p%GatesPerBeam) )
+         endif
       END IF
    ELSE
       IF ( p_FAST%CompServo == Module_SrvD ) THEN
-         SrvD%AddOuts%NewData    = 0
-         SrvD%AddOuts%BeamID     = 0
-         SrvD%AddOuts%Vlos       = 0
-         SrvD%AddOuts%LdrRoll    = 0
-         SrvD%AddOuts%LdrPitch   = 0
-         SrvD%AddOuts%LdrYaw     = 0
-         SrvD%AddOuts%LdrXd      = 0
-         SrvD%AddOuts%LdrYd      = 0
-         SrvD%AddOuts%LdrZd      = 0
+         SrvD%u%LidarMeas%NewData    = 0
+         SrvD%u%LidarMeas%BeamID     = 0
+         SrvD%u%LidarMeas%LdrRoll    = 0
+         SrvD%u%LidarMeas%LdrPitch   = 0
+         SrvD%u%LidarMeas%LdrYaw     = 0
+         SrvD%u%LidarMeas%LdrXd      = 0
+         SrvD%u%LidarMeas%LdrYd      = 0
+         SrvD%u%LidarMeas%LdrZd      = 0
+         if (allocated(SrvD%u%LidarMeas%Vlos)) then
+            SrvD%u%LidarMeas%Vlos       = 0
+         endif
       END IF
    END IF
    
@@ -5060,7 +5064,7 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
    IF ( p_FAST%CompServo == Module_SrvD  ) THEN
          
       CALL SrvD_CalcOutput( this_time, SrvD%Input(1), SrvD%p, SrvD%x(this_state), SrvD%xd(this_state), SrvD%z(this_state), &
-                             SrvD%OtherSt(this_state), SrvD%AddOuts, SrvD%y, SrvD%m, ErrStat2, ErrMsg2 )
+                             SrvD%OtherSt(this_state), SrvD%y, SrvD%m, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    END IF

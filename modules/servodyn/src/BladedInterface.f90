@@ -377,12 +377,11 @@ END SUBROUTINE BladedInterface_End
 !==================================================================================================================================
 !> This routine sets the AVRswap array, calls the routine from the BladedDLL, and sets the outputs from the call to be used as
 !! necessary in the main ServoDyn CalcOutput routine.
-SUBROUTINE BladedInterface_CalcOutput(t, u, p, AddOuts, m, ErrStat, ErrMsg)
+SUBROUTINE BladedInterface_CalcOutput(t, u, p, m, ErrStat, ErrMsg)
 
    REAL(DbKi),                     INTENT(IN   )  :: t           !< Current simulation time in seconds
    TYPE(SrvD_InputType),           INTENT(IN   )  :: u           !< Inputs at t
    TYPE(SrvD_ParameterType),       INTENT(IN   )  :: p           !< Parameters
-   TYPE(SrvD_AddOutsType),         INTENT(IN   )  :: AddOuts     !< Additional outputs for the avrSWAP array
    TYPE(SrvD_MiscVarType),         INTENT(INOUT)  :: m           !< misc (optimization) variables
    INTEGER(IntKi),                 INTENT(  OUT)  :: ErrStat     !< Error status of the operation
    CHARACTER(*),                   INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
@@ -398,7 +397,7 @@ SUBROUTINE BladedInterface_CalcOutput(t, u, p, AddOuts, m, ErrStat, ErrMsg)
    
    
       ! Set the input values of the avrSWAP array:
-   CALL Fill_avrSWAP( t, u, p, AddOuts, LEN(ErrMsg), m%dll_data )
+   CALL Fill_avrSWAP( t, u, p, LEN(ErrMsg), m%dll_data )
    
 #ifdef DEBUG_BLADED_INTERFACE
 !CALL WrNumAryFileNR ( 58, (/t/),'1x,ES15.6E2', ErrStat, ErrMsg )
@@ -436,7 +435,7 @@ END SUBROUTINE BladedInterface_CalcOutput
 !==================================================================================================================================
 !> This routine fills the avrSWAP array with its inputs, as described in Appendices A and B of the Bladed User Manual of Bladed 
 !! version 3.81.
-SUBROUTINE Fill_avrSWAP( t, u, p, AddOuts, ErrMsgSz, dll_data )
+SUBROUTINE Fill_avrSWAP( t, u, p, ErrMsgSz, dll_data )
 !SUBROUTINE Fill_avrSWAP( StatFlag, t, u, p, ErrMsgSz, dll_data )
 !..................................................................................................................................
  
@@ -444,7 +443,6 @@ SUBROUTINE Fill_avrSWAP( t, u, p, AddOuts, ErrMsgSz, dll_data )
    REAL(DbKi),                     INTENT(IN   )  :: t           !< Current simulation time in seconds
    TYPE(SrvD_InputType),           INTENT(IN   )  :: u           !< Inputs at t
    TYPE(SrvD_ParameterType),       INTENT(IN   )  :: p           !< Parameters
-   TYPE(SrvD_AddOutsType),         INTENT(IN   )  :: AddOuts     !< Additional outputs for the avrSWAP array
    INTEGER(IntKi),                 INTENT(IN   )  :: ErrMsgSz    !< Allowed size of the DLL-returned error message (-)
 !   REAL(SiKi),                     INTENT(INOUT)  :: avrSWAP(:)  ! the SWAP array for the Bladed DLL Interface
    TYPE(BladedDLLType),            INTENT(INOUT)  :: dll_data    !< data for the Bladed DLL
@@ -586,23 +584,23 @@ END IF
    
    
    !> NewData
-   dll_data%avrSWAP( L ) = AddOuts%NewData
+   dll_data%avrSWAP( L ) = u%LidarMeas%NewData
 
    !> BeamID
-   dll_data%avrSWAP( L + 1 ) = AddOuts%BeamID
+   dll_data%avrSWAP( L + 1 ) = u%LidarMeas%BeamID
    
    !> Line of sight velocities
    DO I = 1,p%GatesPerBeam
-       dll_data%avrSWAP( L + 1 + I ) = AddOuts%Vlos( I )
+       dll_data%avrSWAP( L + 1 + I ) = u%LidarMeas%Vlos( I )
    ENDDO   
    
    !> Lidar roll, pitch and yaw tilt angular (rotational) displacement (deg) and velocities
-   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 1) = AddOuts%LdrRoll
-   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 2) = AddOuts%LdrPitch
-   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 3) = AddOuts%LdrYaw
-   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 4) = AddOuts%LdrXd
-   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 5) = AddOuts%LdrYd
-   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 6) = AddOuts%LdrZd   
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 1) = u%LidarMeas%LdrRoll
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 2) = u%LidarMeas%LdrPitch
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 3) = u%LidarMeas%LdrYaw
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 4) = u%LidarMeas%LdrXd
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 5) = u%LidarMeas%LdrYd
+   dll_data%avrSWAP(L + 1 + p%GatesPerBeam + 6) = u%LidarMeas%LdrZd   
    
    
    RETURN

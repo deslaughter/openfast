@@ -138,6 +138,17 @@ typedef	^	BladedDLLType	ReKi	PrevBlPitch	3	-	-	"Previously commanded blade pitch
 typedef	^	BladedDLLType	ReKi	BlAirfoilCom	3	-	-	"Commanded Airfoil UserProp for blade.  Passed to AD15 for airfoil interpolation (must be same units as given in AD15 airfoil tables)"	-
 typedef	^	BladedDLLType	SiKi	SCoutput	{:}	-	-	"controller output to supercontroller"	-
 
+# ..... LidarSim Outputs for controller .......................................................................................................
+typedef	^	LidarMeasType	ReKi	Vlos	:	-	-	"LidarSim outputs array -- measurement of velocities"	-
+typedef	^	LidarMeasType	IntKi	BeamID		-   -   -	"Index of currently active beam (zero-based)"	-
+typedef	^	LidarMeasType	IntKi	NewData		-   -   -	"Flag for new Lidar measurement data"	-
+typedef	^	LidarMeasType	ReKi	LdrRoll		-   -   -	"LidarSim Roll angle (I-Coordinate System)"	
+typedef	^	LidarMeasType	ReKi	LdrPitch	-   -   -	"LidarSim Pitch angle (I-Coordinate System)"	
+typedef	^	LidarMeasType	ReKi	LdrYaw		-   -   -	"LidarSim Yaw angle (I-Coordinate System)"	
+typedef	^	LidarMeasType	ReKi	LdrXd		-   -   -	"LidarSim velocity in x direction (I-Coordinate System)"	
+typedef	^	LidarMeasType	ReKi	LdrYd		-   -   -	"LidarSim velocity in y direction (I-Coordinate System)"	
+typedef	^	LidarMeasType	ReKi	LdrZd		-   -   -	"LidarSim velocity in z direction (I-Coordinate System)"
+
 # ..... States ....................................................................................................................
 # Define continuous (differentiable) states here:
 typedef	^	ContinuousStateType	ReKi	DummyContState	-	-	-	"Remove this variable if you have continuous states"	-
@@ -327,6 +338,7 @@ typedef	^	InputType	ReKi	GenTrq_prev	-	-	-	"Electrical generator torque (from pr
 typedef	^	InputType	TMD_InputType	NTMD	-	-	-	"TMD module inputs - nacelle"	-
 typedef	^	InputType	TMD_InputType	TTMD	-	-	-	"TMD module inputs - tower"	-
 typedef	^	InputType	SiKi	SuperController	{:}	-	-	"A swap array: used to pass input data to the DLL controller from the supercontroller"	-
+typedef	^	InputType	LidarMeasType	LidarMeas	-	-	-	"Measurements from LidarSim"	-
 
 # ..... Outputs ...................................................................................................................
 # Define outputs that are contained on the mesh here:
@@ -343,15 +355,4 @@ typedef	^	OutputType	ReKi	TBDrCon	{:}	-	-	"Instantaneous tip-brake drag constant
 typedef	^	OutputType	TMD_OutputType	NTMD	-	-	-	"TMD module outputs - nacelle"	-
 typedef	^	OutputType	TMD_OutputType	TTMD	-	-	-	"TMD module outputs - tower"	-
 typedef	^	OutputType	SiKi	SuperController	{:}	-	-	"A swap array: used to pass output data from the DLL controller to the supercontroller"	-
-
-# ..... avrSWAP Array AdditionalOutputs .......................................................................................................
-typedef	^	SrvD_AddOutsType	ReKi	Vlos		:   -   -	"LidarSim output array"	-
-typedef	^	SrvD_AddOutsType	IntKi	BeamID		-   -   -	"Index of currently active beam (zero-based)"	-
-typedef	^	SrvD_AddOutsType	IntKi	NewData		-   -   -	"Flag for new Lidar measurement data"	-
-typedef	^	SrvD_AddOutsType	ReKi	LdrRoll		-   -   -	"LidarSim Roll angle (I-Coordinate System)"	
-typedef	^	SrvD_AddOutsType	ReKi	LdrPitch	-   -   -	"LidarSim Pitch angle (I-Coordinate System)"	
-typedef	^	SrvD_AddOutsType	ReKi	LdrYaw		-   -   -	"LidarSim Yaw angle (I-Coordinate System)"	
-typedef	^	SrvD_AddOutsType	ReKi	LdrXd		-   -   -	"LidarSim velocity in x direction (I-Coordinate System)"	
-typedef	^	SrvD_AddOutsType	ReKi	LdrYd		-   -   -	"LidarSim velocity in y direction (I-Coordinate System)"	
-typedef	^	SrvD_AddOutsType	ReKi	LdrZd		-   -   -	"LidarSim velocity in z direction (I-Coordinate System)"
 
