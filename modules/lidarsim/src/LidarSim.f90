@@ -47,10 +47,12 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
     CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
 
     !Local Variables
-    TYPE(LidarSim_InputFile)                                ::  InputFileData      !< Structure to load the input file data into
-    CHARACTER(1024)                                         ::  RootFileName
-    CHARACTER(1024)                                         ::  EchoFileName
-   integer(IntKi)                                           :: i                    !< Generic counter
+    type(FileInfoType)                                      :: FileInfo_In          !< The derived type for holding the full input file for parsing -- we may pass this in the future
+    TYPE(LidarSim_InputFile)                                :: InputFileData        !< Structure to load the input file data into
+    CHARACTER(1024)                                         :: RootFileName
+    character(1024)                                         :: PriPath              !< Primary path
+    integer(IntKi)                                          :: i                    !< Generic counter
+    integer(IntKi)                                          :: UnEcho               ! Unit number for the echo file
 
     ! Temporary variables for error handling
     INTEGER(IntKi)                                          ::  TmpErrStat          !< temporary error message
@@ -63,12 +65,33 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
     
     RootFileName  = InitInp%RootName
     IF (LEN_TRIM(RootFileName) == 0) CALL GetRoot( InitInp%InputInitFile, RootFileName )
-    EchoFileName  = TRIM(RootFileName)//".ech"
 
-    
-    ! Reads the Config from the Input file and writes it into the LidarSim_InputFile data 
-    CALL LidarSim_ReadInputFile(InitInp%InputInitFile,EchoFileName , InputFileData, TmpErrStat, TmpErrMsg)!EchoFileName
-      if (Failed()) return
+    p%RootName  = TRIM(InitInp%RootName)
+    CALL GetPath( InitInp%InputInitFile, PriPath )     ! Input files will be relative to the path where the primary input file is located.
+
+
+
+
+      ! -----------------------------------------------------------------
+      ! Read the primary AeroDyn input file, or copy from passed input
+   if (InitInp%UsePrimaryInputFile) then
+      ! Read the entire input file, minus any comment lines, into the FileInfo_In
+      ! data structure in memory for further processing.
+      call ProcessComFile( InitInp%InputInitFile, FileInfo_In, TmpErrStat, TmpErrMsg )
+   else
+      call NWTC_Library_CopyFileInfoType( InitInp%PassedFileData, FileInfo_In, MESH_NEWCOPY, TmpErrStat, TmpErrMsg )
+   endif
+   if (Failed()) return;
+
+
+   ! For diagnostic purposes, the following can be used to display the contents
+   ! of the FileInfo_In data structure.
+   ! call Print_FileInfo_Struct( CU, FileInfo_In ) ! CU is the screen -- different number on different systems.
+
+      !  Parse the FileInfo_In structure of data from the inputfile into the InitInp%InputFile structure
+   CALL LidarSim_ParsePrimaryFileInfo( PriPath, InitInp%InputInitFile, p%RootName, FileInfo_In, InputFileData, UnEcho, TmpErrStat, TmpErrMsg )
+      if (Failed()) return;
+
 
    ! Convert angles read in degrees to radians
    InputFileData%RollAngle_N  =  InputFileData%RollAngle_N  *  D2R_D

@@ -8,11 +8,10 @@
     IMPLICIT NONE
     PRIVATE
     
-    PUBLIC  ::  LidarSim_ReadInputFile
+    PUBLIC  ::  LidarSim_ParsePrimaryFileInfo
     PUBLIC  ::  LidarSim_InitMeasuringPoints_Cartesian
     PUBLIC  ::  LidarSim_TransformLidarToInertial
     PUBLIC  ::  LidarSim_InitMeasuringPoints_Spherical
-!    PUBLIC  ::  LidarSim_CreateRotationMatrix
     PUBLIC  ::  LidarSim_InitializeWeightingGauss
     PUBLIC  ::  LidarSim_InitializeWeightingManual
     PUBLIC  ::  LidarSim_CalculateVlos
@@ -25,8 +24,7 @@
 
 !#########################################################################################################################################################################
 
-SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, ErrStat, ErrMsg)
-
+SUBROUTINE LidarSim_ParsePrimaryFileInfo( PriPath, InputFile, RootName, FileInfo, InputFileData, UnitEcho, ErrStat, ErrMsg)
    !  This subroutine originally opened the file as two units simultaneously. Unfortunately, the Fortran
    !  standard does not currenlty allow for opening the same file twice simultaneously. This behaviour
    !  is an extension to the standard that only the Intel Fortran compiler allows.  gfortran and other
@@ -35,28 +33,30 @@ SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, Er
    !  Therefore, to support an arbitrary number of comment lines, the file will be read into memory, then
    !  parsed line by line.
 
-   IMPLICIT                                NONE
-   CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_ReadInputFile"
+   implicit                                none
 
-   CHARACTER(1024),                        INTENT(IN   )   ::  InputInitFile       !< Name of the Input File
-   CHARACTER(*),                           INTENT(IN   )   ::  EchoFileName        !< name of the echo file
-   TYPE(LidarSim_InputFile),               INTENT(INOUT)   ::  InputFileData
-   INTEGER(IntKi),                         INTENT(  OUT)   ::  ErrStat             !< Error status of the operation
-   CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
+      ! Passed variables
+   character(*),                    intent(in   )  :: PriPath           !< primary path
+   CHARACTER(*),                    intent(in   )  :: InputFile         !< Name of the file containing the primary input data
+   CHARACTER(*),                    intent(in   )  :: RootName          !< The rootname of the echo file, possibly opened in this routine
+   type(LidarSim_InputFile),        intent(inout)  :: InputFileData     !< All the data in the AD15 primary input file
+   type(FileInfoType),              intent(in   )  :: FileInfo          !< The derived type for holding the file information.
+   integer(IntKi),                  intent(  out)  :: UnitEcho          !< The local unit number for this module's echo file
+   integer(IntKi),                  intent(  out)  :: ErrStat           !< Error status
+   CHARACTER(ErrMsgLen),            intent(  out)  :: ErrMsg            !< Error message
+
+   character(*),                    parameter      ::  RoutineName="LidarSim_ParsePrimaryFileInfo"
 
    ! Local variables
-   INTEGER(IntKi)                                          ::  UnitEcho            !< The local unit number for this module's echo file
+   INTEGER(IntKi)                                  ::  TmpErrStat
+   CHARACTER(ErrMsgLen)                            ::  TmpErrMsg           !< temporary error message
+   INTEGER(IntKi)                                  ::  ErrStatIO           !< temporary error for read commands
 
-   INTEGER(IntKi)                                          ::  TmpErrStat
-   CHARACTER(ErrMsgLen)                                    ::  TmpErrMsg           !< temporary error message
-   INTEGER(IntKi)                                          ::  ErrStatIO           !< temporary error for read commands
-
-   TYPE (FileInfoType)                                     :: FileInfo             !< The derived type for holding the file information.
-   integer(IntKi)                                          :: i                    !< generic counter
-   integer(IntKi)                                          :: CurLine              !< current entry in FileInfo%Lines array
-   real(ReKi),allocatable                                  :: TmpRe(:)             !< temporary 2d array for reading values in
-   real(ReKi)                                              :: TmpRe2(2)            !< temporary 2 number array for reading values in
-   real(ReKi)                                              :: TmpRe3(3)            !< temporary 3 number array for reading values in
+   integer(IntKi)                                  :: i                    !< generic counter
+   integer(IntKi)                                  :: CurLine              !< current entry in FileInfo%Lines array
+   real(ReKi),allocatable                          :: TmpRe(:)             !< temporary 2d array for reading values in
+   real(ReKi)                                      :: TmpRe2(2)            !< temporary 2 number array for reading values in
+   real(ReKi)                                      :: TmpRe3(3)            !< temporary 3 number array for reading values in
 
 
    ! Initialization
@@ -68,14 +68,6 @@ SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, Er
    CALL AllocAry( InputFileData%OutList, 18, "LidarSim Input File's OutList", TmpErrStat, TmpErrMsg ) !Max additional output parameters = 18
         if (Failed()) return;
 
-   ! Read the entire input file, minus any comment lines, into the FileInfo
-   ! data structure in memory for further processing.
-   call ProcessComFile( InputInitFile, FileInfo, TmpErrStat, TmpErrMsg )
-         if (Failed()) return;
-
-   ! For diagnostic purposes, the following can be used to display the contents
-   ! of the FileInfo data structure.
-   !   call Print_FileInfo_Struct( CU, FileInfo ) ! CU is the screen -- different number on different systems.
 
    !-------------------------------------------------------------------------------------------------
    ! General settings
@@ -86,9 +78,9 @@ SUBROUTINE LidarSim_ReadInputFile(InputInitFile, EchoFileName, InputFileData, Er
          if (Failed()) return;
 
    if ( InputFileData%Echo ) then
-      CALL OpenEcho ( UnitEcho, TRIM(EchoFileName), TmpErrStat, TmpErrMsg )
+      CALL OpenEcho ( UnitEcho, TRIM(RootName)//'.ech', TmpErrStat, TmpErrMsg )
          if (Failed()) return;
-      WRITE(UnitEcho, '(A)') 'Echo file for LidarSim input file: '//trim(InputInitFile)
+      WRITE(UnitEcho, '(A)') 'Echo file for LidarSim input file: '//trim(InputFile)
       ! Write the first three lines into the echo file
       WRITE(UnitEcho, '(A)') FileInfo%Lines(1)
       WRITE(UnitEcho, '(A)') FileInfo%Lines(2)
@@ -284,7 +276,7 @@ CONTAINS
    END SUBROUTINE Cleanup
    !-------------------------------------------------------------------------------------------------
 
-END SUBROUTINE LidarSim_ReadInputFile
+END SUBROUTINE LidarSim_ParsePrimaryFileInfo
 
 !#########################################################################################################################################################################
     
