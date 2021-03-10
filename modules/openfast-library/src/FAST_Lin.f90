@@ -1097,7 +1097,7 @@ SUBROUTINE FAST_Linearize_OP(t_global, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD,
    
       ! get the dUdu and dUdy matrices, which linearize SolveOption2 for the modules we've included in linearization
    call Glue_Jacobians( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD, IfW, OpFM, HD, SD, MAPp, FEAM, MD, Orca, &
-                         IceF, IceD, MeshMapData, dUdu, dUdy, ErrStat2, ErrMsg2 )
+                         IceF, IceD, LidSim, MeshMapData, dUdu, dUdy, ErrStat2, ErrMsg2 )
       call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
       if (ErrStat >=AbortErrLev) then
          call cleanup()
@@ -1521,7 +1521,7 @@ END SUBROUTINE Glue_GetOP
 
 !> This routine forms the Jacobian for the glue-code input-output solves.
 SUBROUTINE Glue_Jacobians( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD, IfW, OpFM, HD, SD, MAPp, FEAM, MD, Orca, &
-                         IceF, IceD, MeshMapData, dUdu, dUdy, ErrStat, ErrMsg )
+                         IceF, IceD, LidSim, MeshMapData, dUdu, dUdy, ErrStat, ErrMsg )
 
    TYPE(FAST_ParameterType), INTENT(IN   ) :: p_FAST              !< Parameters for the glue code
    TYPE(FAST_OutputFileType),INTENT(INOUT) :: y_FAST              !< Output variables for the glue code
@@ -1541,6 +1541,7 @@ SUBROUTINE Glue_Jacobians( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD, IfW, OpFM, 
    TYPE(OrcaFlex_Data),      INTENT(INOUT) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(INOUT) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(INOUT) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< LidarSim data
 
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
    REAL(R8Ki), ALLOCATABLE,  INTENT(INOUT) :: dUdu(:,:)           !< Partial derivatives of input-output equations (U(y,u)=0) with respect
@@ -4153,6 +4154,20 @@ SUBROUTINE AllocateOP(p_FAST, y_FAST, ErrStat, ErrMsg )
          if (ErrStat2 /= 0) call SetErrStat( ErrID_Fatal, 'Error allocating arrays for VTK operating points.', ErrStat, ErrMsg, RoutineName)
    END IF
    
+         ! LidarSim: copy states and inputs to OP array
+   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+      ALLOCATE(       y_FAST%op%x_LidSim(p_FAST%NLinTimes), STAT=ErrStat2 )
+         if (ErrStat2 /= 0) call SetErrStat( ErrID_Fatal, 'Error allocating arrays for VTK operating points.', ErrStat, ErrMsg, RoutineName)
+      ALLOCATE(      y_FAST%op%xd_LidSim(p_FAST%NLinTimes), STAT=ErrStat2 )
+         if (ErrStat2 /= 0) call SetErrStat( ErrID_Fatal, 'Error allocating arrays for VTK operating points.', ErrStat, ErrMsg, RoutineName)
+      ALLOCATE(       y_FAST%op%z_LidSim(p_FAST%NLinTimes), STAT=ErrStat2 )
+         if (ErrStat2 /= 0) call SetErrStat( ErrID_Fatal, 'Error allocating arrays for VTK operating points.', ErrStat, ErrMsg, RoutineName)
+      ALLOCATE( y_FAST%op%OtherSt_LidSim(p_FAST%NLinTimes), STAT=ErrStat2 )
+         if (ErrStat2 /= 0) call SetErrStat( ErrID_Fatal, 'Error allocating arrays for VTK operating points.', ErrStat, ErrMsg, RoutineName)
+      ALLOCATE(       y_FAST%op%u_LidSim(p_FAST%NLinTimes), STAT=ErrStat2 )
+         if (ErrStat2 /= 0) call SetErrStat( ErrID_Fatal, 'Error allocating arrays for VTK operating points.', ErrStat, ErrMsg, RoutineName)
+   END IF
+ 
 END SUBROUTINE AllocateOP
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine is the inverse of SetOperatingPoint(). It saves the current operating points so they can be retrieved 
@@ -4397,7 +4412,22 @@ SUBROUTINE SaveOP(i, p_FAST, y_FAST, ED, BD, SrvD, AD, IfW, OpFM, HD, SD, ExtPtf
             CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       END DO
    END IF   
-   
+  
+         ! LidarSim: copy states and inputs to OP array
+   IF ( p_FAST%CompLidar == Module_LidSim ) then 
+      CALL LidarSim_CopyContState   (LidSim%x( STATE_CURR), y_FAST%op%x_LidSim(i), CtrlCode, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyDiscState   (LidSim%xd(STATE_CURR), y_FAST%op%xd_LidSim(i), CtrlCode, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyConstrState (LidSim%z( STATE_CURR), y_FAST%op%z_LidSim(i), CtrlCode, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyOtherState (LidSim%OtherSt(STATE_CURR), y_FAST%op%OtherSt_LidSim(i), CtrlCode, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+               
+      CALL LidarSim_CopyInput (LidSim%Input(1), y_FAST%op%u_LidSim(i), CtrlCode, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   END IF
+
    
 END SUBROUTINE SaveOP
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -4561,6 +4591,10 @@ SUBROUTINE PerturbOP(t, iLinTime, iMode, p_FAST, y_FAST, ED, BD, SrvD, AD, IfW, 
    !!!ELSEIF ( p_FAST%CompIce == Module_IceD ) THEN
    !!!   DO k=1,p_FAST%numIceLegs
    !!!   END DO
+   !!!END IF   
+   !!!          
+   !!!      ! LidarSim: copy op to actual states and inputs
+   !!!IF ( p_FAST%CompLidar == Module_LidSim ) THEN
    !!!END IF   
    
 
@@ -4803,6 +4837,21 @@ SUBROUTINE SetOperatingPoint(i, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD, IfW, O
          CALL IceD_CopyInput (y_FAST%op%u_IceD(k, i), IceD%Input(1,k), MESH_UPDATECOPY, Errstat2, ErrMsg2)
             CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       END DO
+   END IF
+
+         ! LidarSim: copy op to actual states and inputs
+   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+      CALL LidarSim_CopyContState   (y_FAST%op%x_LidSim(i), LidSim%x( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyDiscState   (y_FAST%op%xd_LidSim(i), LidSim%xd(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyConstrState (y_FAST%op%z_LidSim(i), LidSim%z( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyOtherState (y_FAST%op%OtherSt_LidSim(i), LidSim%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+               
+      CALL LidarSim_CopyInput (y_FAST%op%u_LidSim(i), LidSim%Input(1), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    END IF
 
 END SUBROUTINE SetOperatingPoint
@@ -5153,6 +5202,12 @@ SUBROUTINE FAST_InitSteadyOutputs( psi, p_FAST, m_FAST, ED, BD, SrvD, AD, IfW, H
       !END IF  ! IceFloe/IceDyn
 
 
+      !! LidarSim
+      !IF ( p_FAST%CompLidar == Module_IceF ) THEN
+      !
+      !END IF
+
+
 END SUBROUTINE FAST_InitSteadyOutputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine saves outputs for future interpolation at a desired azimuth.
@@ -5325,6 +5380,12 @@ SUBROUTINE FAST_SaveOutputs( psi, p_FAST, m_FAST, ED, BD, SrvD, AD, IfW, HD, SD,
       !END IF  ! IceFloe/IceDyn
 
 
+      !! LidarSim
+      !IF ( p_FAST%CompLidar == Module_IceF ) THEN
+      !
+      !END IF
+
+
 END SUBROUTINE FAST_SaveOutputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine interpolates the outputs at the target azimuths, computes the compared to the previous rotation, and stores 
@@ -5481,6 +5542,12 @@ SUBROUTINE FAST_DiffInterpOutputs( psi_target, p_FAST, y_FAST, m_FAST, ED, BD, S
       !END IF  ! IceFloe/IceDyn
 
       
+      !! LidarSim
+      !IF ( p_FAST%CompLidar == Module_IceF ) THEN
+      !
+      !END IF
+
+
       call pack_in_array(p_FAST, y_FAST, m_FAST)
       
       if (m_FAST%Lin%IsConverged) then

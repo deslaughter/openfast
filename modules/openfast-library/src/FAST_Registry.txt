@@ -271,6 +271,12 @@ typedef   ^      ^                   MD_ConstraintStateType                 z_MD
 typedef   ^      ^                   MD_OtherStateType                OtherSt_MD      {:}    -   -   "Other states"
 typedef   ^      ^                   MD_InputType                           u_MD      {:}    -   -   "System inputs"
 # ..... NO OrcaFlex OP data .......................................................................................................
+# ..... LidarSim OP data .......................................................................................................
+typedef   FAST   FAST_LinStateSave   LidarSim_ContinuousStateType           x_LidSim  {:}    -   -   "Continuous states"
+typedef   ^      ^                   LidarSim_DiscreteStateType            xd_LidSim  {:}    -   -   "Discrete states"
+typedef   ^      ^                   LidarSim_ConstraintStateType           z_LidSim  {:}    -   -   "Constraint states"
+typedef   ^      ^                   LidarSim_OtherStateType          OtherSt_LidSim  {:}    -   -   "Other states"
+typedef   ^      ^                   LidarSim_InputType                     u_LidSim  {:}    -   -   "System inputs"
 
 # ..... FAST_LinType data .......................................................................................................
 typedef	FAST	FAST_LinType	CHARACTER(LinChanLen)	Names_u	{:}	-	-	"Names of the linearized inputs"
