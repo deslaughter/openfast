@@ -479,6 +479,7 @@ subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2CtrlGlob
    INTEGER(C_INT),         INTENT(  OUT) :: InflowType    ! inflow type - 1 = From Inflow module, 2 = External
    INTEGER(C_INT),         INTENT(  OUT) :: NumBl_c
    INTEGER(C_INT),         INTENT(  OUT) :: NumBlElem_c
+   INTEGER(C_INT),         INTENT(  OUT) :: NumTwrElem_c
    TYPE(ExtInfw_InputType_C), INTENT(  OUT) :: ExtInfw_Input_from_FAST
    TYPE(ExtInfw_OutputType_C),INTENT(  OUT) :: ExtInfw_Output_to_FAST
    TYPE(SC_DX_InputType_C),   INTENT(INOUT) :: SC_DX_Input_from_FAST
@@ -561,7 +562,7 @@ subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2CtrlGlob
       return
    end if
 
-   call SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Output_to_FAST, SC_Input_from_FAST, SC_Output_to_FAST)
+   call SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST)
 
    ! 7-Sep-2015: OpenFAST doesn't restrict the number of nodes on each blade mesh to be the same, so if this DOES ever change,
    ! we'll need to make ExternalInflow less tied to the AeroDyn mapping.
@@ -570,9 +571,9 @@ subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2CtrlGlob
       NumBlElem_c = Turbine(iTurb)%AD14%Input(1)%InputMarkers(1)%Nnodes
       NumTwrElem_c = 0 ! Don't care about Aerodyn14 anymore
    ELSEIF (Turbine(iTurb)%p_FAST%CompAero == MODULE_AD) THEN
-      NumBl_c     = SIZE(Turbine(iTurb)%AD%Input(1)%BladeMotion)
-      NumBlElem_c = Turbine(iTurb)%AD%Input(1)%BladeMotion(1)%Nnodes
-      NumTwrElem_c = Turbine(iTurb)%AD%y%TowerLoad%Nnodes
+      NumBl_c     = SIZE(Turbine(iTurb)%AD%Input(1)%rotors(1)%BladeMotion)
+      NumBlElem_c = Turbine(iTurb)%AD%Input(1)%rotors(1)%BladeMotion(1)%Nnodes
+      NumTwrElem_c = Turbine(iTurb)%AD%y%rotors(1)%TowerLoad%Nnodes
    ELSE
       NumBl_c     = 0
       NumBlElem_c = 0
@@ -588,7 +589,7 @@ subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2CtrlGlob
      FAILED = ErrStat >= AbortErrLev
 
      IF (ErrStat > 0) THEN
-        CALL WrScr( "Error in FAST_OpFM_Init:FAST_InitializeAll_T" // TRIM(ErrMsg) )
+        CALL WrScr( "Error in FAST_ExtInfw_Init:FAST_InitializeAll_T" // TRIM(ErrMsg) )
 
         IF ( FAILED ) THEN
 
@@ -727,7 +728,7 @@ subroutine FAST_AL_CFD_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, dt_c,
 
    if (ErrStat >= AbortErrLev) return
 
-   call SetOpenFOAM_pointers(iTurb, OpFM_Input_from_FAST, OpFM_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST)
+   call SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST)
 
    InflowType = Turbine(iTurb)%p_FAST%CompInflow
 
@@ -745,14 +746,14 @@ subroutine FAST_AL_CFD_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, dt_c,
 
 end subroutine FAST_AL_CFD_Restart
 !==================================================================================================================================
-subroutine SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Output_to_FAST, SC_Input_from_FAST, SC_Output_to_FAST)
+subroutine SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST)
 
    IMPLICIT NONE
    INTEGER(C_INT),         INTENT(IN   ) :: iTurb            ! Turbine number
    TYPE(ExtInfw_InputType_C), INTENT(INOUT) :: ExtInfw_Input_from_FAST
    TYPE(ExtInfw_OutputType_C),INTENT(INOUT) :: ExtInfw_Output_to_FAST
-   TYPE(SC_InputType_C),   INTENT(INOUT) :: SC_Input_from_FAST
-   TYPE(SC_OutputType_C),  INTENT(INOUT) :: SC_Output_to_FAST
+   TYPE(SC_DX_InputType_C),   INTENT(INOUT) :: SC_DX_Input_from_FAST
+   TYPE(SC_DX_OutputType_C),  INTENT(INOUT) :: SC_DX_Output_to_FAST
 
    ExtInfw_Input_from_FAST%pxVel_Len = Turbine(iTurb)%ExtInfw%u%c_obj%pxVel_Len; ExtInfw_Input_from_FAST%pxVel = Turbine(iTurb)%ExtInfw%u%c_obj%pxVel
    ExtInfw_Input_from_FAST%pyVel_Len = Turbine(iTurb)%ExtInfw%u%c_obj%pyVel_Len; ExtInfw_Input_from_FAST%pyVel = Turbine(iTurb)%ExtInfw%u%c_obj%pyVel
@@ -822,9 +823,9 @@ subroutine FAST_CFD_Prework(iTurb, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_CFD_
 
    ELSE
 
-      if(Turbine(iTurb)%SC%p%scOn) then
-         CALL SC_SetOutputs(Turbine(iTurb)%p_FAST, Turbine(iTurb)%SrvD%Input(1), Turbine(iTurb)%SC, ErrStat, ErrMsg)
-      end if
+      ! if(Turbine(iTurb)%SC%p%scOn) then
+      !    CALL SC_SetOutputs(Turbine(iTurb)%p_FAST, Turbine(iTurb)%SrvD%Input(1), Turbine(iTurb)%SC, ErrStat, ErrMsg)
+      ! end if
 
       CALL FAST_Prework_T( t_initial, n_t_global, Turbine(iTurb), ErrStat, ErrMsg )
 
@@ -908,9 +909,9 @@ subroutine FAST_CFD_AdvanceToNextTimeStep(iTurb, ErrStat_c, ErrMsg_c) BIND (C, N
 
       CALL FAST_AdvanceToNextTimeStep_T( t_initial, n_t_global, Turbine(iTurb), ErrStat, ErrMsg )
 
-      if(Turbine(iTurb)%SC%p%scOn) then
-         CALL SC_SetInputs(Turbine(iTurb)%p_FAST, Turbine(iTurb)%SrvD%y, Turbine(iTurb)%SC, ErrStat, ErrMsg)
-      end if
+      ! if(Turbine(iTurb)%SC%p%scOn) then
+      !    CALL SC_SetInputs(Turbine(iTurb)%p_FAST, Turbine(iTurb)%SrvD%y, Turbine(iTurb)%SC, ErrStat, ErrMsg)
+      ! end if
 
       if (iTurb .eq. (NumTurbines-1) ) then
          n_t_global = n_t_global + 1

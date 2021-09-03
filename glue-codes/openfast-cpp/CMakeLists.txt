@@ -60,16 +60,16 @@ target_link_libraries(openfastcpp openfastcpplib openfastlib
   ${CMAKE_DL_LIBS})
 
 if(MPI_COMPILE_FLAGS)
-  set_target_properties(openfast-cpp PROPERTIES
+  set_target_properties(openfastcpp PROPERTIES
     COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
 endif(MPI_COMPILE_FLAGS)
 
 if(MPI_LINK_FLAGS)
-  set_target_properties(openfast-cpp PROPERTIES
+  set_target_properties(openfastcpp PROPERTIES
     LINK_FLAGS "${MPI_LINK_FLAGS}")
 endif(MPI_LINK_FLAGS)
 
-set_property(TARGET openfast-cpp PROPERTY LINKER_LANGUAGE CXX)
+set_property(TARGET openfastcpp PROPERTY LINKER_LANGUAGE CXX)
 
 install(TARGETS openfastcpplib
   EXPORT "${CMAKE_PROJECT_NAME}Libraries"
@@ -81,5 +81,5 @@ install(FILES
   src/OpenFAST.H src/SC.H
   DESTINATION include)
 
-install(TARGETS openfast-cpp
+install(TARGETS openfastcpp
   RUNTIME DESTINATION bin)

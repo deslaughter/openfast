@@ -100,12 +100,9 @@ SUBROUTINE Init_ExtInfw( InitInp, p_FAST, AirDens, u_AD14, u_AD, initOut_AD, y_A
    ExtInfw%p%NnodesForceBlade =  InitInp%NumActForcePtsBlade
    ExtInfw%p%NnodesForceTower = InitInp%NumActForcePtsTower
    ExtInfw%p%NnodesForce = 1 + ExtInfw%p%NumBl * InitInp%NumActForcePtsBlade
-   ExtInfw%p%BladeLength = ExtInfw%BladeLength
 
    if ( y_AD%rotors(1)%TowerLoad%NNodes > 0 ) then
       ExtInfw%p%NMappings = ExtInfw%p%NumBl + 1
-      ExtInfw%p%TowerHeight = InitInp%TowerHeight
-      ExtInfw%p%TowerBaseHeight = InitInp%TowerBaseHeight
       ExtInfw%p%NnodesForce = ExtInfw%p%NnodesForce + InitInp%NumActForcePtsTower
    else
       ExtInfw%p%NMappings = ExtInfw%p%NumBl
@@ -141,11 +138,6 @@ SUBROUTINE Init_ExtInfw( InitInp, p_FAST, AirDens, u_AD14, u_AD, initOut_AD, y_A
    CALL AllocPAry( ExtInfw%u%momentz, ExtInfw%p%NnodesForce, 'momentz', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    CALL AllocPAry( ExtInfw%u%forceNodesChord, ExtInfw%p%NnodesForce, 'forceNodesChord', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-
-   IF (InitInp%NumCtrl2SC > 0) THEN
-      CALL AllocPAry( ExtInfw%u%SuperController, InitInp%NumCtrl2SC, 'u%SuperController', ErrStat2, ErrMsg2 )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-   END IF
 
    IF (ErrStat >= AbortErrLev) RETURN
 
@@ -519,7 +511,7 @@ SUBROUTINE SetExtInfwForces(p_FAST, p_AD14, u_AD14, y_AD14, u_AD, y_AD, y_ED, y_
    INTEGER(IntKi)                                  :: J           ! Loops through nodes / elements
    INTEGER(IntKi)                                  :: K           ! Loops through blades.
    INTEGER(IntKi)                                  :: Node        ! Node number for blade/node on mesh
-#ifdef DEBUG_OPENFOAM
+#ifdef DEBUG_EXTERNALINFLOW
    INTEGER(IntKi)                                  :: actForcesFile, aerodynForcesFile ! Unit numbers for files containing actuator forces and aerodyn forces
 #endif
    INTEGER(IntKi)                                  :: ErrStat2    ! temporary Error status of the operation
@@ -540,7 +532,7 @@ SUBROUTINE SetExtInfwForces(p_FAST, p_AD14, u_AD14, y_AD14, u_AD, y_AD, y_ED, y_
    ! blade nodes
    !.......................
 
-#ifdef DEBUG_OPENFOAM
+#ifdef DEBUG_EXTERNALINFLOW
    CALL GetNewUnit( aerodynForcesFile )
    open(unit=aerodynForcesFile,file='fast_aerodyn_velocity_forces.csv')
    write(aerodynForcesFile,*) '#x, y, z, fx, fy, fz'
@@ -552,13 +544,13 @@ SUBROUTINE SetExtInfwForces(p_FAST, p_AD14, u_AD14, y_AD14, u_AD, y_AD, y_ED, y_
 
    DO K = 1,ExtInfw%p%NumBl
 
-#ifdef DEBUG_OPENFOAM
-      DO J = 1,u_AD%BladeMotion(k)%NNodes
-         write(aerodynForcesFile,*) u_AD%BladeMotion(k)%TranslationDisp(1,j) + u_AD%BladeMotion(k)%Position(1,j), ', ', u_AD%BladeMotion(k)%TranslationDisp(2,j) + u_AD%BladeMotion(k)%Position(2,j), ', ', u_AD%BladeMotion(k)%TranslationDisp(3,j) + u_AD%BladeMotion(k)%Position(3,j), ', ', ExtInfw%y%u(1 + (k-1)*u_AD%BladeMotion(k)%NNodes + j), ', ', ExtInfw%y%v(1 + (k-1)*u_AD%BladeMotion(k)%NNodes + j), ', ', ExtInfw%y%w(1 + (k-1)*u_AD%BladeMotion(k)%NNodes + j), ', ', y_AD%rotors(1)%BladeLoad(k)%Force(1,j), ', ', y_AD%rotors(1)%BladeLoad(k)%Force(2,j), ', ', y_AD%rotors(1)%BladeLoad(k)%Force(2,j)
+#ifdef DEBUG_EXTERNALINFLOW
+      DO J = 1,u_AD%rotors(1)%BladeMotion(k)%NNodes
+         write(aerodynForcesFile,*) u_AD%rotors(1)%BladeMotion(k)%TranslationDisp(1,j) + u_AD%rotors(1)%BladeMotion(k)%Position(1,j), ', ', u_AD%rotors(1)%BladeMotion(k)%TranslationDisp(2,j) + u_AD%rotors(1)%BladeMotion(k)%Position(2,j), ', ', u_AD%rotors(1)%BladeMotion(k)%TranslationDisp(3,j) + u_AD%rotors(1)%BladeMotion(k)%Position(3,j), ', ', ExtInfw%y%u(1 + (k-1)*u_AD%rotors(1)%BladeMotion(k)%NNodes + j), ', ', ExtInfw%y%v(1 + (k-1)*u_AD%rotors(1)%BladeMotion(k)%NNodes + j), ', ', ExtInfw%y%w(1 + (k-1)*u_AD%rotors(1)%BladeMotion(k)%NNodes + j), ', ', y_AD%rotors(1)%BladeLoad(k)%Force(1,j), ', ', y_AD%rotors(1)%BladeLoad(k)%Force(2,j), ', ', y_AD%rotors(1)%BladeLoad(k)%Force(2,j)
       END DO
 #endif
 
-      call Transfer_Line2_to_Line2( y_AD%rotors(1)%BladeLoad(k), ExtInfw%m%ActForceLoads(k), ExtInfw%m%Line2_to_Line2_Loads(k), ErrStat2, ErrMsg2, u_AD%BladeMotion(k), ExtInfw%m%ActForceMotions(k) )
+      call Transfer_Line2_to_Line2( y_AD%rotors(1)%BladeLoad(k), ExtInfw%m%ActForceLoads(k), ExtInfw%m%Line2_to_Line2_Loads(k), ErrStat2, ErrMsg2, u_AD%rotors(1)%BladeMotion(k), ExtInfw%m%ActForceMotions(k) )
       if(ErrStat2 /= 0) then
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       end if
@@ -576,7 +568,7 @@ SUBROUTINE SetExtInfwForces(p_FAST, p_AD14, u_AD14, y_AD14, u_AD, y_AD, y_ED, y_
          ExtInfw%u%momenty(Node) = ExtInfw%m%ActForceLoadsPoints(k)%Moment(2,j)
          ExtInfw%u%momentz(Node) = ExtInfw%m%ActForceLoadsPoints(k)%Moment(3,j)
 
-#ifdef DEBUG_OPENFOAM
+#ifdef DEBUG_EXTERNALINFLOW
          write(actForcesFile,*) ExtInfw%u%pxForce(Node), ', ', ExtInfw%u%pyForce(Node), ', ', ExtInfw%u%pzForce(Node), ', ', ExtInfw%u%fx(Node), ', ', ExtInfw%u%fy(Node), ', ', ExtInfw%u%fz(Node), ', '
 #endif
 
@@ -591,13 +583,13 @@ SUBROUTINE SetExtInfwForces(p_FAST, p_AD14, u_AD14, y_AD14, u_AD, y_AD, y_ED, y_
    ! mesh mapping from line2 mesh to point mesh
    DO K = ExtInfw%p%NumBl+1,ExtInfw%p%NMappings
 
-#ifdef DEBUG_OPENFOAM
-   DO J = 1,u_AD%TowerMotion%NNodes
-      write(aerodynForcesFile,*) u_AD%TowerMotion%TranslationDisp(1,j) + u_AD%TowerMotion%Position(1,j), ', ', u_AD%TowerMotion%TranslationDisp(2,j) + u_AD%TowerMotion%Position(2,j), ', ', u_AD%TowerMotion%TranslationDisp(3,j) + u_AD%TowerMotion%Position(3,j), ', ', y_AD%rotors(1)%TowerLoad%Force(1,j), ', ', y_AD%rotors(1)%TowerLoad%Force(2,j), ', ', y_AD%rotors(1)%TowerLoad%Force(2,j)
+#ifdef DEBUG_EXTERNALINFLOW
+   DO J = 1,u_AD%rotors(1)%TowerMotion%NNodes
+      write(aerodynForcesFile,*) u_AD%rotors(1)%TowerMotion%TranslationDisp(1,j) + u_AD%rotors(1)%TowerMotion%Position(1,j), ', ', u_AD%rotors(1)%TowerMotion%TranslationDisp(2,j) + u_AD%rotors(1)%TowerMotion%Position(2,j), ', ', u_AD%rotors(1)%TowerMotion%TranslationDisp(3,j) + u_AD%rotors(1)%TowerMotion%Position(3,j), ', ', y_AD%rotors(1)%TowerLoad%Force(1,j), ', ', y_AD%rotors(1)%TowerLoad%Force(2,j), ', ', y_AD%rotors(1)%TowerLoad%Force(2,j)
    END DO
 #endif
 
-   call Transfer_Line2_to_Line2( y_AD%rotors(1)%TowerLoad, ExtInfw%m%ActForceLoads(k), ExtInfw%m%Line2_to_Line2_Loads(k), ErrStat2, ErrMsg2, u_AD%TowerMotion, ExtInfw%m%ActForceMotions(k) )
+   call Transfer_Line2_to_Line2( y_AD%rotors(1)%TowerLoad, ExtInfw%m%ActForceLoads(k), ExtInfw%m%Line2_to_Line2_Loads(k), ErrStat2, ErrMsg2, u_AD%rotors(1)%TowerMotion, ExtInfw%m%ActForceMotions(k) )
    if(ErrStat .ne. 0) then
       call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    end if
@@ -615,12 +607,12 @@ SUBROUTINE SetExtInfwForces(p_FAST, p_AD14, u_AD14, y_AD14, u_AD, y_AD, y_ED, y_
       ExtInfw%u%momenty(Node) = ExtInfw%m%ActForceLoadsPoints(k)%Moment(2,j)
       ExtInfw%u%momentz(Node) = ExtInfw%m%ActForceLoadsPoints(k)%Moment(3,j)
 
-#ifdef DEBUG_OPENFOAM
+#ifdef DEBUG_EXTERNALINFLOW
       write(actForcesFile,*) ExtInfw%u%pxForce(Node), ', ', ExtInfw%u%pyForce(Node), ', ', ExtInfw%u%pzForce(Node), ', ', ExtInfw%u%fx(Node), ', ', ExtInfw%u%fy(Node), ', ', ExtInfw%u%fz(Node), ', '
 #endif
    END DO
 
-#ifdef DEBUG_OPENFOAM
+#ifdef DEBUG_EXTERNALINFLOW
    close(aerodynForcesFile)
    close(actForcesFile)
 #endif

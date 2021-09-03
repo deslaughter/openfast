@@ -30,7 +30,7 @@ fast::OpenFAST::OpenFAST():
     debug(false),
     nTurbinesProc(0),
     nTurbinesGlob(0),
-    simStart(fast::INIT),
+    simStart(fast::init),
     timeZero(false),
     dtFAST(-1.0),
     dtDriver(-1.0),
@@ -52,8 +52,6 @@ fast::OpenFAST::OpenFAST():
 {
 }
 
-fast::OpenFAST::~OpenFAST(){ }
-
 inline bool fast::OpenFAST::checkFileExists(const std::string& name) {
     struct stat buffer;
     return (stat (name.c_str(), &buffer) == 0);
@@ -68,7 +66,7 @@ void fast::OpenFAST::init() {
     if (!dryRun) {
         switch (simStart) {
 
-        case fast::trueRestart
+        case fast::trueRestart:
 
             for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
                 /* note that this will set nt_global inside the FAST library */
@@ -84,8 +82,8 @@ void fast::OpenFAST::init() {
                     &ntStart,
                     &i_f_FAST[iTurb],
                     &o_t_FAST[iTurb],
-                    &sc.ip_from_FAST[iTurb],
-                    &sc.op_to_FAST[iTurb],
+                    &sc->ip_from_FAST[iTurb],
+                    &sc->op_to_FAST[iTurb],
                     &ErrStat,
                     ErrMsg);
                 checkError(ErrStat, ErrMsg);
@@ -110,7 +108,7 @@ void fast::OpenFAST::init() {
 
         case fast::init:
 
-            sc.init(scio, nTurbinesProc);
+            sc->init(scio, nTurbinesProc);
             if(scStatus) {
                 std::cout << "Use of Supercontroller is not supported through the C++ API right now" << std::endl;
                 // sc.init_sc(scio, nTurbinesProc, turbineMapProcToGlob, fastMPIComm);
@@ -119,8 +117,8 @@ void fast::OpenFAST::init() {
 
             for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
                 std::copy(
-                    FASTInputFileName[iTurb].data(),
-                    FASTInputFileName[iTurb].data() + (FASTInputFileName[iTurb].size() + 1),
+                    turbineData[iTurb].FASTInputFileName.data(),
+                    turbineData[iTurb].FASTInputFileName.data() + (turbineData[iTurb].FASTInputFileName.size() + 1),
                     currentFileName
                 );
                 FAST_AL_CFD_Init(
@@ -145,8 +143,8 @@ void fast::OpenFAST::init() {
                     &turbineData[iTurb].numVelPtsTwr,
                     &i_f_FAST[iTurb],
                     &o_t_FAST[iTurb],
-                    &sc.ip_from_FAST[iTurb],
-                    &sc.op_to_FAST[iTurb],
+                    &sc->ip_from_FAST[iTurb],
+                    &sc->op_to_FAST[iTurb],
                     &ErrStat,
                     ErrMsg);
                 checkError(ErrStat, ErrMsg);
@@ -173,9 +171,9 @@ void fast::OpenFAST::init() {
 
             break ;
 
-        case fast::restartDriverInitFAST
+        case fast::restartDriverInitFAST:
 
-            sc.init(scio, nTurbinesProc);
+            sc->init(scio, nTurbinesProc);
             if(scStatus) {
                 std::cout << "Use of Supercontroller is not supported through the C++ API right now" << std::endl;
                 // sc.init_sc(scio, nTurbinesProc, turbineMapProcToGlob, fastMPIComm);
@@ -185,8 +183,8 @@ void fast::OpenFAST::init() {
             for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
 
                 std::copy(
-                    FASTInputFileName[iTurb].data(),
-                    FASTInputFileName[iTurb].data() + (FASTInputFileName[iTurb].size() + 1),
+                    turbineData[iTurb].FASTInputFileName.data(),
+                    turbineData[iTurb].FASTInputFileName.data() + (turbineData[iTurb].FASTInputFileName.size() + 1),
                     currentFileName
                 );
                 FAST_AL_CFD_Init(
@@ -211,8 +209,8 @@ void fast::OpenFAST::init() {
                     &turbineData[iTurb].numVelPtsTwr,
                     &i_f_FAST[iTurb],
                     &o_t_FAST[iTurb],
-                    &sc.ip_from_FAST[iTurb],
-                    &sc.op_to_FAST[iTurb],
+                    &sc->ip_from_FAST[iTurb],
+                    &sc->op_to_FAST[iTurb],
                     &ErrStat,
                     ErrMsg);
                 checkError(ErrStat, ErrMsg);
@@ -861,15 +859,6 @@ void fast::OpenFAST::setDriverTimeStep(double dt_driver) {
 }
 
 
-
-void fast::OpenFAST::checkError(const int ErrStat, const char * ErrMsg){
-    if (ErrStat != ErrID_None){
-        if (ErrStat >= AbortErrLev){
-            throw std::runtime_error(ErrMsg);
-        }
-    }
-}
-
 void fast::OpenFAST::setDriverCheckpoint(int nt_checkpoint_driver) {
 
     if (nTurbinesProc > 0) {
@@ -913,7 +902,7 @@ void fast::OpenFAST::setExpLawWindSpeed(double t){
     }
 }
 
-void fast::OpenFAST::getApproxHubPos(double* currentCoords, int iTurbGlob, int nSize) {
+void fast::OpenFAST::getApproxHubPos(std::vector<double> & currentCoords, int iTurbGlob, int nSize) {
     assert(nSize==3);
     // Get hub position of Turbine 'iTurbGlob'
     for(int i =0; i<nSize; ++i){
@@ -966,7 +955,7 @@ void fast::OpenFAST::getForceNodeOrientation(std::vector<double> & currentOrient
         currentOrientation[i] = velForceNodeData[iTurbLoc][t].orient_force[iNode*9+i] ;
 }
 
-void fast::OpenFAST::getRelativeVelForceNode(double* currentVelocity, int iNode, int iTurbGlob, int nSize) {
+void fast::OpenFAST::getRelativeVelForceNode(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, fast::timeStep t, int nSize) {
     assert(nSize==3);
     // Get relative velocity at current node of current turbine
     int iTurbLoc = get_localTurbNo(iTurbGlob);
@@ -993,8 +982,8 @@ double fast::OpenFAST::getChord(int iNode, int iTurbGlob) {
 
 }
 
-void fast::OpenFAST::setVelocity(std::vector<double> & currentVelocity, int iNode, int iTurbGlob) {
-
+void fast::OpenFAST::setVelocity(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, int nSize) {
+    assert(nSize==3);
     // Set velocity at current node of current turbine -
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     for(int j=0; j < iTurbLoc; j++) iNode = iNode - get_numVelPtsLoc(iTurbLoc);
@@ -1009,7 +998,7 @@ void fast::OpenFAST::setVelocity(std::vector<double> & currentVelocity, int iNod
     o_t_FAST[iTurbLoc].w[iNode] = currentVelocity[2];
 }
 
-void fast::OpenFAST::setVelocityForceNode(double* currentVelocity, int iNode, int iTurbGlob, int nSize) {
+void fast::OpenFAST::setVelocityForceNode(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, int nSize) {
     assert(nSize==3);
     // Set velocity at current node of current turbine -
     int iTurbLoc = get_localTurbNo(iTurbGlob);

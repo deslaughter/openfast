@@ -332,12 +332,6 @@ class OpenFAST {
                           float & fy,
                           float & fz);
 
-  hid_t openVelocityDataFile(bool createFile);
-  void readVelocityData(int nTimesteps);
-  void writeVelocityData(hid_t h5file, int iTurb, int iTimestep, OpFM_InputType_t iData, OpFM_OutputType_t oData);
-  herr_t closeVelocityDataFile(int nt_global, hid_t velDataFile);
-  void backupVelocityDataFile(int curTimeStep, hid_t & velDataFile);
-
   //! Allocate turbine number 'iTurbGlob' to the processor with global MPI rank 'procNo'. MUST be called from every MPI rank.
   void setTurbineProcNo(int iTurbGlob, int procNo) { turbineMapGlobToProc[iTurbGlob] = procNo; }
   //! Allocate all turbines to processors in a round-robin fashion. MUST be called from every MPI rank.
@@ -372,7 +366,7 @@ class OpenFAST {
   //! Get the actuator force at force node 'iNode' for turbine number 'iTurbGlob'. Must be called only from the processor containing the turbine.
   void getForce(std::vector<double> & force, int iNode, int iTurbGlob, fast::timeStep t, int nSize=3);
 
-  void getRelativeVelForceNode(double* vel, int iNode, int iTurbGlob, int nSize=3);
+  void getRelativeVelForceNode(std::vector<double> & vel, int iNode, int iTurbGlob, fast::timeStep t, int nSize=3);
 
   //! Get the chord at force node 'iNode' for turbine number 'iTurbGlob'. Must be called only from the processor containing the turbine.
   double getChord(int iNode, int iTurbGlob);
@@ -419,60 +413,61 @@ class OpenFAST {
   //! Compute the torque and thrust for turbine number 'iTurbGlob'. Must be called only from processor containing the turbine.
   void computeTorqueThrust(int iTurGlob, std::vector<double> &  torque, std::vector<double> &  thrust);
 
-  inline
-  void getHubPos(std::vector<double>& currentCoords, int iTurbGlob, fast::timeStep t) {
-      getHubPos(currentCoords.data(), iTurbGlob, t, currentCoords.size());
-  }
+  // inline
+  // void getApproxHubPos(std::vector<double>& currentCoords, int iTurbGlob) {
+  //     getApproxHubPos(currentCoords, iTurbGlob, currentCoords.size());
+  // }
 
-  inline
-  void getApproxHubPos(std::vector<double>& currentCoords, int iTurbGlob, fast::timeStep t) {
-      getApproxHubPos(currentCoords.data(), iTurbGlob,  t, currentCoords.size());
-  }
+  // inline
+  // void getHubPos(std::vector<double>& currentCoords, int iTurbGlob, fast::timeStep t) {
+  //     getHubPos(currentCoords, iTurbGlob, t, currentCoords.size());
+  // }
 
-  inline
-  void getHubShftDir(std::vector<double> & hubShftVec, int iTurbGlob, fast::timeStep t) {
-      getHubShftDir(hubShftVec.data(), iTurbGlob,  t, hubShftVec.size());
-  }
 
-  inline
-  void getVelNodeCoordinates(std::vector<double> & currentCoords, int iNode, int iTurbGlob, fast::timeStep t) {
-      getVelNodeCoordinates(currentCoords.data(), iNode,  t, iTurbGlob, currentCoords.size());
-  }
+  // inline
+  // void getHubShftDir(std::vector<double> & hubShftVec, int iTurbGlob, fast::timeStep t) {
+  //     getHubShftDir(hubShftVec, iTurbGlob,  t, hubShftVec.size());
+  // }
 
-  inline
-  void setVelocity(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, fast::timeStep t) {
-      setVelocity(currentVelocity.data(), iNode, iTurbGlob,  t, currentVelocity.size());
-  }
+  // inline
+  // void getVelNodeCoordinates(std::vector<double> & currentCoords, int iNode, int iTurbGlob, fast::timeStep t) {
+  //     getVelNodeCoordinates(currentCoords, iNode, iTurbGlob, t, currentCoords.size());
+  // }
 
-  inline
-  void setVelocityForceNode(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, fast::timeStep t) {
-      setVelocityForceNode(currentVelocity.data(), iNode, iTurbGlob,  t, currentVelocity.size());
-  }
+  // inline
+  // void setVelocity(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, fast::timeStep t) {
+  //     setVelocity(currentVelocity, iNode, iTurbGlob,  t, currentVelocity.size());
+  // }
 
-  inline
-  void getForceNodeCoordinates(std::vector<double> & currentCoords, int iNode, int iTurbGlob, fast::timeStep t) {
-      getForceNodeCoordinates(currentCoords.data(), iNode, iTurbGlob,  t, currentCoords.size());
-  }
+  // inline
+  // void setVelocityForceNode(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, fast::timeStep t) {
+  //     setVelocityForceNode(currentVelocity, iNode, iTurbGlob,  t, currentVelocity.size());
+  // }
 
-  inline
-  void getForceNodeOrientation(std::vector<double> & currentOrientation, int iNode, int iTurbGlob, fast::timeStep t) {
-      getForceNodeOrientation(currentOrientation.data(), iNode, iTurbGlob,  t, currentOrientation.size());
-  }
+  // inline
+  // void getForceNodeCoordinates(std::vector<double> & currentCoords, int iNode, int iTurbGlob, fast::timeStep t) {
+  //     getForceNodeCoordinates(currentCoords, iNode, iTurbGlob,  t, currentCoords.size());
+  // }
 
-  inline
-  void getForce(std::vector<double> & currentForce, int iNode, int iTurbGlob, fast::timeStep t) {
-      getForce(currentForce.data(), iNode, iTurbGlob,  t, currentForce.size());
-  }
+  // inline
+  // void getForceNodeOrientation(std::vector<double> & currentOrientation, int iNode, int iTurbGlob, fast::timeStep t) {
+  //     getForceNodeOrientation(currentOrientation, iNode, iTurbGlob,  t, currentOrientation.size());
+  // }
 
-  inline
-  void getRelativeVelForceNode(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, fast::timeStep t) {
-      getRelativeVelForceNode(currentVelocity.data(), iNode, iTurbGlob,  t, currentVelocity.size());
-  }
+  // inline
+  // void getForce(std::vector<double> & currentForce, int iNode, int iTurbGlob, fast::timeStep t) {
+  //     getForce(currentForce, iNode, iTurbGlob,  t, currentForce.size());
+  // }
 
-private:
+  // inline
+  // void getRelativeVelForceNode(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, fast::timeStep t) {
+  //     getRelativeVelForceNode(currentVelocity, iNode, iTurbGlob,  t, currentVelocity.size());
+  // }
 
   //! An example function to set velocities at the Aerodyn nodes using a power law wind profile using an exponent of 0.2 and a reference wind speed of 10 m/s at 90 meters. Safe to call from every MPI rank.
-  void setExpLawWindSpeed(double t) ; // An example to set velocities at the Aerodyn nodes
+    void setExpLawWindSpeed(double t) ; // An example to set velocities at the Aerodyn nodes
+
+private:
 
   //! Set state from another state
   void set_state_from_state(fast::timeStep fromState, fast::timeStep toState);
@@ -481,17 +476,6 @@ private:
   void readRestartFile(int iTurbLoc, int n_t_global);
   //! Write velocity and force node data at time step 'n', 'n-1' and 'n-2' to allow for a clean restart
   void writeRestartFile(int iTurbLoc, int n_t_global);
-
-  //! Compute the nacelle force
-  void calc_nacelle_force(const float & u,
-                          const float & v,
-                          const float & w,
-                          const float & cd,
-                          const float & area,
-                          const float & rho,
-                          float & fx,
-                          float & fy,
-                          float & fz);
 
   //! Open 'velData.h5' file to in preparation to write velocity data for all turbines
   hid_t openVelocityDataFile(int iTurb, bool createFile);

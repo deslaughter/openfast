@@ -107,11 +107,11 @@ void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, doubl
 
           if(cDriverInp["sim_start"]) {
               if (cDriverInp["sim_start"].as<std::string>() == "init") {
-                  fi.simStart = fast::INIT;
+                  fi.simStart = fast::init;
               } else if(cDriverInp["sim_start"].as<std::string>() == "trueRestart") {
-                  fi.simStart = fast::TRUERESTART;
+                  fi.simStart = fast::trueRestart;
               } else if(cDriverInp["sim_start"].as<std::string>() == "restartDriverInitFAST") {
-                  fi.simStart = fast::RESTARTDRIVERINITFAST;
+                  fi.simStart = fast::restartDriverInitFAST;
               } else {
                   throw std::runtime_error("sim_start is not well defined in the input file");
               }
