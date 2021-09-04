@@ -730,6 +730,8 @@ typedef   ^   FAST_InitData    AD14_InitInputType           InData_AD14     -  -
 typedef   ^   FAST_InitData    AD14_InitOutputType         OutData_AD14     -  -  -  "AD14 Initialization output data"
 typedef   ^   FAST_InitData    AD_InitInputType             InData_AD       -  -  -  "AD Initialization input data"
 typedef   ^   FAST_InitData    AD_InitOutputType           OutData_AD       -  -  -  "AD Initialization output data"
+typedef   ^   FAST_InitData    ExtLd_InitInputType          InData_ExtLd     -  -  - "ExtLd Initialization input data"
+typedef   ^   FAST_InitData    ExtLd_InitOutputType        OutData_ExtLd     -  -  - "ExtLd Initialization output data"
 typedef   ^   FAST_InitData    InflowWind_InitInputType     InData_IfW      -  -  -  "IfW Initialization input data"
 typedef   ^   FAST_InitData    InflowWind_InitOutputType   OutData_IfW      -  -  -  "IfW Initialization output data"
 typedef   ^   FAST_InitData    ExtInfw_InitInputType        InData_ExtInfw     -  -  -  "ExtInfw Initialization input data"

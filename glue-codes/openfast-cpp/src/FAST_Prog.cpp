@@ -146,8 +146,12 @@ void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, doubl
         }
 
     } else {
-        throw std::runtime_error("Input file " + cInterfaceInputFile + " does not exist or I cannot access it");
+        throw std::runtime_error("Number of turbines <= 0 ");
     }
+
+  } else {
+      throw std::runtime_error("Input file " + cInterfaceInputFile + " does not exist or I cannot access it");
+  }
 
 }
 

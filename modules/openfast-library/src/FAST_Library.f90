@@ -453,7 +453,7 @@ end subroutine FAST_Restart
 
 !==================================================================================================================================
 subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, TurbPosn, AbortErrLev_c, dt_c, NumBl_c, &
-     ExtLd_Input_from_FAST, ExtLd_Output_to_FAST, SC_Input_from_FAST, SC_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_BR_CFD_Init')
+     ExtLd_Input_from_FAST, ExtLd_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_BR_CFD_Init')
 !DEC$ ATTRIBUTES DLLEXPORT::FAST_CFD_Init
    IMPLICIT NONE
 #ifndef IMPLICIT_DLLEXPORT
@@ -470,8 +470,8 @@ subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, TurbPosn, Abor
    INTEGER(C_INT),         INTENT(  OUT) :: NumBl_c
    TYPE(ExtLdDX_InputType_C), INTENT(  OUT) :: ExtLd_Input_from_FAST
    TYPE(ExtLdDX_OutputType_C),INTENT(  OUT) :: ExtLd_Output_to_FAST
-   TYPE(SC_InputType_C),   INTENT(INOUT) :: SC_Input_from_FAST
-   TYPE(SC_OutputType_C),  INTENT(INOUT) :: SC_Output_to_FAST
+   TYPE(SC_DX_InputType_C),   INTENT(INOUT) :: SC_DX_Input_from_FAST
+   TYPE(SC_DX_OutputType_C),  INTENT(INOUT) :: SC_DX_Output_to_FAST
    INTEGER(C_INT),         INTENT(  OUT) :: ErrStat_c
    CHARACTER(KIND=C_CHAR), INTENT(  OUT) :: ErrMsg_c(IntfStrLen)
 
@@ -831,7 +831,7 @@ end subroutine FAST_AL_CFD_Restart
 !==================================================================================================================================
 subroutine FAST_BR_CFD_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, dt_c, numblades_c, &
      n_t_global_c, ExtLd_Input_from_FAST, ExtLd_Output_to_FAST, &
-     SC_Input_from_FAST, SC_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_BR_CFD_Restart')
+     SC_DX_Input_from_FAST, SC_DX_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_BR_CFD_Restart')
 !DEC$ ATTRIBUTES DLLEXPORT::FAST_BR_CFD_Restart
    IMPLICIT NONE
 #ifndef IMPLICIT_DLLEXPORT
@@ -846,8 +846,8 @@ subroutine FAST_BR_CFD_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, dt_c,
    INTEGER(C_INT),         INTENT(  OUT) :: n_t_global_c
    TYPE(ExtLdDX_InputType_C), INTENT(  OUT) :: ExtLd_Input_from_FAST
    TYPE(ExtLdDX_OutputType_C),INTENT(  OUT) :: ExtLd_Output_to_FAST
-   TYPE(SC_InputType_C),   INTENT(INOUT) :: SC_Input_from_FAST
-   TYPE(SC_OutputType_C),  INTENT(INOUT) :: SC_Output_to_FAST
+   TYPE(SC_DX_InputType_C),   INTENT(INOUT) :: SC_DX_Input_from_FAST
+   TYPE(SC_DX_OutputType_C),  INTENT(INOUT) :: SC_DX_Output_to_FAST
    INTEGER(C_INT),         INTENT(  OUT) :: ErrStat_c
    CHARACTER(KIND=C_CHAR), INTENT(  OUT) :: ErrMsg_c(IntfStrLen)
 
