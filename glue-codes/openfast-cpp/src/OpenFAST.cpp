@@ -5,6 +5,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cassert>
+#include <array>
 
 int fast::OpenFAST::AbortErrLev = ErrID_Fatal; // abort error level; compare with NWTC Library
 
@@ -50,6 +51,7 @@ fast::OpenFAST::OpenFAST():
     worldMPIRank(-1),
     ErrStat(0)
 {
+    sc = new SuperController();
 }
 
 inline bool fast::OpenFAST::checkFileExists(const std::string& name) {
@@ -161,7 +163,7 @@ void fast::OpenFAST::init() {
 
         case fast::restartDriverInitFAST:
 
-            sc->init(scio, nTurbinesProc);
+            //sc->init(scio, nTurbinesProc);
             if(scStatus) {
                 std::cout << "Use of Supercontroller is not supported through the C++ API right now" << std::endl;
                 // sc.init_sc(scio, nTurbinesProc, turbineMapProcToGlob, fastMPIComm);
@@ -409,7 +411,7 @@ void extrapRotation(double *rnm2, double *rnm1, double *rn, double *rnp1) {
         rrnp1[i] = 3.0 * ( rrn[i] - rrnm1[i]) ;
     }
     composeWM(rnm2, rrnp1.data(), rnp1, 1.0, 1.0); //Add rigid body rotation of nm2 back
-    
+
 }
 
 
@@ -1349,12 +1351,12 @@ void fast::OpenFAST::allocateMemory_preInit() {
         }
     }
 
-    // Construct a group containing all procs running atleast 1 turbine in FAST
-    MPI_Group_incl(worldMPIGroup, nProcsWithTurbines, &turbineProcs[0], &fastMPIGroup) ;
-    int fastMPIcommTag = MPI_Comm_create(mpiComm, fastMPIGroup, &fastMPIComm);
-    if (MPI_COMM_NULL != fastMPIComm) {
-        MPI_Comm_rank(fastMPIComm, &fastMPIRank);
-    }
+    // // Construct a group containing all procs running atleast 1 turbine in FAST
+    // MPI_Group_incl(worldMPIGroup, nProcsWithTurbines, &turbineProcs[0], &fastMPIGroup) ;
+    // int fastMPIcommTag = MPI_Comm_create(mpiComm, fastMPIGroup, &fastMPIComm);
+    // if (MPI_COMM_NULL != fastMPIComm) {
+    //     MPI_Comm_rank(fastMPIComm, &fastMPIRank);
+    // }
 
     turbineData.resize(nTurbinesProc);
     velForceNodeData.resize(nTurbinesProc);
@@ -1492,11 +1494,11 @@ void fast::OpenFAST::end() {
         }
     }
 
-    MPI_Group_free(&fastMPIGroup);
-    if (MPI_COMM_NULL != fastMPIComm) {
-        MPI_Comm_free(&fastMPIComm);
-    }
-    MPI_Group_free(&worldMPIGroup);
+    // MPI_Group_free(&fastMPIGroup);
+    // if (MPI_COMM_NULL != fastMPIComm) {
+    //     MPI_Comm_free(&fastMPIComm);
+    // }
+    // MPI_Group_free(&worldMPIGroup);
 
     if(scStatus) {
         std::cout << "Use of Supercontroller is not supported through the C++ API right now" << std::endl;

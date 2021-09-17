@@ -552,7 +552,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       IF ( PRESENT(ExternInitData) ) THEN
 
          ! set initialization data for ExtLoads
-         CALL ExtLd_SetInitInput(Init%InData_ExtLd, Init%OutData_ED, ED%Output(1), Init%OutData_BD, BD%y(:), p_FAST, ExternInitData, ErrStat2, ErrMsg2)
+         CALL ExtLd_SetInitInput(Init%InData_ExtLd, Init%OutData_ED, ED%y, Init%OutData_BD, BD%y(:), p_FAST, ExternInitData, ErrStat2, ErrMsg2)
          CALL ExtLd_Init( Init%InData_ExtLd, ExtLd%u, ExtLd%p, ExtLd%y, ExtLd%m, p_FAST%dt_module( MODULE_ExtLd ), Init%OutData_ExtLd, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
@@ -716,7 +716,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
          RETURN
       END IF
          ! set up the data structures for integration with ExternalInflow
-      CALL Init_ExtInfw( Init%InData_ExtInfw, p_FAST, AirDens, AD14%Input(1), AD%Input(1), Init%OutData_AD, AD%y, ED%Output(1), BD%y, ExtInfw, Init%OutData_ExtInfw, ErrStat2, ErrMsg2 )
+      CALL Init_ExtInfw( Init%InData_ExtInfw, p_FAST, AirDens, AD14%Input(1), AD%Input(1), Init%OutData_AD, AD%y, ED%y, BD%y, ExtInfw, Init%OutData_ExtInfw, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
       IF (ErrStat >= AbortErrLev) THEN
@@ -1732,6 +1732,7 @@ SUBROUTINE FAST_Init( p, m_FAST, y_FAST, t_initial, InputFile, ErrStat, ErrMsg, 
    IF (PRESENT(DTdriver)) THEN
       IF (  ABS( NINT(DTdriver/p%DT) * p%DT - DTdriver ) .lt. 0.001 ) THEN
          p%DT_Out = NINT(DTdriver/p%DT) * p%DT
+         p%n_DT_Out = NINT(DTdriver/p%DT)
       ELSE
          CALL SetErrStat( ErrID_Fatal, 'DTdriver specified '//TRIM ( Num2LStr( DTdriver ) )//' is not an integral multiple of FAST time step '//TRIM ( Num2LStr( p%DT ) ), ErrStat, ErrMsg, RoutineName )
       END IF
@@ -2573,7 +2574,8 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
 
       ! CompInflow - inflow wind velocities (switch) {0=still air; 1=InflowWind}:
    CALL ReadVar( UnIn, InputFile, p%CompInflow, "CompInflow", "inflow wind velocities (switch) {0=still air; 1=InflowWind}", ErrStat2, ErrMsg2, UnEc)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   write(*,*) 'CompInflow = ', p%CompInflow
+       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       if ( ErrStat >= AbortErrLev ) then
          call cleanup()
          RETURN
@@ -4776,7 +4778,7 @@ SUBROUTINE FAST_InitIOarrays_SS( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD
       CALL ED_CopyInput (ED%Input(1),  ED%Input_bak(j),  MESH_NEWCOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-      CALL ED_CopyOutput (ED%Output(1), ED%Output_bak(j), MESH_NEWCOPY, Errstat2, ErrMsg2) !BJJ: THIS IS REALLY ONLY NECESSARY FOR ED-HD COUPLING AT THE MOMENT
+      CALL ED_CopyOutput (ED%y, ED%Output_bak(1), MESH_NEWCOPY, Errstat2, ErrMsg2) !BJJ: THIS IS REALLY ONLY NECESSARY FOR ED-HD COUPLING AT THE MOMENT
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    END DO
 
@@ -5383,10 +5385,9 @@ SUBROUTINE FAST_Reset_SS(t_initial, n_t_global, n_timesteps, p_FAST, y_FAST, m_F
    DO j = 1, p_FAST%InterpOrder + 1
       CALL ED_CopyInput (ED%Input_bak(j), ED%Input(j),  MESH_UPDATECOPY, Errstat2, ErrMsg2)
       CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-      CALL ED_CopyOutput (ED%Output_bak(j), ED%Output(j), MESH_UPDATECOPY, Errstat2, ErrMsg2)
-      CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    END DO
+   CALL ED_CopyOutput (ED%Output_bak(1), ED%y, MESH_UPDATECOPY, Errstat2, ErrMsg2)
+   CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    ! ElastoDyn: copy final predictions to actual states
    CALL ED_CopyContState   (ED%x( STATE_SS_PRED), ED%x( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
@@ -5972,10 +5973,10 @@ SUBROUTINE FAST_Store_SS(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
    DO j = 1, p_FAST%InterpOrder + 1
       CALL ED_CopyInput (ED%Input(j), ED%Input_bak(j),  MESH_UPDATECOPY, Errstat2, ErrMsg2)
       CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-      CALL ED_CopyOutput (ED%Output(j), ED%Output_bak(j), MESH_UPDATECOPY, Errstat2, ErrMsg2)
-      CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    END DO
+   CALL ED_CopyOutput (ED%y, ED%Output_bak(1), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+   CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
 
    ! ElastoDyn: copy final predictions to actual states
    CALL ED_CopyContState   (ED%x( STATE_PRED), ED%x( STATE_SS_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)

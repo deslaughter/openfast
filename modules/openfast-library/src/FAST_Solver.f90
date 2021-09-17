@@ -4766,12 +4766,12 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, ExtLd, HD, SD, ExtPtfm, 
 
       ! Create the the mesh mapping for mapping between ED and ExtLoad blade root meshes
       DO K=1,NumBl
-         CALL MeshMapCreate( ED%Output(1)%BladeRootMotion(K), ExtLd%u%BladeRootMotion(K), MeshMapData%ED_P_2_ExtLd_P_R(K), ErrStat2, ErrMsg2 )
+         CALL MeshMapCreate( ED%y%BladeRootMotion(K), ExtLd%u%BladeRootMotion(K), MeshMapData%ED_P_2_ExtLd_P_R(K), ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_P_2_ExtLd_P_R('//TRIM(Num2LStr(K))//')' )
       END DO
 
       ! Hub point mesh
-      CALL MeshMapCreate( ED%Output(1)%HubPtMotion, ExtLd%u%HubMotion, MeshMapData%ED_P_2_ExtLd_P_H, ErrStat2, ErrMsg2 )
+      CALL MeshMapCreate( ED%y%HubPtMotion, ExtLd%u%HubMotion, MeshMapData%ED_P_2_ExtLd_P_H, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_P_2_ExtLd_P_H' )
 
       ! Blade meshes: (allocate two mapping data structures to number of blades, then allocate data inside the structures)
@@ -4786,7 +4786,7 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, ExtLd, HD, SD, ExtPtfm, 
 
          DO K=1,NumBl
             ! Create mapping for ElastoDyn BldMotion line2 meshes to ExtLoads point mesh
-            CALL MeshMapCreate( ED%Output(1)%BladeLn2Mesh(K), ExtLd%u%BladeMotion(K), MeshMapData%BDED_L_2_ExtLd_P_B(K), ErrStat2, ErrMsg2 )
+            CALL MeshMapCreate( ED%y%BladeLn2Mesh(K), ExtLd%u%BladeMotion(K), MeshMapData%BDED_L_2_ExtLd_P_B(K), ErrStat2, ErrMsg2 )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':BDED_L_2_ExtLd_P_B('//TRIM(Num2LStr(K))//')' )
             ! Create mapping for ExtLoads point mesh to ElastoDyn BldMotion line2 mesh
             CALL MeshMapCreate( ExtLd%y%BladeLoad(K), ED%Input(1)%BladePtLoads(K),  MeshMapData%ExtLd_P_2_BDED_B(K), ErrStat2, ErrMsg2 )
@@ -4843,7 +4843,7 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, ExtLd, HD, SD, ExtPtfm, 
 
       ! Tower mesh:
       IF ( ExtLd%u%TowerMotion%Committed ) THEN
-         CALL MeshMapCreate( ED%Output(1)%TowerLn2Mesh, ExtLd%u%TowerMotion, MeshMapData%ED_L_2_ExtLd_P_T, ErrStat2, ErrMsg2 )
+         CALL MeshMapCreate( ED%y%TowerLn2Mesh, ExtLd%u%TowerMotion, MeshMapData%ED_L_2_ExtLd_P_T, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_L_2_ExtLd_P_T' )
 
          IF ( ExtLd%y%TowerLoad%Committed ) THEN
@@ -5341,7 +5341,7 @@ SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, ca
 
    ELSE IF (p_FAST%CompAero == Module_ExtLd ) THEN
 
-      CALL ExtLd_InputSolve_NoIfW( p_FAST, ExtLd%u, ExtLd%p, ED%Output(1), BD, MeshMapData, ErrStat2, ErrMsg2 )
+      CALL ExtLd_InputSolve_NoIfW( p_FAST, ExtLd%u, ExtLd%p, ED%y, BD, MeshMapData, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
       IF ( p_FAST%CompInflow == MODULE_IfW .OR. p_FAST%CompInflow == MODULE_ExtInfw ) THEN
@@ -5357,7 +5357,7 @@ SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, ca
    ! ExternalInflow is the driver and it sets these inputs outside of this solve; the ExternalInflow inputs and outputs thus don't change
    !   in this scenario until ExternalInflow takes another step  **this is a source of error, but it is the way the ExternalInflow-FAST7 coupling
     !   works, so I'm not going to spend time that I don't have now to fix it**
-      CALL ExtInfw_SetInputs( p_FAST, AD14%p, AD14%Input(1), AD14%y, AD%Input(1), AD%y, ED%Output(1), BD%y, SrvD%y, ExtInfw, ErrStat2, ErrMsg2 )
+      CALL ExtInfw_SetInputs( p_FAST, AD14%p, AD14%Input(1), AD14%y, AD%Input(1), AD%y, ED%y, BD%y, SrvD%y, ExtInfw, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    END IF
 
@@ -5768,7 +5768,7 @@ SUBROUTINE SolveOption2c_Inp2AD_SrvD(this_time, this_state, p_FAST, m_FAST, ED, 
    ! ! ExternalInflow is the driver and it computes outputs outside of this solve; the ExternalInflow inputs and outputs thus don't change
    ! !   in this scenario until ExternalInflow takes another step  **this is a source of error, but it is the way the ExternalInflow-FAST7 coupling
    ! !   works, so I'm not going to spend time that I don't have now to fix it**
-   !   CALL ExtInfw_SetInputs( p_FAST, AD14%p, AD14%Input(1), AD14%y, AD%Input(1), AD%y, ED%Output(1), BD%y, SrvD%y, ExtInfw, ErrStat2, ErrMsg2 )
+   !   CALL ExtInfw_SetInputs( p_FAST, AD14%p, AD14%Input(1), AD14%y, AD%Input(1), AD%y, ED%y, BD%y, SrvD%y, ExtInfw, ErrStat2, ErrMsg2 )
    !      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    !   CALL ExtInfw_SetWriteOutput(ExtInfw)
 
@@ -5889,7 +5889,7 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
    !   in this scenario until ExternalInflow takes another step  **this is a source of error, but it is the way the ExternalInflow-FAST7 coupling
    !   works, so I'm not going to spend time that I don't have now to fix it**
    ! note that I'm setting these inputs AFTER the call to ServoDyn so ExternalInflow gets all the inputs updated at the same step
-      CALL ExtInfw_SetInputs( p_FAST, AD14%p, AD14%Input(1), AD14%y, AD%Input(1), AD%y, ED%Output(1), BD%y, SrvD%y, ExtInfw, ErrStat2, ErrMsg2 )
+      CALL ExtInfw_SetInputs( p_FAST, AD14%p, AD14%Input(1), AD14%y, AD%Input(1), AD%y, ED%y, BD%y, SrvD%y, ExtInfw, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL ExtInfw_SetWriteOutput(ExtInfw)
 
