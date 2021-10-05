@@ -138,8 +138,8 @@ void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, doubl
 
         get_required(cDriverInp, "t_start", *tStart);
         get_required(cDriverInp, "t_end", *tEnd);
-        get_required(cDriverInp, "restart_freq", fi.restartFreq_);
-        get_if_present(cDriverInp, "output_freq", fi.outputFreq_, 100);
+        get_required(cDriverInp, "restart_freq", fi.restartFreq);
+        get_if_present(cDriverInp, "output_freq", fi.outputFreq, 100);
         get_required(cDriverInp, "dt_driver", fi.dtDriver);
         get_required(cDriverInp, "t_max", fi.tMax); // t_max is the total duration to which you want to run FAST. This should be the same or greater than the max time given in the FAST fst file.
         get_if_present(cDriverInp, "set_exp_law_wind", *setExpLawWind, false);
