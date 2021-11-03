@@ -991,6 +991,9 @@ SUBROUTINE CreateTmpStructModelMesh(p_FAST, y_ED, y_BD, p_ExtInfw, tmpStructMode
 
      DO K = 1,p_ExtInfw%NumBl
 
+        write(*,*) 'NumBlades = ', p_ExtInfw%NumBl
+        write(*,*) 'Size(y_ED%BladeLn2Mesh = ', SIZE(y_ED%BladeLn2Mesh,1)
+
         nNodesStructModel = SIZE(y_ED%BladeLn2Mesh(K)%position(1,:))
 
         CALL MeshCreate( BlankMesh       = tmpStructModelMesh(K)  &
