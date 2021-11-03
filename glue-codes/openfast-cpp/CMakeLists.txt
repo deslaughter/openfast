@@ -79,7 +79,7 @@ install(TARGETS openfastcpplib
   LIBRARY DESTINATION lib)
 
 install(FILES
-  src/OpenFAST.H src/SC.H
+  src/OpenFAST.H src/SC.h
   DESTINATION include)
 
 install(TARGETS openfastcpp
