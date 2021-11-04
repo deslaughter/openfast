@@ -452,7 +452,8 @@ subroutine FAST_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, NumOuts_c, d
 end subroutine FAST_Restart
 
 !==================================================================================================================================
-subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, TurbPosn, AbortErrLev_c, dtDriver_c, dt_c, NumBl_c, &
+subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, OutFileRoot_c, TurbPosn, AbortErrLev_c, dtDriver_c, dt_c, NumBl_c, &
+     az_blend_mean_c, az_blend_delta_c, vel_mean_c, wind_dir_c, z_ref_c, shear_exp_c, dt_c, NumBl_c, &
      ExtLd_Input_from_FAST, ExtLd_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_BR_CFD_Init')
 !DEC$ ATTRIBUTES DLLEXPORT::FAST_BR_CFD_Init
    IMPLICIT NONE
@@ -464,8 +465,15 @@ subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, TurbPosn, Abor
    REAL(C_DOUBLE),         INTENT(IN   ) :: TMax
    CHARACTER(KIND=C_CHAR), INTENT(IN   ) :: InputFileName_c(IntfStrLen)
    INTEGER(C_INT),         INTENT(IN   ) :: TurbID           ! Need not be same as iTurb
+   CHARACTER(KIND=C_CHAR), INTENT(  OUT) :: OutFileRoot_c(IntfStrLen)
    REAL(C_FLOAT),          INTENT(IN   ) :: TurbPosn(3)
    REAL(C_DOUBLE),         INTENT(IN   ) :: dtDriver_c
+   REAL(C_DOUBLE),         INTENT(IN   ) :: az_blend_mean_c
+   REAL(C_DOUBLE),         INTENT(IN   ) :: az_blend_delta_c
+   REAL(C_DOUBLE),         INTENT(IN   ) :: vel_mean_c
+   REAL(C_DOUBLE),         INTENT(IN   ) :: wind_dir_c
+   REAL(C_DOUBLE),         INTENT(IN   ) :: z_ref_c
+   REAL(C_DOUBLE),         INTENT(IN   ) :: shear_exp_c
    REAL(C_DOUBLE),         INTENT(  OUT) :: dt_c
    INTEGER(C_INT),         INTENT(  OUT) :: AbortErrLev_c
    INTEGER(C_INT),         INTENT(  OUT) :: NumBl_c
@@ -501,9 +509,16 @@ subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, TurbPosn, Abor
    ExternInitData%NumCtrl2SC = 0
    ExternInitData%NumSC2Ctrl = 0
    ExternInitData%DTdriver = dtDriver_c
+   ExternInitData%az_blend_mean = az_blend_mean_c
+   ExternInitData%az_blend_delta = az_blend_delta_c
+   ExternInitData%vel_mean = vel_mean_c
+   ExternInitData%wind_dir = wind_dir_c
+   ExternInitData%z_ref = z_ref_c
+   ExternInitData%shear_exp = shear_exp_c
 
    CALL FAST_InitializeAll_T( t_initial, 1_IntKi, Turbine(iTurb), ErrStat, ErrMsg, InputFileName, ExternInitData )
 
+   write(*,*) 'ErrMsg = ', ErrMsg
       ! set values for return to ExternalInflow
    if (ErrStat .ne. ErrID_None) then
       AbortErrLev_c = AbortErrLev
@@ -527,13 +542,15 @@ subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, TurbPosn, Abor
 
    call SetExtLoads_pointers(iTurb, ExtLd_Input_from_FAST, ExtLd_Output_to_FAST)
 
+   OutFileRoot_c = TRANSFER( trim(Turbine(iTurb)%p_FAST%OutFileRoot)//C_NULL_CHAR, OutFileRoot_c )
+
    ErrStat_c     = ErrStat
    ErrMsg_c      = TRANSFER( trim(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
 
 end subroutine FAST_BR_CFD_Init
 
 !==================================================================================================================================
-subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2CtrlGlob, NumSC2Ctrl, NumCtrl2SC, InitSCOutputsGlob, InitSCOutputsTurbine, &
+subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, OutFileRoot_c, NumSC2CtrlGlob, NumSC2Ctrl, NumCtrl2SC, InitSCOutputsGlob, InitSCOutputsTurbine, &
      NumActForcePtsBlade, NumActForcePtsTower, TurbPosn, AbortErrLev_c, dtDriver_c, dt_c, InflowType, NumBl_c, NumBlElem_c, NumTwrElem_c, &
      ExtInfw_Input_from_FAST, ExtInfw_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_AL_CFD_Init')
 !DEC$ ATTRIBUTES DLLEXPORT::FAST_CFD_Init
@@ -547,6 +564,7 @@ subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2CtrlGlob
    CHARACTER(KIND=C_CHAR), INTENT(IN   ) :: InputFileName_c(IntfStrLen)
    INTEGER(C_INT),         INTENT(IN   ) :: TurbID           ! Need not be same as iTurb
    INTEGER(C_INT),         INTENT(IN   ) :: NumSC2CtrlGlob   ! Supercontroller global outputs = controller global inputs
+   CHARACTER(KIND=C_CHAR), INTENT(  OUT) :: OutFileRoot_c(IntfStrLen)    ! Root of output and restart file name
    INTEGER(C_INT),         INTENT(IN   ) :: NumSC2Ctrl       ! Supercontroller outputs = controller inputs
    INTEGER(C_INT),         INTENT(IN   ) :: NumCtrl2SC       ! controller outputs = Supercontroller inputs
    REAL(C_FLOAT),          INTENT(IN   ) :: InitScOutputsGlob (*) ! Initial Supercontroller global outputs = controller inputs
@@ -661,6 +679,8 @@ subroutine FAST_AL_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2CtrlGlob
       NumBlElem_c = 0
       NumTwrElem_c = 0
    END IF
+
+   OutFileRoot_c = TRANSFER( trim(Turbine(iTurb)%p_FAST%OutFileRoot)//C_NULL_CHAR, OutFileRoot_c )
 
    ErrStat_c     = ErrStat
    ErrMsg_c      = TRANSFER( trim(ErrMsg)//C_NULL_CHAR, ErrMsg_c )
@@ -913,8 +933,12 @@ subroutine SetExtLoads_pointers(iTurb, ExtLd_iFromOF, ExtLd_oToOF)
    TYPE(ExtLdDX_InputType_C), INTENT(INOUT) :: ExtLd_iFromOF
    TYPE(ExtLdDX_OutputType_C),INTENT(INOUT) :: ExtLd_oToOF
 
+   ExtLd_iFromOF%twrHloc_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrHloc_Len; ExtLd_iFromOF%twrHloc = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrHloc
+   ExtLd_iFromOF%twrDia_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrDia_Len; ExtLd_iFromOF%twrDia = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrDia
    ExtLd_iFromOF%twrRefPos_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrRefPos_Len; ExtLd_iFromOF%twrRefPos = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrRefPos
    ExtLd_iFromOF%twrDef_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrDef_Len; ExtLd_iFromOF%twrDef = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrDef
+   ExtLd_iFromOF%bldRloc_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldRloc_Len; ExtLd_iFromOF%bldRloc = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldRloc
+   ExtLd_iFromOF%bldChord_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldChord_Len; ExtLd_iFromOF%bldChord = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldChord
    ExtLd_iFromOF%bldRefPos_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldRefPos_Len; ExtLd_iFromOF%bldRefPos = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldRefPos
    ExtLd_iFromOF%bldDef_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldDef_Len; ExtLd_iFromOF%bldDef = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldDef
    ExtLd_iFromOF%nBlades_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nBlades_Len; ExtLd_iFromOF%nBlades = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nBlades
@@ -962,6 +986,7 @@ subroutine SetExternalInflow_pointers(iTurb, ExtInfw_Input_from_FAST, ExtInfw_Ou
    ExtInfw_Input_from_FAST%momenty_Len = Turbine(iTurb)%ExtInfw%u%c_obj%momenty_Len; ExtInfw_Input_from_FAST%momenty = Turbine(iTurb)%ExtInfw%u%c_obj%momenty
    ExtInfw_Input_from_FAST%momentz_Len = Turbine(iTurb)%ExtInfw%u%c_obj%momentz_Len; ExtInfw_Input_from_FAST%momentz = Turbine(iTurb)%ExtInfw%u%c_obj%momentz
    ExtInfw_Input_from_FAST%forceNodesChord_Len = Turbine(iTurb)%ExtInfw%u%c_obj%forceNodesChord_Len; ExtInfw_Input_from_FAST%forceNodesChord = Turbine(iTurb)%ExtInfw%u%c_obj%forceNodesChord
+   ExtInfw_Input_from_FAST%forceRHloc_Len = Turbine(iTurb)%ExtInfw%u%c_obj%forceRHloc_Len; ExtInfw_Input_from_FAST%forceRHloc = Turbine(iTurb)%ExtInfw%u%c_obj%forceRHloc
 
    if (Turbine(iTurb)%p_FAST%UseSC) then
       SC_DX_Input_from_FAST%toSC_Len = Turbine(iTurb)%SC_DX%u%c_obj%toSC_Len

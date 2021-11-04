@@ -480,7 +480,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
          RETURN
       END IF
 
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( ( p_FAST%CompAero == Module_AD ) .OR. ( p_FAST%CompAero == Module_ExtLd) ) THEN
 
       allocate(Init%InData_AD%rotors(1), stat=errStat)
       if (errStat/=0) then
@@ -504,7 +504,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       Init%InData_AD%Linearize          = p_FAST%Linearize
       Init%InData_AD%InputFile          = p_FAST%AeroFile
       Init%InData_AD%RootName           = p_FAST%OutFileRoot
-
 
       Init%InData_AD%rotors(1)%HubPosition        = ED%y%HubPtMotion%Position(:,1)
       Init%InData_AD%rotors(1)%HubOrientation     = ED%y%HubPtMotion%RefOrientation(:,:,1)
@@ -547,13 +546,18 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
 
       AirDens = Init%OutData_AD%rotors(1)%AirDens
 
-   ELSEIF ( p_FAST%CompAero == Module_ExtLd ) THEN
+   ELSE
+      AirDens = 0.0_ReKi
+   END IF ! CompAero
+
+
+   IF ( p_FAST%CompAero == Module_ExtLd ) THEN
 
       IF ( PRESENT(ExternInitData) ) THEN
 
          ! set initialization data for ExtLoads
-         CALL ExtLd_SetInitInput(Init%InData_ExtLd, Init%OutData_ED, ED%y, Init%OutData_BD, BD%y(:), p_FAST, ExternInitData, ErrStat2, ErrMsg2)
-         CALL ExtLd_Init( Init%InData_ExtLd, ExtLd%u, ExtLd%p, ExtLd%y, ExtLd%m, p_FAST%dt_module( MODULE_ExtLd ), Init%OutData_ExtLd, ErrStat2, ErrMsg2 )
+         CALL ExtLd_SetInitInput(Init%InData_ExtLd, Init%OutData_ED, ED%y, Init%OutData_BD, BD%y(:), Init%OutData_AD, p_FAST, ExternInitData, ErrStat2, ErrMsg2)
+         CALL ExtLd_Init( Init%InData_ExtLd, ExtLd%u, ExtLd%xd(1), ExtLd%p, ExtLd%y, ExtLd%m, p_FAST%dt_module( MODULE_ExtLd ), Init%OutData_ExtLd, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
          p_FAST%ModuleInitialized(Module_ExtLd) = .TRUE.
@@ -569,11 +573,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
 
       END IF
 
-   ELSE
-      AirDens = 0.0_ReKi
-   END IF ! CompAero
-
-
+   END IF
    ! ........................
    ! initialize InflowWind
    ! ........................
@@ -2025,7 +2025,7 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
    IF ( p_FAST%CompAero == Module_AD14 )  THEN
       y_FAST%Module_Ver( Module_AD14  ) = Init%OutData_AD14%Ver
       y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_AD14  ) ))
-   ELSEIF ( p_FAST%CompAero == Module_AD )  THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) )  THEN
       y_FAST%Module_Ver( Module_AD  ) = Init%OutData_AD%Ver
       y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_AD  ) ))
    END IF
@@ -3600,13 +3600,14 @@ SUBROUTINE WrVTK_Ground ( RefPoint, HalfLengths, FileRootName, ErrStat, ErrMsg )
 END SUBROUTINE WrVTK_Ground
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine sets up the information needed to initialize ExtLoads
-SUBROUTINE ExtLd_SetInitInput(InitInData_ExtLd, InitOutData_ED, y_ED, InitOutData_BD, y_BD, p_FAST, ExternInitData, ErrStat, ErrMsg)
+SUBROUTINE ExtLd_SetInitInput(InitInData_ExtLd, InitOutData_ED, y_ED, InitOutData_BD, y_BD, InitOutData_AD, p_FAST, ExternInitData, ErrStat, ErrMsg)
    ! Passed variables:
-   TYPE(ExtLd_InitInputType),INTENT(INOUT) :: InitInData_ExtLd  !< The initialization input to AeroDyn14
+   TYPE(ExtLd_InitInputType),INTENT(INOUT) :: InitInData_ExtLd  !< The initialization input to ExtLoads
    TYPE(ED_InitOutputType), INTENT(IN)    :: InitOutData_ED   !< The initialization output from structural dynamics module
    TYPE(ED_OutputType),     INTENT(IN)    :: y_ED             !< The outputs of the structural dynamics module (meshes with position/RefOrientation set)
    TYPE(BD_InitOutputType), INTENT(IN)    :: InitOutData_BD(:)   !< The initialization output from structural dynamics module
    TYPE(BD_OutputType),     INTENT(IN)    :: y_BD(:)             !< The outputs of the structural dynamics module (meshes with position/RefOrientation set)
+   TYPE(AD_InitOutputType), INTENT(IN)    :: InitOutData_AD   !< The initialization output from AeroDyn
    TYPE(FAST_ParameterType),INTENT(IN)    :: p_FAST           !< The parameters of the glue code
    TYPE(FAST_ExternInitType),INTENT(IN)   :: ExternInitData   !< Initialization input data from an external source
 
@@ -3614,9 +3615,14 @@ SUBROUTINE ExtLd_SetInitInput(InitInData_ExtLd, InitOutData_ED, y_ED, InitOutDat
    CHARACTER(*)                           :: ErrMsg           !< Error message if ErrStat /= ErrID_None
 
       ! Local variables
-   INTEGER                    :: k, tmp
+   INTEGER                    :: i,j,k,jLower,tmp
+   integer                    :: nNodesBladeProps, nNodesTowerProps
+   real(ReKi)                 :: rInterp
    INTEGER                    :: nTotBldNds
    INTEGER                    :: nMaxBldNds
+   REAL(ReKi)                 :: tmp_eta
+
+   REAL(ReKi), ALLOCATABLE    :: AD_etaNodes(:)  ! Non-dimensional co-ordinates eta at which the blade and tower chord are defined
 
    ErrStat = ErrID_None
    ErrMsg  = ""
@@ -3713,6 +3719,24 @@ SUBROUTINE ExtLd_SetInitInput(InitInData_ExtLd, InitOutData_ED, y_ED, InitOutDat
       END DO
    END IF
 
+   IF (.NOT. ALLOCATED( InitInData_ExtLd%BldRloc) ) THEN
+      ALLOCATE( InitInData_ExtLd%BldRloc( nMaxBldNds, InitInData_ExtLd%NumBlades), STAT = ErrStat )
+      IF ( ErrStat /= 0 ) THEN
+         ErrStat = ErrID_Fatal
+         ErrMsg = ' Error allocating space for InitInData_ExtLd%BldRloc.'
+         RETURN
+      ELSE
+         ErrStat = ErrID_None !reset to ErrID_None, just in case ErrID_None /= 0
+      END IF
+   END IF
+
+   do k=1,InitInData_ExtLd%NumBlades
+      InitInData_ExtLd%BldRloc(1,k) = 0.0
+      do j = 2, InitInData_ExtLd%NumBldNodes(k)
+         InitInData_ExtLd%BldRloc(j,k) = InitInData_ExtLd%BldRloc(j-1,k) + norm2(InitInData_ExtLd%BldPos(:,j,k) - InitInData_ExtLd%BldPos(:,j-1,k))
+      end do
+   end do
+
    ! Tower mesh
    InitInData_ExtLd%TwrAero = .true.
    if (InitInData_ExtLd%TwrAero) then
@@ -3746,6 +3770,33 @@ SUBROUTINE ExtLd_SetInitInput(InitInData_ExtLd, InitOutData_ED, y_ED, InitOutDat
          ! Now fill in rest of the nodes
          InitInData_ExtLd%TwrPos(:,2:InitInData_ExtLd%NumTwrNds) = y_ED%TowerLn2Mesh%Position(:,1:InitInData_ExtLd%NumTwrNds-1)
          InitInData_ExtLd%TwrOrient(:,:,2:InitInData_ExtLd%NumTwrNds) = y_ED%TowerLn2Mesh%RefOrientation(:,:,1:InitInData_ExtLd%NumTwrNds-1)
+
+         IF (.NOT. ALLOCATED( InitInData_ExtLd%TwrDia ) ) THEN
+            ALLOCATE( InitInData_ExtLd%TwrDia( InitInData_ExtLd%NumTwrNds ), STAT = ErrStat )
+            IF ( ErrStat /= 0 ) THEN
+               ErrStat = ErrID_Fatal
+               ErrMsg = ' Error allocating space for InitInData_AD%TwrDia.'
+               RETURN
+            ELSE
+               ErrStat = ErrID_None
+            END IF
+         END IF
+
+         IF (.NOT. ALLOCATED( InitInData_ExtLd%TwrHloc ) ) THEN
+            ALLOCATE( InitInData_ExtLd%TwrHloc( InitInData_ExtLd%NumTwrNds ), STAT = ErrStat )
+            IF ( ErrStat /= 0 ) THEN
+               ErrStat = ErrID_Fatal
+               ErrMsg = ' Error allocating space for InitInData_AD%TwrHloc.'
+               RETURN
+            ELSE
+               ErrStat = ErrID_None
+            END IF
+         END IF
+
+         InitInData_ExtLd%TwrHloc(1) = 0.0
+         do j = 2, InitInData_ExtLd%NumTwrNds
+            InitInData_ExtLd%TwrHloc(j) = InitInData_ExtLd%TwrHloc(j-1) + norm2(InitInData_ExtLd%TwrPos(:,j) - InitInData_ExtLd%TwrPos(:,j-1))
+         end do
       END IF
 
    else
@@ -3760,7 +3811,70 @@ SUBROUTINE ExtLd_SetInitInput(InitInData_ExtLd, InitOutData_ED, y_ED, InitOutDat
    InitInData_ExtLd%NacellePos         = y_ED%NacelleMotion%Position(:,1)
    InitInData_ExtLd%NacelleOrient      = y_ED%NacelleMotion%RefOrientation(:,:,1)
 
-   RETURN
+   InitInData_ExtLd%az_blend_mean = ExternInitData%az_blend_mean
+   InitInData_ExtLd%az_blend_delta = ExternInitData%az_blend_delta
+   InitInData_ExtLd%vel_mean = ExternInitData%vel_mean
+   InitInData_ExtLd%wind_dir = ExternInitData%wind_dir
+   InitInData_ExtLd%z_ref = ExternInitData%z_ref
+   InitInData_ExtLd%shear_exp = ExternInitData%shear_exp
+
+   !Interpolate chord from AeroDyn to nodes of the ExtLoads module
+   IF (.NOT. ALLOCATED( InitInData_ExtLd%BldChord) ) THEN
+      ALLOCATE( InitInData_ExtLd%BldChord(nMaxBldNds, InitInData_ExtLd%NumBlades), STAT = ErrStat )
+      IF ( ErrStat /= 0 ) THEN
+         ErrStat = ErrID_Fatal
+         ErrMsg = ' Error allocating space for InitInData_ExtLd%BldRootPos.'
+         RETURN
+      ELSE
+         ErrStat = ErrID_None !reset to ErrID_None, just in case ErrID_None /= 0
+      END IF
+   END IF
+
+   ! The blades first
+   do k = 1, InitInData_ExtLd%NumBlades
+     ! Calculate the chord at the force nodes based on interpolation
+     nNodesBladeProps = SIZE(InitOutData_AD%rotors(1)%BladeProps(k)%BlChord)
+     allocate(AD_etaNodes(nNodesBladeProps))
+     AD_etaNodes = InitOutData_AD%rotors(1)%BladeProps(k)%BlSpn(:)/InitOutData_AD%rotors(1)%BladeProps(k)%BlSpn(nNodesBladeProps)
+     do i=1,InitInData_ExtLd%NumBldNodes(k)
+        jLower=1
+        tmp_eta = InitInData_ExtLd%BldRloc(i,k)/InitInData_ExtLd%BldRloc(InitInData_ExtLd%NumBldNodes(k),k)
+        do while ( ( (AD_etaNodes(jLower) - tmp_eta)*(AD_etaNodes(jLower+1) - tmp_eta) .gt. 0 ) .and. (jLower .lt. nNodesBladeProps) )!Determine the closest two nodes at which the blade properties are specified
+           jLower = jLower + 1
+        end do
+        if (jLower .lt. nNodesBladeProps) then
+           rInterp =  (tmp_eta - AD_etaNodes(jLower))/(AD_etaNodes(jLower+1)-AD_etaNodes(jLower)) ! The location of this force node in (0,1) co-ordinates between the jLower and jLower+1 nodes
+           InitInData_ExtLd%BldChord(i,k) = InitOutData_AD%rotors(1)%BladeProps(k)%BlChord(jLower) + rInterp * (InitOutData_AD%rotors(1)%BladeProps(k)%BlChord(jLower+1) - InitOutData_AD%rotors(1)%BladeProps(k)%BlChord(jLower))
+        else
+           InitInData_ExtLd%BldChord(i,k) = InitOutData_AD%rotors(1)%BladeProps(k)%BlChord(nNodesBladeProps) !Work around for when the last node of the actuator mesh is slightly outside of the Aerodyn blade properties. Surprisingly this is not an issue with the tower.
+        end if
+     end do
+     deallocate(AD_etaNodes)
+  end do
+
+  ! The tower now
+  if ( InitInData_ExtLd%NumTwrNds > 0 ) then
+     nNodesTowerProps = SIZE(InitOutData_AD%rotors(1)%TwrElev)
+     allocate(AD_etaNodes(nNodesTowerProps))
+     ! Calculate the chord at the force nodes based on interpolation
+     AD_etaNodes = InitOutData_AD%rotors(1)%TwrElev(:)/InitOutData_AD%rotors(1)%TwrElev(nNodesTowerProps) ! Non-dimensionalize the tower elevation array
+     do i=1,InitInData_ExtLd%NumTwrNds
+        tmp_eta = InitInData_ExtLd%TwrHloc(i)/InitInData_ExtLd%TwrHloc(InitInData_ExtLd%NumTwrNds)
+        jLower=1
+        do while ( ( (AD_etaNodes(jLower) - tmp_eta)*(AD_etaNodes(jLower+1) - tmp_eta) .gt. 0) .and. (jLower .lt. nNodesTowerProps) ) !Determine the closest two nodes at which the blade properties are specified
+           jLower = jLower + 1
+        end do
+        if (jLower .lt. nNodesTowerProps) then
+           rInterp =   (tmp_eta - AD_etaNodes(jLower))/(AD_etaNodes(jLower+1)-AD_etaNodes(jLower)) ! The location of this force node in (0,1) co-ordinates between the jLower and jLower+1 nodes
+           InitInData_ExtLd%TwrDia(i) = InitOutData_AD%rotors(1)%TwrDiam(jLower) + rInterp * (InitOutData_AD%rotors(1)%TwrDiam(jLower+1) - InitOutData_AD%rotors(1)%TwrDiam(jLower))
+        else
+           InitInData_ExtLd%TwrDia(i) = InitOutData_AD%rotors(1)%TwrDiam(nNodesTowerProps) !Work around for when the last node of the actuator mesh is slightly outside of the Aerodyn tower properties.
+        end if
+     end do
+     deallocate(AD_etaNodes)
+  end if
+
+  RETURN
 
 END SUBROUTINE ExtLd_SetInitInput
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -3952,7 +4066,7 @@ SUBROUTINE FAST_WrSum( p_FAST, y_FAST, MeshMapData, ErrStat, ErrMsg )
    WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
 
    DescStr = GetNVD( y_FAST%Module_Ver( Module_AD ) )
-   IF ( p_FAST%CompAero /= Module_AD ) DescStr = TRIM(DescStr)//NotUsedTxt
+   IF ( (p_FAST%CompAero /= Module_AD) .and. (p_FAST%CompAero /= Module_ExtLd) ) DescStr = TRIM(DescStr)//NotUsedTxt
    WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
 
    DescStr = GetNVD( y_FAST%Module_Ver( Module_SrvD ) )
@@ -4397,7 +4511,7 @@ SUBROUTINE FAST_InitIOarrays( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, A
       CALL AD14_CopyOtherState( AD14%OtherSt(STATE_CURR), AD14%OtherSt(STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
          ! Copy values for interpolation/extrapolation:
 
       DO j = 1, p_FAST%InterpOrder + 1
@@ -4910,7 +5024,7 @@ SUBROUTINE FAST_InitIOarrays_SS( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD
       CALL AD14_CopyOtherState( AD14%OtherSt(STATE_PRED), AD14%OtherSt(STATE_SS_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
          ! Copy values for interpolation/extrapolation:
 
       DO j = 1, p_FAST%InterpOrder + 1
@@ -5523,8 +5637,7 @@ SUBROUTINE FAST_Reset_SS(t_initial, n_t_global, n_timesteps, p_FAST, y_FAST, m_F
       CALL AD14_CopyOtherState (AD14%OtherSt(STATE_SS_CURR), AD14%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
          ! Copy values for interpolation/extrapolation:
 
       DO j = 1, p_FAST%InterpOrder + 1
@@ -6097,8 +6210,7 @@ SUBROUTINE FAST_Store_SS(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
       CALL AD14_CopyOtherState (AD14%OtherSt(STATE_CURR), AD14%OtherSt(STATE_SS_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
          ! Copy values for interpolation/extrapolation:
 
       DO j = 1, p_FAST%InterpOrder + 1
@@ -6799,7 +6911,7 @@ SUBROUTINE FAST_AdvanceToNextTimeStep(t_initial, n_t_global, p_FAST, y_FAST, m_F
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AD14_CopyOtherState (AD14%OtherSt(STATE_PRED), AD14%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
       CALL AD_CopyContState   (AD%x( STATE_PRED), AD%x( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AD_CopyDiscState   (AD%xd(STATE_PRED), AD%xd(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
@@ -7164,7 +7276,6 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
    !! STATE_CURR values of x, xd, z, and OtherSt contain values at m_FAST%t_global;
    !! STATE_PRED values contain values at t_global_next.
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
       CALL FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, ExtInfw, HD, SD, ExtPtfm, &
                                MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -7254,7 +7365,7 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AD14_CopyOtherState (AD14%OtherSt(STATE_PRED), AD14%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
+   ELSEIF ( (p_FAST%CompAero == Module_AD) .or. (p_FAST%CompAero == Module_ExtLd) ) THEN
       CALL AD_CopyContState   (AD%x( STATE_PRED), AD%x( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AD_CopyDiscState   (AD%xd(STATE_PRED), AD%xd(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)

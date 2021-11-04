@@ -1,6 +1,7 @@
 #include "OpenFAST.H"
 #include "yaml-cpp/yaml.h"
 #include <iostream>
+#include <cmath>
 #include <mpi.h>
 
 inline bool checkFileExists(const std::string& name) {
@@ -75,9 +76,21 @@ void readTurbineData(int iTurb, fast::fastInputs & fi, YAML::Node turbNode) {
   get_if_present(turbNode, "nacelle_cd", fi.globTurbineData[iTurb].nacelle_cd, fZero);
   get_if_present(turbNode, "nacelle_area", fi.globTurbineData[iTurb].nacelle_area, fZero);
   get_if_present(turbNode, "air_density", fi.globTurbineData[iTurb].air_density, fZero);
+
+  if (simType == "ext-loads") {
+
+      get_if_present(turbNode, "az_blend_mean", fi.globTurbineData[iTurb].azBlendMean, 20*360.0*M_PI/180.0); //20 revs
+      get_if_present(turbNode, "az_blend_delta", fi.globTurbineData[iTurb].azBlendDelta, 3.0*360.0*M_PI/180.0);  // 3 rev
+      get_required(turbNode, "vel_mean", fi.globTurbineData[iTurb].velMean);
+      get_required(turbNode, "wind_dir", fi.globTurbineData[iTurb].windDir);
+      get_required(turbNode, "z_ref", fi.globTurbineData[iTurb].zRef);
+      get_required(turbNode, "shear_exp", fi.globTurbineData[iTurb].shearExp);
+
+  }
+
 }
 
-void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, double * tEnd, int * couplingMode, bool * setExpLawWind, bool * setUniformXBladeForces, int * nIter) {
+void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, double *tStart, double * tEnd, int * couplingMode, bool * setExpLawWind, bool * setUniformXBladeForces, int * nIter) {
 
   fi.comm = MPI_COMM_WORLD;
 
@@ -123,9 +136,10 @@ void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, doubl
             }
         }
 
-        get_required(cDriverInp, "t_start", fi.tStart);
+        get_required(cDriverInp, "t_start", *tStart);
         get_required(cDriverInp, "t_end", *tEnd);
-        get_required(cDriverInp, "n_checkpoint", fi.nEveryCheckPoint);
+        get_required(cDriverInp, "restart_freq", fi.restartFreq_);
+        get_if_present(cDriverInp, "output_freq", fi.outputFreq_, 100);
         get_required(cDriverInp, "dt_driver", fi.dtDriver);
         get_required(cDriverInp, "t_max", fi.tMax); // t_max is the total duration to which you want to run FAST. This should be the same or greater than the max time given in the FAST fst file.
         get_if_present(cDriverInp, "set_exp_law_wind", *setExpLawWind, false);
@@ -173,6 +187,7 @@ int main(int argc, char** argv) {
     iErr = MPI_Comm_rank( MPI_COMM_WORLD, &rank);
 
     int couplingMode ; //CLASSIC (SOWFA style = 0) or STRONG (Conventional Serial Staggered - allow for outer iterations = 1)
+    double tStart; // This doesn't belong in the C++ API
     double tEnd ; // This doesn't belong in the FAST - C++ interface
     int ntStart, ntEnd ; // This doesn't belong in the FAST - C++ interface
     int nSubsteps; //
@@ -184,7 +199,7 @@ int main(int argc, char** argv) {
     fast::OpenFAST FAST;
     fast::fastInputs fi ;
     try {
-        readInputFile(fi, cDriverInputFile, &tEnd, &couplingMode, &setExpLawWind, &setUniformXBladeForces, &nIter);
+        readInputFile(fi, cDriverInputFile, &tStart, &tEnd, &couplingMode, &setExpLawWind, &setUniformXBladeForces, &nIter);
     } catch( const std::runtime_error & ex) {
         std::cerr << ex.what() << std::endl ;
         std::cerr << "Program quitting now" << std::endl ;
@@ -199,23 +214,24 @@ int main(int argc, char** argv) {
 
     nSubsteps = fi.dtDriver/FAST.get_timestep();
 
-    ntStart = fi.tStart/fi.dtDriver;  //Calculate the first time step
-    ntEnd = tEnd/fi.dtDriver;  //Calculate the last time step
-
-    if (setExpLawWind)
-        FAST.setExpLawWindSpeed(0.0);
-
-    if (FAST.isTimeZero())
-      FAST.solution0();
-
     if ( FAST.isDryRun() ) {
         FAST.end() ;
         MPI_Finalize() ;
         return 0;
     }
 
-    for (int nt = ntStart; nt < ntEnd; nt++) {
+    if (FAST.isTimeZero()) {
+        if (setExpLawWind)
+            FAST.setExpLawWindSpeed(0.0);
 
+        FAST.solution0();
+    }
+
+
+    ntStart = tStart/fi.dtDriver;  //Calculate the first time step
+    ntEnd = tEnd/fi.dtDriver;  //Calculate the last time step
+
+    for (int nt = ntStart; nt < ntEnd; nt++) {
         if (couplingMode == 0) {
             // If running with a CFD solver, sample velocities at the actuator/velocity nodes here
             if (setExpLawWind)
