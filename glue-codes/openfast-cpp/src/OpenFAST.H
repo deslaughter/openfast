@@ -250,40 +250,40 @@ class OpenFAST {
   //! MPI Communicator
   MPI_Comm mpiComm;
   //! The simulation will not run if dryRun is set to true. However, the simulation will read the input files, allocate turbines to processors and prepare to run the individual turbine instances. This flag is useful to test the setup of the simulation before running it.
-  bool dryRun;        // If this is true, class will simply go through allocation and deallocation of turbine data
+  bool dryRun{false};        // If this is true, class will simply go through allocation and deallocation of turbine data
   //! Enable debug outputs if set to true
-  bool debug;   // Write out extra information if this flags is turned on
+  bool debug{false};   // Write out extra information if this flags is turned on
   //! Number of turbines on this MPI rank
-  int nTurbinesProc;
+  int nTurbinesProc{0};
   //! Total number of turbines in the simulation
-  int nTurbinesGlob;
+  int nTurbinesGlob{0};
   //! Start type of the simulation: 'INIT', 'TRUERESTART' or 'RESTARTDRIVERINITFAST'.
-  simStartType simStart;
+  simStartType simStart{fast::init};
   //! Offset between driver and openfast simulation time  - t_driver - t_openfast
-  double driverOpenfastOffset_;
+  double driverOpenfastOffset_{0.0};
   //! Is the time now zero: True/False
-  bool timeZero;
+  bool timeZero{false};
   //! Time step for FAST. All turbines on a given processor should have the same time step.
-  double dtFAST;
+  double dtFAST{-1.0};
   //! Time step for Driver.
-  double dtDriver;
+  double dtDriver{-1.0};
   //! Number of OpenFAST time steps per unit time step of the driver program
-  int nSubsteps_;
+  int nSubsteps_{-1};
   //! Is this the first pass through a time step
-  bool firstPass_;
+  bool firstPass_{true};
   //! Max time of the simulation
-  double tMax;
+  double tMax{-1.0};
   //! Start time of the simulation
-  double tStart;
+  double tStart{-1.0};
 
   //! The current time step number
-  int nt_global;
+  int nt_global{0};
   //! The current nonlinear iteration
-  int nlinIter_;
+  int nlinIter_{0};
   //! The starting time step number
-  int ntStart;
+  int ntStart{0};
   //! Restart files will be written every so many time steps
-  int restartFreq_;
+  int restartFreq_{-1};
   //! Output files will be written every so many time steps
   int outputFreq_{100};
 
@@ -341,7 +341,7 @@ class OpenFAST {
   std::vector<int> turbineProcs;
 
   // Supercontroller stuff
-  bool scStatus;
+    bool scStatus{false};
   std::string scLibFile;
   // Dynamic load stuff copied from 'C++ dlopen mini HOWTO' on tldp.org
   void *scLibHandle ;
@@ -351,29 +351,23 @@ class OpenFAST {
   destroy_sc_t * destroy_SuperController;
   SuperController * sc;
 
-  //! Number of inputs and output to the supercontroller from/to each turbine
-  int numScOutputs;  // # outputs from the supercontroller == # inputs to the controller == NumSC2Ctrl
-  int numScInputs;   // # inputs to the supercontroller == # outputs from the controller == NumCtrl2SC
-  std::vector<double> scOutputsGlob;  // # outputs from the supercontroller for all turbines
-  std::vector<double> scInputsGlob;   // # inputs to the supercontroller for all turbines
-
   // MPI related book keeping for all processors containing turbines
   //! Number of processors in a fastMPIGroup
-  int fastMPIGroupSize;
+  int fastMPIGroupSize{-1};
   //! An MPI group created among all processors that simulate atleast one turbine
   MPI_Group fastMPIGroup;
   //! An MPI communicator for the MPI group created among all processors that simulate atleast one turbine
   MPI_Comm  fastMPIComm;
   //! MPI rank of processor on the fastMPIComm
-  int fastMPIRank;
+  int fastMPIRank{-1};
 
   //! Global MPI group
   MPI_Group worldMPIGroup;
   //! MPI rank of processor on global MPI Comm
-  int worldMPIRank;
+  int worldMPIRank{-1};
 
   //! Error status and Error message to communicate with OpenFAST
-  int ErrStat;
+  int ErrStat{0};
   char ErrMsg[INTERFACE_STRING_LENGTH];  // make sure this is the same size as IntfStrLen in FAST_Library.f90
   static int AbortErrLev;
 
@@ -454,7 +448,6 @@ class OpenFAST {
   //! Get the coordinates of velocity node number 'iNode' for turbine number 'iTurbGlob'. Must be called only from the processor containing the turbine.
   void getVelNodeCoordinates(std::vector<double> & currentCoords, int iNode, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=3);
 
-  void getRelativeVelForceNode(std::vector<double> & vel, int iNode, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=3);
   //! Set the velocity at velocity node 'iNode' for turbine number 'iTurbGlob'. Must be called only from the processor containing the turbine.
   void setVelocity(std::vector<double> & velocity, int iNode, int iTurbGlob, int nSize=3);
   //! Set the velocity at force node 'iNode' for turbine number 'iTurbGlob'. Must be called only from the processor containing the turbine.

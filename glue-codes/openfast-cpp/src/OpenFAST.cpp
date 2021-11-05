@@ -21,7 +21,7 @@ fast::fastInputs::fastInputs():
     dryRun(false),
     debug(false),
     tStart(-1.0),
-    nEveryCheckPoint(-1),
+    restartFreq_(-1),
     tMax(0.0),
     dtDriver(0.0),
     scStatus(false),
@@ -31,32 +31,7 @@ fast::fastInputs::fastInputs():
 }
 
 //Constructor
-fast::OpenFAST::OpenFAST():
-    mpiComm(NULL),
-    dryRun(false),
-    debug(false),
-    nTurbinesProc(0),
-    nTurbinesGlob(0),
-    simStart(fast::init),
-    driverOpenfastOffset_(0.0),
-    timeZero(false),
-    dtFAST(-1.0),
-    dtDriver(-1.0),
-    nSubsteps_(-1),
-    firstPass_(true),
-    tMax(-1.0),
-    tStart(-1.0),
-    nt_global(0),
-    nlinIter_(0),
-    ntStart(0),
-    restartFreq_(-1),
-    scStatus(false),
-    numScInputs(0),
-    numScOutputs(0),
-    fastMPIGroupSize(0),
-    fastMPIRank(-1),
-    worldMPIRank(-1),
-    ErrStat(0)
+fast::OpenFAST::OpenFAST()
 {
 
     sc = new SuperController();
@@ -686,7 +661,7 @@ void fast::OpenFAST::init() {
 
                 } else if(turbineData[iTurb].sType == EXTLOADS) {
 
-                    FAST_BR_CFD_Init(&iTurb, &tMax, turbineData[iTurb].FASTInputFileName.data(), &turbineData[iTurb].TurbID, tmpOutFileRoot, turbineData[iTurb].TurbineBasePos.data(), &AbortErrLev, &dtDriver, &turbineData[iTurb].azBlendMean, &turbineData[iTurb].azBlendDelta, &turbineData[iTurb].velMean, &turbineData[iTurb].windDir, &turbineData[iTurb].zRef, &turbineData[iTurb].shearExp, &turbineData[iTurb].dt, &turbineData[iTurb].numBlades, &extld_i_f_FAST[iTurb], &extld_o_t_FAST[iTurb], &sc->ip_from_FAST[iTurb], &sc->op_to_FAST[iTurb], &ErrStat, ErrMsg);
+                    FAST_BR_CFD_Init(&iTurb, &tMax, turbineData[iTurb].FASTInputFileName.data(), &turbineData[iTurb].TurbID, tmpOutFileRoot, turbineData[iTurb].TurbineBasePos.data(), &AbortErrLev, &dtDriver, &turbineData[iTurb].dt, &turbineData[iTurb].numBlades, &turbineData[iTurb].azBlendMean, &turbineData[iTurb].azBlendDelta, &turbineData[iTurb].velMean, &turbineData[iTurb].windDir, &turbineData[iTurb].zRef, &turbineData[iTurb].shearExp, &extld_i_f_FAST[iTurb], &extld_o_t_FAST[iTurb], &sc->ip_from_FAST[iTurb], &sc->op_to_FAST[iTurb], &ErrStat, ErrMsg);
                     checkError(ErrStat, ErrMsg);
 
                     turbineData[iTurb].inflowType = 0;
@@ -1629,13 +1604,7 @@ double fast::OpenFAST::getChord(int iNode, int iTurbGlob) {
 
 }
 
-
-void fast::OpenFAST::getRelativeVelForceNode(std::vector<double> & vel, int iNode, int iTurbGlob, fast::timeStep t, int nSize) {
-
-    // Do nothing here
-}
-
-void fast::OpenFAST::setVelocity(std::vector<double> & currentVelocity, int iNode, int iTurbGlob) {
+void fast::OpenFAST::setVelocity(std::vector<double> & currentVelocity, int iNode, int iTurbGlob, int nSize) {
     assert(nSize==3);
     // Set velocity at current node of current turbine -
     int iTurbLoc = get_localTurbNo(iTurbGlob);
@@ -2661,17 +2630,19 @@ void fast::OpenFAST::writeOutputFile(int iTurbLoc, int n_t_global) {
 
     }
 
-    std::vector<size_t> start_dim{n_tsteps, 0};
-    std::vector<size_t> count_dim{1,3};
-    ierr = nc_put_vara_double(ncid, ncOutVarIDs_["hub_disp"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].hub_def[0]);
-    ierr = nc_put_vara_double(ncid, ncOutVarIDs_["hub_orient"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].hub_def[3]);
-    ierr = nc_put_vara_double(ncid, ncOutVarIDs_["hub_vel"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].hub_vel[0]);
-    ierr = nc_put_vara_double(ncid, ncOutVarIDs_["hub_rotvel"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].hub_vel[3]);
+    {
+        std::vector<size_t> start_dim{n_tsteps, 0};
+        std::vector<size_t> count_dim{1,3};
+        ierr = nc_put_vara_double(ncid, ncOutVarIDs_["hub_disp"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].hub_def[0]);
+        ierr = nc_put_vara_double(ncid, ncOutVarIDs_["hub_orient"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].hub_def[3]);
+        ierr = nc_put_vara_double(ncid, ncOutVarIDs_["hub_vel"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].hub_vel[0]);
+        ierr = nc_put_vara_double(ncid, ncOutVarIDs_["hub_rotvel"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].hub_vel[3]);
 
-    ierr = nc_put_vara_double(ncid, ncOutVarIDs_["nac_disp"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].nac_def[0]);
-    ierr = nc_put_vara_double(ncid, ncOutVarIDs_["nac_orient"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].nac_def[3]);
-    ierr = nc_put_vara_double(ncid, ncOutVarIDs_["nac_vel"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].nac_vel[0]);
-    ierr = nc_put_vara_double(ncid, ncOutVarIDs_["nac_rotvel"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].nac_vel[3]);
+        ierr = nc_put_vara_double(ncid, ncOutVarIDs_["nac_disp"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].nac_def[0]);
+        ierr = nc_put_vara_double(ncid, ncOutVarIDs_["nac_orient"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].nac_def[3]);
+        ierr = nc_put_vara_double(ncid, ncOutVarIDs_["nac_vel"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].nac_vel[0]);
+        ierr = nc_put_vara_double(ncid, ncOutVarIDs_["nac_rotvel"], start_dim.data(), count_dim.data(), &brFSIData[iTurbLoc][3].nac_vel[3]);
+    }
 
     }
 

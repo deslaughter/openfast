@@ -82,6 +82,7 @@
     float * momentx ;     int momentx_Len ;
     float * momenty ;     int momenty_Len ;
     float * momentz ;     int momentz_Len ;
+    float * forceRHloc ;     int forceRHloc_Len ;
     float * forceNodesChord ;     int forceNodesChord_Len ;
   } ExtInfw_InputType_t ;
   typedef struct ExtInfw_OutputType {

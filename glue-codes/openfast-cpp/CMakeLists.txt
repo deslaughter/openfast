@@ -25,7 +25,7 @@ find_package(MPI REQUIRED)
 find_package(LibXml2 REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(NetCDF REQUIRED COMPONENTS C)
-find_package(YAMLCPP REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 include_directories(${YAML_INCLUDES})
 include_directories(${NetCDF_INCLUDE_DIRS})

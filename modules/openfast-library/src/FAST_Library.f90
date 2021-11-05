@@ -453,7 +453,7 @@ end subroutine FAST_Restart
 
 !==================================================================================================================================
 subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, OutFileRoot_c, TurbPosn, AbortErrLev_c, dtDriver_c, dt_c, NumBl_c, &
-     az_blend_mean_c, az_blend_delta_c, vel_mean_c, wind_dir_c, z_ref_c, shear_exp_c, dt_c, NumBl_c, &
+     az_blend_mean_c, az_blend_delta_c, vel_mean_c, wind_dir_c, z_ref_c, shear_exp_c, &
      ExtLd_Input_from_FAST, ExtLd_Output_to_FAST, SC_DX_Input_from_FAST, SC_DX_Output_to_FAST, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_BR_CFD_Init')
 !DEC$ ATTRIBUTES DLLEXPORT::FAST_BR_CFD_Init
    IMPLICIT NONE

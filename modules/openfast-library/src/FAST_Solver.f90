@@ -52,7 +52,7 @@ CONTAINS
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the inputs required for BD--using the Option 2 solve method; currently the only inputs solved in this routine
 !! are the blade distributed loads from AD15; other inputs are solved in option 1.
-SUBROUTINE BD_InputSolve( p_FAST, BD, y_AD, u_AD, y_ExtLd, u_ExtLd, p_ExtLd, y_ED, y_SrvD, u_SrvD, MeshMapData, ErrStat, ErrMsg )
+SUBROUTINE BD_InputSolve( p_FAST, BD, y_AD, u_AD, m_ExtLd, y_ExtLd, u_ExtLd, p_ExtLd, y_ED, y_SrvD, u_SrvD, MeshMapData, ErrStat, ErrMsg )
 !..................................................................................................................................
 
    TYPE(FAST_ParameterType),       INTENT(IN   )  :: p_FAST                   !< Glue-code simulation parameters
@@ -215,7 +215,7 @@ END SUBROUTINE BD_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the inputs required for ED--using the Option 2 solve method; currently the only input not solved in this routine
 !! are the fields on PlatformPtMesh and HubPtLoad,  which are solved in option 1.
-SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_ExtLd, y_SrvD, u_AD, m_ExtLd, u_ExtLd, p_ExtLd, u_SrvD, MeshMapData, ErrStat, ErrMsg )
+SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, u_AD, y_ExtLd, m_ExtLd, u_ExtLd, p_ExtLd, y_SrvD, u_SrvD, MeshMapData, ErrStat, ErrMsg )
 !..................................................................................................................................
 
    TYPE(FAST_ParameterType),       INTENT(IN   )  :: p_FAST                   !< Glue-code simulation parameters
@@ -280,7 +280,7 @@ SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_ExtLd, y_S
       ELSE IF (p_FAST%CompAero == Module_ExtLd ) THEN
 
          DO K = 1,SIZE(u_ED%BladePtLoads,1) ! Loop through all blades (p_ED%NumBl)
-            CALL Transfer_Line2_to_Point( y_AD%BladeLoad(k), y_ExtLd%BladeLoad(k), MeshMapData%AD_L_2_ExtLd_B(k), ErrStat2, ErrMsg2, u_AD%BladeMotion(k), u_ExtLd%BladeMotion(k) )
+            CALL Transfer_Line2_to_Point( y_AD%rotors(1)%BladeLoad(k), y_ExtLd%BladeLoad(k), MeshMapData%AD_L_2_ExtLd_B(k), ErrStat2, ErrMsg2, u_AD%rotors(1)%BladeMotion(k), u_ExtLd%BladeMotion(k) )
             CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
          END DO
 
@@ -336,7 +336,7 @@ SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_ExtLd, y_S
    ELSE IF (p_FAST%CompAero == Module_ExtLd ) THEN
 
       IF ( y_ExtLd%TowerLoad%Committed ) THEN ! NOTE - not only is TowerLn2Mesh not a Sbiling of TowerPtLoads, it is a line 2 mesh with different number of nodes
-         call Transfer_Line2_to_point( y_AD%TowerLoad, y_ExtLd%TowerLoad, MeshMapData%AD_L_2_ExtLd_T, ErrStat2, ErrMsg2, u_AD%TowerMotion, u_ExtLd%TowerMotion )
+         call Transfer_Line2_to_point( y_AD%rotors(1)%TowerLoad, y_ExtLd%TowerLoad, MeshMapData%AD_L_2_ExtLd_T, ErrStat2, ErrMsg2, u_AD%rotors(1)%TowerMotion, u_ExtLd%TowerMotion )
             call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
          call ExtLd_ConvertOpDataForOpenFAST(y_ExtLd, u_ExtLd, m_ExtLd, p_ExtLd, ErrStat2, ErrMsg2)
@@ -727,29 +727,29 @@ SUBROUTINE AD_InputSolve_IfW_ExtLoads( p_FAST, u_AD, p_ExtLd, ErrStat, ErrMsg )
   integer(IntKi)                         :: Nnodes     !< Number of nodes
 
   pi = acos(-1.0)
-  NumBl  = size(u_AD%InflowOnBlade,3)
-  Nnodes = size(u_AD%InflowOnBlade,2)
+  NumBl  = size(u_AD%rotors(1)%InflowOnBlade,3)
+  Nnodes = size(u_AD%rotors(1)%InflowOnBlade,2)
 
   do k=1,NumBl
      do j=1,Nnodes
         !Get position first
-        z = u_AD%BladeMotion(k)%Position(3,j) + u_AD%BladeMotion(k)%TranslationDisp(3,j)
+        z = u_AD%rotors(1)%BladeMotion(k)%Position(3,j) + u_AD%rotors(1)%BladeMotion(k)%TranslationDisp(3,j)
         mean_vel = p_ExtLd%vel_mean * ( (z/p_ExtLd%z_ref) ** p_ExtLd%shear_exp)
-        u_AD%InflowOnBlade(1,j,k) = -mean_vel * sin(p_ExtLd%wind_dir * pi / 180.0)
-        u_AD%InflowOnBlade(2,j,k) = -mean_vel * cos(p_ExtLd%wind_dir * pi / 180.0)
-        u_AD%InflowOnBlade(3,j,k) = 0.0
+        u_AD%rotors(1)%InflowOnBlade(1,j,k) = -mean_vel * sin(p_ExtLd%wind_dir * pi / 180.0)
+        u_AD%rotors(1)%InflowOnBlade(2,j,k) = -mean_vel * cos(p_ExtLd%wind_dir * pi / 180.0)
+        u_AD%rotors(1)%InflowOnBlade(3,j,k) = 0.0
      end do
   end do
 
-  if ( allocated(u_AD%InflowOnTower) ) then
-     Nnodes = size(u_AD%InflowOnTower,2)
+  if ( allocated(u_AD%rotors(1)%InflowOnTower) ) then
+     Nnodes = size(u_AD%rotors(1)%InflowOnTower,2)
      do j=1,Nnodes
         !Get position first
-        z = u_AD%TowerMotion%Position(3,j) + u_AD%TowerMotion%TranslationDisp(3,j)
+        z = u_AD%rotors(1)%TowerMotion%Position(3,j) + u_AD%rotors(1)%TowerMotion%TranslationDisp(3,j)
         mean_vel = p_ExtLd%vel_mean * ( (z/p_ExtLd%z_ref) ** p_ExtLd%shear_exp)
-        u_AD%InflowOnTower(1,j) = -mean_vel * sin(p_ExtLd%wind_dir * pi / 180.0)
-        u_AD%InflowOnTower(2,j) = -mean_vel * cos(p_ExtLd%wind_dir * pi / 180.0)
-        u_AD%InflowOnTower(3,j) = 0.0
+        u_AD%rotors(1)%InflowOnTower(1,j) = -mean_vel * sin(p_ExtLd%wind_dir * pi / 180.0)
+        u_AD%rotors(1)%InflowOnTower(2,j) = -mean_vel * cos(p_ExtLd%wind_dir * pi / 180.0)
+        u_AD%rotors(1)%InflowOnTower(3,j) = 0.0
      end do
   end if
 
@@ -4856,7 +4856,7 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, ExtLd, HD, SD, ExtPtfm, 
 
       ! Create mapping for AD line mesh to ExtLoads point mesh
       do k=1,NumBl
-         call MeshMapCreate( AD%y%BladeLoad(k), ExtLd%y%BladeLoadAD(k), MeshMapData%AD_L_2_ExtLd_B(k), ErrStat2, ErrMsg2)
+         call MeshMapCreate( AD%y%rotors(1)%BladeLoad(k), ExtLd%y%BladeLoadAD(k), MeshMapData%AD_L_2_ExtLd_B(k), ErrStat2, ErrMsg2)
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':AD_L_2_ExtLd_B('//TRIM(Num2LStr(K))//')' )
       end do
 
@@ -4928,9 +4928,9 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, ExtLd, HD, SD, ExtPtfm, 
             CALL MeshMapCreate( ExtLd%y%TowerLoad, ED%Input(1)%TowerPtLoads,  MeshMapData%ExtLd_P_2_ED_P_T, ErrStat2, ErrMsg2 )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ExtLd_P_2_ED_P_T' )
 
-            IF ( ( AD%Input(1)%TowerMotion%Committed ) .and. ( AD%y%TowerLoad%Committed ) ) THEN
+            IF ( ( AD%Input(1)%rotors(1)%TowerMotion%Committed ) .and. ( AD%y%rotors(1)%TowerLoad%Committed ) ) THEN
                !Aerodyn to External loads
-               CALL MeshMapCreate( AD%y%TowerLoad, ExtLd%y%TowerLoadAD,  MeshMapData%AD_L_2_ExtLd_T, ErrStat2, ErrMsg2 )
+               CALL MeshMapCreate( AD%y%rotors(1)%TowerLoad, ExtLd%y%TowerLoadAD,  MeshMapData%AD_L_2_ExtLd_T, ErrStat2, ErrMsg2 )
                CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':AD_L_2_ExLd_T' )
             END IF
 
@@ -6000,16 +6000,16 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
 
 
    !bjj: note ED%Input(1) may be a sibling mesh of output, but ED%u is not (routine may update something that needs to be shared between siblings)
-   CALL ED_InputSolve( p_FAST, ED%Input(1), ED%y, AD14%p, AD14%y, AD%y, ExtLd%y, SrvD%y, AD%Input(1), ExtLd%u, ExtLd%p, SrvD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
+   CALL ED_InputSolve( p_FAST, ED%Input(1), ED%y, AD14%p, AD14%y, AD%y, AD%Input(1), ExtLd%y, ExtLd%m, ExtLd%u, ExtLd%p, SrvD%y, SrvD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-   CALL BD_InputSolve( p_FAST, BD, AD%y, AD%Input(1), ExtLd%y, ExtLd%u, ExtLd%p, ED%y, SrvD%y, SrvD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
+   CALL BD_InputSolve( p_FAST, BD, AD%y, AD%Input(1), ExtLd%m, ExtLd%y, ExtLd%u, ExtLd%p, ED%y, SrvD%y, SrvD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
 END SUBROUTINE SolveOption2
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routines advances the states of each module
-SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, ExtInfw, HD, SD, ExtPtfm, &
+SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, SrvD, AD14, AD, ExtLd, IfW, ExtInfw, HD, SD, ExtPtfm, &
                                MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat, ErrMsg, WriteThisStep )
 
    REAL(DbKi),               INTENT(IN   ) :: t_initial           !< initial simulation time (almost always 0)

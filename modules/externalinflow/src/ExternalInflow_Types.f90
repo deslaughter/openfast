@@ -163,6 +163,8 @@ IMPLICIT NONE
     INTEGER(C_int) :: momenty_Len = 0 
     TYPE(C_ptr) :: momentz = C_NULL_PTR 
     INTEGER(C_int) :: momentz_Len = 0 
+    TYPE(C_ptr) :: forceRHloc = C_NULL_PTR 
+    INTEGER(C_int) :: forceRHloc_Len = 0 
     TYPE(C_ptr) :: forceNodesChord = C_NULL_PTR 
     INTEGER(C_int) :: forceNodesChord_Len = 0 
   END TYPE ExtInfw_InputType_C
@@ -187,6 +189,7 @@ IMPLICIT NONE
     REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: momentx => NULL()      !< normalized x moment at actuator force nodes [Nm/kg/m^3]
     REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: momenty => NULL()      !< normalized y moment at actuator force nodes [Nm/kg/m^3]
     REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: momentz => NULL()      !< normalized z moment at actuator force nodes [Nm/kg/m^3]
+    REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: forceRHloc => NULL()      !< Radial or height location at force nodes [m]
     REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: forceNodesChord => NULL()      !< chord distribution at the actuator force nodes [m]
   END TYPE ExtInfw_InputType
 ! =======================
@@ -3025,6 +3028,21 @@ IF (ASSOCIATED(SrcInputData%momentz)) THEN
   END IF
     DstInputData%momentz = SrcInputData%momentz
 ENDIF
+IF (ASSOCIATED(SrcInputData%forceRHloc)) THEN
+  i1_l = LBOUND(SrcInputData%forceRHloc,1)
+  i1_u = UBOUND(SrcInputData%forceRHloc,1)
+  IF (.NOT. ASSOCIATED(DstInputData%forceRHloc)) THEN 
+    ALLOCATE(DstInputData%forceRHloc(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%forceRHloc.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+    DstInputData%c_obj%forceRHloc_Len = SIZE(DstInputData%forceRHloc)
+    IF (DstInputData%c_obj%forceRHloc_Len > 0) &
+      DstInputData%c_obj%forceRHloc = C_LOC( DstInputData%forceRHloc(i1_l) ) 
+  END IF
+    DstInputData%forceRHloc = SrcInputData%forceRHloc
+ENDIF
 IF (ASSOCIATED(SrcInputData%forceNodesChord)) THEN
   i1_l = LBOUND(SrcInputData%forceNodesChord,1)
   i1_u = UBOUND(SrcInputData%forceNodesChord,1)
@@ -3165,6 +3183,12 @@ IF (ASSOCIATED(InputData%momentz)) THEN
   InputData%C_obj%momentz = C_NULL_PTR
   InputData%C_obj%momentz_Len = 0
 ENDIF
+IF (ASSOCIATED(InputData%forceRHloc)) THEN
+  DEALLOCATE(InputData%forceRHloc)
+  InputData%forceRHloc => NULL()
+  InputData%C_obj%forceRHloc = C_NULL_PTR
+  InputData%C_obj%forceRHloc_Len = 0
+ENDIF
 IF (ASSOCIATED(InputData%forceNodesChord)) THEN
   DEALLOCATE(InputData%forceNodesChord)
   InputData%forceNodesChord => NULL()
@@ -3302,6 +3326,11 @@ ENDIF
   IF ( ASSOCIATED(InData%momentz) ) THEN
     Int_BufSz   = Int_BufSz   + 2*1  ! momentz upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%momentz)  ! momentz
+  END IF
+  Int_BufSz   = Int_BufSz   + 1     ! forceRHloc allocated yes/no
+  IF ( ASSOCIATED(InData%forceRHloc) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*1  ! forceRHloc upper/lower bounds for each dimension
+      Re_BufSz   = Re_BufSz   + SIZE(InData%forceRHloc)  ! forceRHloc
   END IF
   Int_BufSz   = Int_BufSz   + 1     ! forceNodesChord allocated yes/no
   IF ( ASSOCIATED(InData%forceNodesChord) ) THEN
@@ -3619,6 +3648,21 @@ ENDIF
 
       DO i1 = LBOUND(InData%momentz,1), UBOUND(InData%momentz,1)
         ReKiBuf(Re_Xferred) = InData%momentz(i1)
+        Re_Xferred = Re_Xferred + 1
+      END DO
+  END IF
+  IF ( .NOT. ASSOCIATED(InData%forceRHloc) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%forceRHloc,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%forceRHloc,1)
+    Int_Xferred = Int_Xferred + 2
+
+      DO i1 = LBOUND(InData%forceRHloc,1), UBOUND(InData%forceRHloc,1)
+        ReKiBuf(Re_Xferred) = InData%forceRHloc(i1)
         Re_Xferred = Re_Xferred + 1
       END DO
   END IF
@@ -4065,6 +4109,27 @@ ENDIF
         Re_Xferred = Re_Xferred + 1
       END DO
   END IF
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! forceRHloc not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ASSOCIATED(OutData%forceRHloc)) DEALLOCATE(OutData%forceRHloc)
+    ALLOCATE(OutData%forceRHloc(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%forceRHloc.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    OutData%c_obj%forceRHloc_Len = SIZE(OutData%forceRHloc)
+    IF (OutData%c_obj%forceRHloc_Len > 0) &
+       OutData%c_obj%forceRHloc = C_LOC( OutData%forceRHloc(i1_l) ) 
+      DO i1 = LBOUND(OutData%forceRHloc,1), UBOUND(OutData%forceRHloc,1)
+        OutData%forceRHloc(i1) = REAL(ReKiBuf(Re_Xferred), C_FLOAT)
+        Re_Xferred = Re_Xferred + 1
+      END DO
+  END IF
   IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! forceNodesChord not allocated
     Int_Xferred = Int_Xferred + 1
   ELSE
@@ -4272,6 +4337,15 @@ ENDIF
           NULLIFY( InputData%momentz )
        ELSE
           CALL C_F_POINTER(InputData%C_obj%momentz, InputData%momentz, (/InputData%C_obj%momentz_Len/))
+       END IF
+    END IF
+
+    ! -- forceRHloc Input Data fields
+    IF ( .NOT. SkipPointers_local ) THEN
+       IF ( .NOT. C_ASSOCIATED( InputData%C_obj%forceRHloc ) ) THEN
+          NULLIFY( InputData%forceRHloc )
+       ELSE
+          CALL C_F_POINTER(InputData%C_obj%forceRHloc, InputData%forceRHloc, (/InputData%C_obj%forceRHloc_Len/))
        END IF
     END IF
 
@@ -4526,6 +4600,18 @@ ENDIF
           InputData%c_obj%momentz_Len = SIZE(InputData%momentz)
           IF (InputData%c_obj%momentz_Len > 0) &
              InputData%c_obj%momentz = C_LOC( InputData%momentz( LBOUND(InputData%momentz,1) ) ) 
+       END IF
+    END IF
+
+    ! -- forceRHloc Input Data fields
+    IF ( .NOT. SkipPointers_local ) THEN
+       IF ( .NOT. ASSOCIATED(InputData%forceRHloc)) THEN 
+          InputData%c_obj%forceRHloc_Len = 0
+          InputData%c_obj%forceRHloc = C_NULL_PTR
+       ELSE
+          InputData%c_obj%forceRHloc_Len = SIZE(InputData%forceRHloc)
+          IF (InputData%c_obj%forceRHloc_Len > 0) &
+             InputData%c_obj%forceRHloc = C_LOC( InputData%forceRHloc( LBOUND(InputData%forceRHloc,1) ) ) 
        END IF
     END IF
 
@@ -5210,6 +5296,12 @@ IF (ASSOCIATED(u_out%momentz) .AND. ASSOCIATED(u1%momentz)) THEN
     u_out%momentz(i1) = u1%momentz(i1) + b * ScaleFactor
   END DO
 END IF ! check if allocated
+IF (ASSOCIATED(u_out%forceRHloc) .AND. ASSOCIATED(u1%forceRHloc)) THEN
+  DO i1 = LBOUND(u_out%forceRHloc,1),UBOUND(u_out%forceRHloc,1)
+    b = -(u1%forceRHloc(i1) - u2%forceRHloc(i1))
+    u_out%forceRHloc(i1) = u1%forceRHloc(i1) + b * ScaleFactor
+  END DO
+END IF ! check if allocated
 IF (ASSOCIATED(u_out%forceNodesChord) .AND. ASSOCIATED(u1%forceNodesChord)) THEN
   DO i1 = LBOUND(u_out%forceNodesChord,1),UBOUND(u_out%forceNodesChord,1)
     b = -(u1%forceNodesChord(i1) - u2%forceNodesChord(i1))
@@ -5404,6 +5496,13 @@ IF (ASSOCIATED(u_out%momentz) .AND. ASSOCIATED(u1%momentz)) THEN
     b = (t(3)**2*(u1%momentz(i1) - u2%momentz(i1)) + t(2)**2*(-u1%momentz(i1) + u3%momentz(i1)))* scaleFactor
     c = ( (t(2)-t(3))*u1%momentz(i1) + t(3)*u2%momentz(i1) - t(2)*u3%momentz(i1) ) * scaleFactor
     u_out%momentz(i1) = u1%momentz(i1) + b  + c * t_out
+  END DO
+END IF ! check if allocated
+IF (ASSOCIATED(u_out%forceRHloc) .AND. ASSOCIATED(u1%forceRHloc)) THEN
+  DO i1 = LBOUND(u_out%forceRHloc,1),UBOUND(u_out%forceRHloc,1)
+    b = (t(3)**2*(u1%forceRHloc(i1) - u2%forceRHloc(i1)) + t(2)**2*(-u1%forceRHloc(i1) + u3%forceRHloc(i1)))* scaleFactor
+    c = ( (t(2)-t(3))*u1%forceRHloc(i1) + t(3)*u2%forceRHloc(i1) - t(2)*u3%forceRHloc(i1) ) * scaleFactor
+    u_out%forceRHloc(i1) = u1%forceRHloc(i1) + b  + c * t_out
   END DO
 END IF ! check if allocated
 IF (ASSOCIATED(u_out%forceNodesChord) .AND. ASSOCIATED(u1%forceNodesChord)) THEN
