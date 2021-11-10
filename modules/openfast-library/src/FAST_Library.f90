@@ -506,6 +506,7 @@ subroutine FAST_BR_CFD_Init(iTurb, TMax, InputFileName_c, TurbID, OutFileRoot_c,
    ExternInitData%TurbineID = TurbID
    ExternInitData%TurbinePos = TurbPosn
    ExternInitData%SensorType = SensorType_None
+   ExternInitData%NumSC2CtrlGlob = 0
    ExternInitData%NumCtrl2SC = 0
    ExternInitData%NumSC2Ctrl = 0
    ExternInitData%DTdriver = dtDriver_c
