@@ -1756,6 +1756,11 @@ void fast::OpenFAST::interpolateVel_ForceToVelNodes() {
 
 void fast::OpenFAST::computeTorqueThrust(int iTurbGlob, double* torque, double* thrust, int nSize) {
     assert(nSize==3);
+
+    int iTurbLoc = get_localTurbNo(iTurbGlob) ;
+    if (turbineData[iTurbLoc].sType != EXTINFLOW)
+        return;
+
     //Compute the torque and thrust based on the forces at the actuator nodes
     std::vector<double> relLoc(3,0.0);
     std::vector<double> rPerpShft(3);
@@ -1764,8 +1769,7 @@ void fast::OpenFAST::computeTorqueThrust(int iTurbGlob, double* torque, double* 
 
     std::vector<double> hubShftVec(3);
     getHubShftDir(hubShftVec, iTurbGlob, fast::STATE_NP1);
-
-    int iTurbLoc = get_localTurbNo(iTurbGlob) ;
+    
     int nfpts = get_numForcePtsBlade(iTurbLoc);
     for (int k=0; k < get_numBladesLoc(iTurbLoc); k++) {
         for (int j=0; j < nfpts; j++) {
@@ -2975,13 +2979,29 @@ void fast::OpenFAST::setUniformXBladeForces() {
         std::vector<double> fsiForceTower(6*nPtsTwr,0.0);
         setTowerForces(fsiForceTower, iTurbGlob, fast::STATE_NP1);
 
-        int nBlades = get_numBladesLoc(iTurb);
-        int nTotPtsBlade = 0;
+        size_t nBlades = get_numBladesLoc(iTurb);
+        size_t nTotPtsBlade = 0;
         for(int iBlade=0; iBlade < nBlades; iBlade++)
-            nTotPtsBlade += turbineData[iTurb].nBRfsiPtsBlade[iBlade];
+            nTotPtsBlade +=  turbineData[iTurb].nBRfsiPtsBlade[iBlade];
         std::vector<double> fsiForceBlade(6*nTotPtsBlade, 0.0);
+        std::vector<double> dr(nTotPtsBlade, 0.0);
+
+        size_t iNode=0;
+        for(int iBlade=0; iBlade < nBlades; iBlade++) {
+            int nBldPts = turbineData[iTurb].nBRfsiPtsBlade[iBlade];
+            dr[iNode] = 0.5*(brFSIData[iTurb][3].bld_rloc[iNode+1] - brFSIData[iTurb][3].bld_rloc[iNode]);
+            iNode++;
+            for(int i=1; i < nBldPts-1; i++) {
+                dr[iNode] = 0.5*(brFSIData[iTurb][3].bld_rloc[iNode+1] - brFSIData[iTurb][3].bld_rloc[iNode-1]);
+                iNode++;
+            }
+            dr[iNode] = 0.5*(brFSIData[iTurb][3].bld_rloc[iNode] - brFSIData[iTurb][3].bld_rloc[iNode-1]);
+            iNode++;
+        }
+
         for(int i=0; i < nTotPtsBlade; i++)
-            fsiForceBlade[i*6] = 5e-4; // X component of force
+            fsiForceBlade[i*6] = 5e-4 * dr[i]; // X component of force
+
         setBladeForces(fsiForceBlade, iTurbGlob, fast::STATE_NP1);
 
     }
