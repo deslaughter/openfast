@@ -461,9 +461,14 @@ subroutine Init_u( u, p, InitInp, errStat, errMsg )
          call SetErrStat( ErrID_Fatal, 'Error allocating u%BladeMotion array.', ErrStat, ErrMsg, RoutineName )
          return
       end if
-      
-      do k=1,p%NumBlds
 
+      allocate( u%BladePitch(p%NumBlds), STAT = ErrStat2 )
+      if (ErrStat2 /= 0) then
+         call SetErrStat( ErrID_Fatal, 'Error allocating u%BladePitch array.', ErrStat, ErrMsg, RoutineName )
+         return
+      end if
+
+      do k=1,p%NumBlds
 
          call MeshCreate ( BlankMesh = u%BladeRootMotion(k)     &
               ,IOS       = COMPONENT_INPUT &
@@ -626,11 +631,14 @@ subroutine Init_u( u, p, InitInp, errStat, errMsg )
    CALL AllocPAry( u%DX_u%bldRloc, p%nTotBldNds, 'bldRloc', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    CALL AllocPAry( u%DX_u%twrdia, p%NumTwrNds, 'twrDia', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    CALL AllocPAry( u%DX_u%twrHloc, p%NumTwrNds, 'twrHloc', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   CALL AllocPAry( u%DX_u%bldPitch, p%NumBlds, 'bldPitch', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
    ! make sure the C versions are synced with these arrays
    u%DX_u%c_obj%bldChord_Len = p%nTotBldNds; u%DX_u%c_obj%bldChord = C_LOC( u%DX_u%bldChord(1) )
    u%DX_u%c_obj%bldRloc_Len = p%nTotBldNds; u%DX_u%c_obj%bldRloc = C_LOC( u%DX_u%bldRloc(1) )
    u%DX_u%c_obj%twrDia_Len = p%NumTwrNds; u%DX_u%c_obj%twrDia = C_LOC( u%DX_u%twrDia(1) )
    u%DX_u%c_obj%twrHloc_Len = p%NumTwrNds; u%DX_u%c_obj%twrHloc = C_LOC( u%DX_u%twrHloc(1) )
+   u%DX_u%c_obj%bldPitch_Len = p%NumBlds; u%DX_u%c_obj%bldPitch = C_LOC( u%DX_u%bldPitch(1) )
 
    jTot = 1
    do k=1,p%NumBlds
@@ -749,6 +757,8 @@ subroutine ExtLd_ConvertInpDataForExtProg(u, p, errStat, errMsg )
       u%DX_u%bldRootDef( (k-1)*12+10:(k-1)*12+12 ) = u%BladeRootMotion(k)%RotationVel(:,1)
    end do
    
+   u%DX_u%bldPitch(:) = u%BladePitch
+
 end subroutine ExtLd_ConvertInpDataForExtProg
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine converts the data in the simple array format in the output data type into OpenFAST mesh format

@@ -934,6 +934,7 @@ subroutine SetExtLoads_pointers(iTurb, ExtLd_iFromOF, ExtLd_oToOF)
    TYPE(ExtLdDX_InputType_C), INTENT(INOUT) :: ExtLd_iFromOF
    TYPE(ExtLdDX_OutputType_C),INTENT(INOUT) :: ExtLd_oToOF
 
+   ExtLd_iFromOF%bldPitch_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldPitch_Len; ExtLd_iFromOF%bldPitch = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldPitch
    ExtLd_iFromOF%twrHloc_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrHloc_Len; ExtLd_iFromOF%twrHloc = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrHloc
    ExtLd_iFromOF%twrDia_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrDia_Len; ExtLd_iFromOF%twrDia = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrDia
    ExtLd_iFromOF%twrRefPos_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrRefPos_Len; ExtLd_iFromOF%twrRefPos = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%twrRefPos

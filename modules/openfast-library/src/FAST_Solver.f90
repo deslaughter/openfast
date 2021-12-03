@@ -1107,6 +1107,7 @@ SUBROUTINE ExtLd_InputSolve_NoIfW( p_FAST, u_ExtLd, p_ExtLd, y_ED, BD, MeshMapDa
    END IF
 
    u_ExtLd%az = y_ED%LSSTipPxa
+   u_ExtLd%BladePitch(:) = y_ED%BlPitch
 
    call ExtLd_ConvertInpDataForExtProg(u_ExtLd, p_ExtLd, ErrStat2, ErrMsg2 )
    CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)

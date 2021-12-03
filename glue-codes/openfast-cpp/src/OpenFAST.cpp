@@ -897,6 +897,10 @@ void fast::OpenFAST::set_state_from_state(fast::timeStep fromState, fast::timeSt
                 brFSIData[iTurb][toState].nac_vel[j] = brFSIData[iTurb][fromState].nac_vel[j];
 
             }
+            for (int j=0; j < numBlades; j++) {
+                brFSIData[iTurb][toState].bld_pitch[j] = brFSIData[iTurb][fromState].bld_pitch[j];
+
+            }
         }
     }
 
@@ -2008,6 +2012,8 @@ void fast::OpenFAST::allocateMemory_postInit(int iTurbLoc) {
             brFSIData[iTurbLoc][k].nac_ref_pos.resize(6);
             brFSIData[iTurbLoc][k].nac_def.resize(6);
             brFSIData[iTurbLoc][k].nac_vel.resize(6);
+            brFSIData[iTurbLoc][k].hub_ref_pos.resize(6);
+            brFSIData[iTurbLoc][k].bld_pitch.resize(turbineData[iTurbLoc].numBlades);
         }
     }
 
@@ -2783,6 +2789,7 @@ void fast::OpenFAST::get_ref_positions_from_openfast(int iTurb) {
                 brFSIData[iTurb][fast::STATE_NP1].bld_rloc[iRunTot] = extld_i_f_FAST[iTurb].bldRloc[iRunTot];
                 iRunTot++;
             }
+            brFSIData[iTurb][fast::STATE_NP1].bld_pitch[i] = extld_i_f_FAST[iTurb].bldPitch[i] * 180/M_PI;
         }
 
         int nPtsTwr = turbineData[iTurb].nBRfsiPtsTwr;
@@ -2869,6 +2876,15 @@ void fast::OpenFAST::getBladeDisplacements(double* bldDefl, double* bldVel, int 
             iRunTot++;
         }
     }
+
+}
+
+void fast::OpenFAST::getBladePitch(double* bldPitch, int iTurbGlob, int nSize) {
+
+    assert(nSize==3);
+    int iTurbLoc = get_localTurbNo(iTurbGlob);
+    for (int j=0; j < nSize; j++)
+        bldPitch[j] = brFSIData[iTurbLoc][fast::STATE_NP1].bld_pitch[j];
 
 }
 

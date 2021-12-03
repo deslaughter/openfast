@@ -71,6 +71,8 @@ IMPLICIT NONE
     INTEGER(C_int) :: twrDia_Len = 0 
     TYPE(C_ptr) :: twrHloc = C_NULL_PTR 
     INTEGER(C_int) :: twrHloc_Len = 0 
+    TYPE(C_ptr) :: bldPitch = C_NULL_PTR 
+    INTEGER(C_int) :: bldPitch_Len = 0 
   END TYPE ExtLdDX_InputType_C
   TYPE, PUBLIC :: ExtLdDX_InputType
     TYPE( ExtLdDX_InputType_C ) :: C_obj
@@ -91,6 +93,7 @@ IMPLICIT NONE
     REAL(KIND=C_DOUBLE) , DIMENSION(:), POINTER  :: bldRloc => NULL()      !< Radial location along the blade [m]
     REAL(KIND=C_DOUBLE) , DIMENSION(:), POINTER  :: twrDia => NULL()      !< Tower diameter [m]
     REAL(KIND=C_DOUBLE) , DIMENSION(:), POINTER  :: twrHloc => NULL()      !< Height location along the tower [m]
+    REAL(KIND=C_DOUBLE) , DIMENSION(:), POINTER  :: bldPitch => NULL()      !< Pitch angle of blade [-]
   END TYPE ExtLdDX_InputType
 ! =======================
 ! =========  ExtLdDX_OutputType_C  =======
@@ -378,6 +381,21 @@ IF (ASSOCIATED(SrcInputData%twrHloc)) THEN
   END IF
     DstInputData%twrHloc = SrcInputData%twrHloc
 ENDIF
+IF (ASSOCIATED(SrcInputData%bldPitch)) THEN
+  i1_l = LBOUND(SrcInputData%bldPitch,1)
+  i1_u = UBOUND(SrcInputData%bldPitch,1)
+  IF (.NOT. ASSOCIATED(DstInputData%bldPitch)) THEN 
+    ALLOCATE(DstInputData%bldPitch(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%bldPitch.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+    DstInputData%c_obj%bldPitch_Len = SIZE(DstInputData%bldPitch)
+    IF (DstInputData%c_obj%bldPitch_Len > 0) &
+      DstInputData%c_obj%bldPitch = C_LOC( DstInputData%bldPitch(i1_l) ) 
+  END IF
+    DstInputData%bldPitch = SrcInputData%bldPitch
+ENDIF
  END SUBROUTINE ExtLdDX_CopyInput
 
  SUBROUTINE ExtLdDX_DestroyInput( InputData, ErrStat, ErrMsg )
@@ -490,6 +508,12 @@ IF (ASSOCIATED(InputData%twrHloc)) THEN
   InputData%twrHloc => NULL()
   InputData%C_obj%twrHloc = C_NULL_PTR
   InputData%C_obj%twrHloc_Len = 0
+ENDIF
+IF (ASSOCIATED(InputData%bldPitch)) THEN
+  DEALLOCATE(InputData%bldPitch)
+  InputData%bldPitch => NULL()
+  InputData%C_obj%bldPitch = C_NULL_PTR
+  InputData%C_obj%bldPitch_Len = 0
 ENDIF
  END SUBROUTINE ExtLdDX_DestroyInput
 
@@ -612,6 +636,11 @@ ENDIF
   IF ( ASSOCIATED(InData%twrHloc) ) THEN
     Int_BufSz   = Int_BufSz   + 2*1  ! twrHloc upper/lower bounds for each dimension
       Db_BufSz   = Db_BufSz   + SIZE(InData%twrHloc)  ! twrHloc
+  END IF
+  Int_BufSz   = Int_BufSz   + 1     ! bldPitch allocated yes/no
+  IF ( ASSOCIATED(InData%bldPitch) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*1  ! bldPitch upper/lower bounds for each dimension
+      Db_BufSz   = Db_BufSz   + SIZE(InData%bldPitch)  ! bldPitch
   END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
@@ -894,6 +923,21 @@ ENDIF
 
       DO i1 = LBOUND(InData%twrHloc,1), UBOUND(InData%twrHloc,1)
         DbKiBuf(Db_Xferred) = InData%twrHloc(i1)
+        Db_Xferred = Db_Xferred + 1
+      END DO
+  END IF
+  IF ( .NOT. ASSOCIATED(InData%bldPitch) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%bldPitch,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%bldPitch,1)
+    Int_Xferred = Int_Xferred + 2
+
+      DO i1 = LBOUND(InData%bldPitch,1), UBOUND(InData%bldPitch,1)
+        DbKiBuf(Db_Xferred) = InData%bldPitch(i1)
         Db_Xferred = Db_Xferred + 1
       END DO
   END IF
@@ -1283,6 +1327,27 @@ ENDIF
         Db_Xferred = Db_Xferred + 1
       END DO
   END IF
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! bldPitch not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ASSOCIATED(OutData%bldPitch)) DEALLOCATE(OutData%bldPitch)
+    ALLOCATE(OutData%bldPitch(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%bldPitch.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+    OutData%c_obj%bldPitch_Len = SIZE(OutData%bldPitch)
+    IF (OutData%c_obj%bldPitch_Len > 0) &
+       OutData%c_obj%bldPitch = C_LOC( OutData%bldPitch(i1_l) ) 
+      DO i1 = LBOUND(OutData%bldPitch,1), UBOUND(OutData%bldPitch,1)
+        OutData%bldPitch(i1) = REAL(DbKiBuf(Db_Xferred), C_DOUBLE)
+        Db_Xferred = Db_Xferred + 1
+      END DO
+  END IF
  END SUBROUTINE ExtLdDX_UnPackInput
 
  SUBROUTINE ExtLdDX_C2Fary_CopyInput( InputData, ErrStat, ErrMsg, SkipPointers )
@@ -1451,6 +1516,15 @@ ENDIF
           NULLIFY( InputData%twrHloc )
        ELSE
           CALL C_F_POINTER(InputData%C_obj%twrHloc, InputData%twrHloc, (/InputData%C_obj%twrHloc_Len/))
+       END IF
+    END IF
+
+    ! -- bldPitch Input Data fields
+    IF ( .NOT. SkipPointers_local ) THEN
+       IF ( .NOT. C_ASSOCIATED( InputData%C_obj%bldPitch ) ) THEN
+          NULLIFY( InputData%bldPitch )
+       ELSE
+          CALL C_F_POINTER(InputData%C_obj%bldPitch, InputData%bldPitch, (/InputData%C_obj%bldPitch_Len/))
        END IF
     END IF
  END SUBROUTINE ExtLdDX_C2Fary_CopyInput
@@ -1672,6 +1746,18 @@ ENDIF
           InputData%c_obj%twrHloc_Len = SIZE(InputData%twrHloc)
           IF (InputData%c_obj%twrHloc_Len > 0) &
              InputData%c_obj%twrHloc = C_LOC( InputData%twrHloc( LBOUND(InputData%twrHloc,1) ) ) 
+       END IF
+    END IF
+
+    ! -- bldPitch Input Data fields
+    IF ( .NOT. SkipPointers_local ) THEN
+       IF ( .NOT. ASSOCIATED(InputData%bldPitch)) THEN 
+          InputData%c_obj%bldPitch_Len = 0
+          InputData%c_obj%bldPitch = C_NULL_PTR
+       ELSE
+          InputData%c_obj%bldPitch_Len = SIZE(InputData%bldPitch)
+          IF (InputData%c_obj%bldPitch_Len > 0) &
+             InputData%c_obj%bldPitch = C_LOC( InputData%bldPitch( LBOUND(InputData%bldPitch,1) ) ) 
        END IF
     END IF
  END SUBROUTINE ExtLdDX_F2C_CopyInput
@@ -2184,6 +2270,12 @@ IF (ASSOCIATED(u_out%twrHloc) .AND. ASSOCIATED(u1%twrHloc)) THEN
     u_out%twrHloc(i1) = u1%twrHloc(i1) + b * ScaleFactor
   END DO
 END IF ! check if allocated
+IF (ASSOCIATED(u_out%bldPitch) .AND. ASSOCIATED(u1%bldPitch)) THEN
+  DO i1 = LBOUND(u_out%bldPitch,1),UBOUND(u_out%bldPitch,1)
+    b = -(u1%bldPitch(i1) - u2%bldPitch(i1))
+    u_out%bldPitch(i1) = u1%bldPitch(i1) + b * ScaleFactor
+  END DO
+END IF ! check if allocated
  END SUBROUTINE ExtLdDX_Input_ExtrapInterp1
 
 
@@ -2343,6 +2435,13 @@ IF (ASSOCIATED(u_out%twrHloc) .AND. ASSOCIATED(u1%twrHloc)) THEN
     b = (t(3)**2*(u1%twrHloc(i1) - u2%twrHloc(i1)) + t(2)**2*(-u1%twrHloc(i1) + u3%twrHloc(i1)))* scaleFactor
     c = ( (t(2)-t(3))*u1%twrHloc(i1) + t(3)*u2%twrHloc(i1) - t(2)*u3%twrHloc(i1) ) * scaleFactor
     u_out%twrHloc(i1) = u1%twrHloc(i1) + b  + c * t_out
+  END DO
+END IF ! check if allocated
+IF (ASSOCIATED(u_out%bldPitch) .AND. ASSOCIATED(u1%bldPitch)) THEN
+  DO i1 = LBOUND(u_out%bldPitch,1),UBOUND(u_out%bldPitch,1)
+    b = (t(3)**2*(u1%bldPitch(i1) - u2%bldPitch(i1)) + t(2)**2*(-u1%bldPitch(i1) + u3%bldPitch(i1)))* scaleFactor
+    c = ( (t(2)-t(3))*u1%bldPitch(i1) + t(3)*u2%bldPitch(i1) - t(2)*u3%bldPitch(i1) ) * scaleFactor
+    u_out%bldPitch(i1) = u1%bldPitch(i1) + b  + c * t_out
   END DO
 END IF ! check if allocated
  END SUBROUTINE ExtLdDX_Input_ExtrapInterp2

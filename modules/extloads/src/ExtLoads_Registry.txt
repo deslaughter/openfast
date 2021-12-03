@@ -43,7 +43,6 @@ typedef ^                       InitInputType   ReKi    BldChord       {:}{:}   
 typedef ^                       InitInputType   ReKi    BldRloc        {:}{:}   -	-	"Radial location of each node along the blade"	m
 typedef ^                       InitInputType   ReKi    TwrDia         {:}   -	-	"Tower diameter (NumTwrNodes)"	m
 typedef ^                       InitInputType   ReKi    TwrHloc        {:}   -	-	"Height location of each node along the tower"	m
-        
 
 # Define outputs from the initialization routine here:
 typedef	^	InitOutputType	CHARACTER(ChanLen)	WriteOutputHdr	{:}	-	-	"Names of the output-to-file channels"	-       
@@ -94,6 +93,7 @@ typedef	^	InputType	MeshType	HubMotion	-	-	-	"motion on the hub"	-
 typedef	^	InputType	MeshType	NacelleMotion	-	-	-	"motion on the nacelle"	-
 typedef	^	InputType	MeshType	BladeRootMotion	{:}	-	-	"motion on each blade root"	-
 typedef	^	InputType	MeshType	BladeMotion	{:}	-	-	"motion on each blade"	-
+typedef ^ InputType   ReKi    BladePitch {:} - - "Pitch angle for each blade" radians
 
 # ..... Outputs ...................................................................................................................
 # Define outputs that are contained on the mesh here:
