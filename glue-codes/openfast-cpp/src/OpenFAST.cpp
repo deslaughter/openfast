@@ -1011,6 +1011,11 @@ void fast::OpenFAST::predict_states() {
                     }
                 }
 
+                int nTotBlades = turbineData[iTurb].numBlades;
+                for (int j=0; j < nTotBlades; j++) {
+                    brFSIData[iTurb][fast::STATE_NP1].bld_pitch[j] = brFSIData[iTurb][fast::STATE_NM2].bld_pitch[j] + 3.0*(brFSIData[iTurb][fast::STATE_N].bld_pitch[j] - brFSIData[iTurb][fast::STATE_NM1].bld_pitch[j]);
+                }
+
                 int nPtsTwr = turbineData[iTurb].nBRfsiPtsTwr;
                 for (int j=0; j < nPtsTwr; j++) {
                     extrapRotation(&brFSIData[iTurb][fast::STATE_NM2].twr_def[j*6+3],&brFSIData[iTurb][fast::STATE_NM1].twr_def[j*6+3],&brFSIData[iTurb][fast::STATE_N].twr_def[j*6+3], &brFSIData[iTurb][fast::STATE_NP1].twr_def[j*6+3]);

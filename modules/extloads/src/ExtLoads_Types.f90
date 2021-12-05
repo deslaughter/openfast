@@ -120,7 +120,6 @@ IMPLICIT NONE
     TYPE(MeshType)  :: NacelleMotion      !< motion on the nacelle [-]
     TYPE(MeshType) , DIMENSION(:), ALLOCATABLE  :: BladeRootMotion      !< motion on each blade root [-]
     TYPE(MeshType) , DIMENSION(:), ALLOCATABLE  :: BladeMotion      !< motion on each blade [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BladePitch      !< Pitch angle for each blade [radians]
   END TYPE ExtLd_InputType
 ! =======================
 ! =========  ExtLd_OutputType  =======
@@ -2369,18 +2368,6 @@ IF (ALLOCATED(SrcInputData%BladeMotion)) THEN
          IF (ErrStat>=AbortErrLev) RETURN
     ENDDO
 ENDIF
-IF (ALLOCATED(SrcInputData%BladePitch)) THEN
-  i1_l = LBOUND(SrcInputData%BladePitch,1)
-  i1_u = UBOUND(SrcInputData%BladePitch,1)
-  IF (.NOT. ALLOCATED(DstInputData%BladePitch)) THEN 
-    ALLOCATE(DstInputData%BladePitch(i1_l:i1_u),STAT=ErrStat2)
-    IF (ErrStat2 /= 0) THEN 
-      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%BladePitch.', ErrStat, ErrMsg,RoutineName)
-      RETURN
-    END IF
-  END IF
-    DstInputData%BladePitch = SrcInputData%BladePitch
-ENDIF
  END SUBROUTINE ExtLd_CopyInput
 
  SUBROUTINE ExtLd_DestroyInput( InputData, ErrStat, ErrMsg )
@@ -2407,9 +2394,6 @@ DO i1 = LBOUND(InputData%BladeMotion,1), UBOUND(InputData%BladeMotion,1)
   CALL MeshDestroy( InputData%BladeMotion(i1), ErrStat, ErrMsg )
 ENDDO
   DEALLOCATE(InputData%BladeMotion)
-ENDIF
-IF (ALLOCATED(InputData%BladePitch)) THEN
-  DEALLOCATE(InputData%BladePitch)
 ENDIF
  END SUBROUTINE ExtLd_DestroyInput
 
@@ -2563,11 +2547,6 @@ ENDIF
          DEALLOCATE(Int_Buf)
       END IF
     END DO
-  END IF
-  Int_BufSz   = Int_BufSz   + 1     ! BladePitch allocated yes/no
-  IF ( ALLOCATED(InData%BladePitch) ) THEN
-    Int_BufSz   = Int_BufSz   + 2*1  ! BladePitch upper/lower bounds for each dimension
-      Re_BufSz   = Re_BufSz   + SIZE(InData%BladePitch)  ! BladePitch
   END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
@@ -2791,21 +2770,6 @@ ENDIF
         IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
       ENDIF
     END DO
-  END IF
-  IF ( .NOT. ALLOCATED(InData%BladePitch) ) THEN
-    IntKiBuf( Int_Xferred ) = 0
-    Int_Xferred = Int_Xferred + 1
-  ELSE
-    IntKiBuf( Int_Xferred ) = 1
-    Int_Xferred = Int_Xferred + 1
-    IntKiBuf( Int_Xferred    ) = LBOUND(InData%BladePitch,1)
-    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%BladePitch,1)
-    Int_Xferred = Int_Xferred + 2
-
-      DO i1 = LBOUND(InData%BladePitch,1), UBOUND(InData%BladePitch,1)
-        ReKiBuf(Re_Xferred) = InData%BladePitch(i1)
-        Re_Xferred = Re_Xferred + 1
-      END DO
   END IF
  END SUBROUTINE ExtLd_PackInput
 
@@ -3109,24 +3073,6 @@ ENDIF
       IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
       IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
     END DO
-  END IF
-  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! BladePitch not allocated
-    Int_Xferred = Int_Xferred + 1
-  ELSE
-    Int_Xferred = Int_Xferred + 1
-    i1_l = IntKiBuf( Int_Xferred    )
-    i1_u = IntKiBuf( Int_Xferred + 1)
-    Int_Xferred = Int_Xferred + 2
-    IF (ALLOCATED(OutData%BladePitch)) DEALLOCATE(OutData%BladePitch)
-    ALLOCATE(OutData%BladePitch(i1_l:i1_u),STAT=ErrStat2)
-    IF (ErrStat2 /= 0) THEN 
-       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%BladePitch.', ErrStat, ErrMsg,RoutineName)
-       RETURN
-    END IF
-      DO i1 = LBOUND(OutData%BladePitch,1), UBOUND(OutData%BladePitch,1)
-        OutData%BladePitch(i1) = ReKiBuf(Re_Xferred)
-        Re_Xferred = Re_Xferred + 1
-      END DO
   END IF
  END SUBROUTINE ExtLd_UnPackInput
 
@@ -3920,12 +3866,6 @@ IF (ALLOCATED(u_out%BladeMotion) .AND. ALLOCATED(u1%BladeMotion)) THEN
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    ENDDO
 END IF ! check if allocated
-IF (ALLOCATED(u_out%BladePitch) .AND. ALLOCATED(u1%BladePitch)) THEN
-  DO i1 = LBOUND(u_out%BladePitch,1),UBOUND(u_out%BladePitch,1)
-    b = -(u1%BladePitch(i1) - u2%BladePitch(i1))
-    u_out%BladePitch(i1) = u1%BladePitch(i1) + b * ScaleFactor
-  END DO
-END IF ! check if allocated
  END SUBROUTINE ExtLd_Input_ExtrapInterp1
 
 
@@ -4005,13 +3945,6 @@ IF (ALLOCATED(u_out%BladeMotion) .AND. ALLOCATED(u1%BladeMotion)) THEN
       CALL MeshExtrapInterp2(u1%BladeMotion(i1), u2%BladeMotion(i1), u3%BladeMotion(i1), tin, u_out%BladeMotion(i1), tin_out, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    ENDDO
-END IF ! check if allocated
-IF (ALLOCATED(u_out%BladePitch) .AND. ALLOCATED(u1%BladePitch)) THEN
-  DO i1 = LBOUND(u_out%BladePitch,1),UBOUND(u_out%BladePitch,1)
-    b = (t(3)**2*(u1%BladePitch(i1) - u2%BladePitch(i1)) + t(2)**2*(-u1%BladePitch(i1) + u3%BladePitch(i1)))* scaleFactor
-    c = ( (t(2)-t(3))*u1%BladePitch(i1) + t(3)*u2%BladePitch(i1) - t(2)*u3%BladePitch(i1) ) * scaleFactor
-    u_out%BladePitch(i1) = u1%BladePitch(i1) + b  + c * t_out
-  END DO
 END IF ! check if allocated
  END SUBROUTINE ExtLd_Input_ExtrapInterp2
 

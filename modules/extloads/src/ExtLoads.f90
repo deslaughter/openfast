@@ -462,12 +462,6 @@ subroutine Init_u( u, p, InitInp, errStat, errMsg )
          return
       end if
 
-      allocate( u%BladePitch(p%NumBlds), STAT = ErrStat2 )
-      if (ErrStat2 /= 0) then
-         call SetErrStat( ErrID_Fatal, 'Error allocating u%BladePitch array.', ErrStat, ErrMsg, RoutineName )
-         return
-      end if
-
       do k=1,p%NumBlds
 
          call MeshCreate ( BlankMesh = u%BladeRootMotion(k)     &
@@ -757,8 +751,6 @@ subroutine ExtLd_ConvertInpDataForExtProg(u, p, errStat, errMsg )
       u%DX_u%bldRootDef( (k-1)*12+10:(k-1)*12+12 ) = u%BladeRootMotion(k)%RotationVel(:,1)
    end do
    
-   u%DX_u%bldPitch(:) = u%BladePitch
-
 end subroutine ExtLd_ConvertInpDataForExtProg
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine converts the data in the simple array format in the output data type into OpenFAST mesh format
