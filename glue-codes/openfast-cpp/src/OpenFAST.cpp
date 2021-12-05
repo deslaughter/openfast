@@ -895,11 +895,12 @@ void fast::OpenFAST::set_state_from_state(fast::timeStep fromState, fast::timeSt
                 brFSIData[iTurb][toState].nac_ref_pos[j] = brFSIData[iTurb][fromState].nac_ref_pos[j];
                 brFSIData[iTurb][toState].nac_def[j] = brFSIData[iTurb][fromState].nac_def[j];
                 brFSIData[iTurb][toState].nac_vel[j] = brFSIData[iTurb][fromState].nac_vel[j];
-
             }
             for (int j=0; j < numBlades; j++) {
+                for (int k=0; k < 6; k++) {
+                    brFSIData[iTurb][toState].bld_root_def[j] = brFSIData[iTurb][fromState].bld_root_def[j];
+                }
                 brFSIData[iTurb][toState].bld_pitch[j] = brFSIData[iTurb][fromState].bld_pitch[j];
-
             }
         }
     }
@@ -1014,6 +1015,10 @@ void fast::OpenFAST::predict_states() {
                 int nTotBlades = turbineData[iTurb].numBlades;
                 for (int j=0; j < nTotBlades; j++) {
                     brFSIData[iTurb][fast::STATE_NP1].bld_pitch[j] = brFSIData[iTurb][fast::STATE_NM2].bld_pitch[j] + 3.0*(brFSIData[iTurb][fast::STATE_N].bld_pitch[j] - brFSIData[iTurb][fast::STATE_NM1].bld_pitch[j]);
+                    extrapRotation(&brFSIData[iTurb][fast::STATE_NM2].bld_root_def[j*6+3], &brFSIData[iTurb][fast::STATE_NM1].bld_root_def[j*6+3], &brFSIData[iTurb][fast::STATE_N].bld_root_def[j*6+3], &brFSIData[iTurb][fast::STATE_NP1].bld_root_def[j*6+3]);
+                    for (int k=0; k < 3; k++) {
+                        brFSIData[iTurb][fast::STATE_NP1].bld_root_def[j*6+k] = brFSIData[iTurb][fast::STATE_NM2].bld_root_def[j*6+k] + 3.0*(brFSIData[iTurb][fast::STATE_N].bld_root_def[j*6+k] - brFSIData[iTurb][fast::STATE_NM1].bld_root_def[j*6+k]);
+                    }
                 }
 
                 int nPtsTwr = turbineData[iTurb].nBRfsiPtsTwr;
@@ -2019,6 +2024,7 @@ void fast::OpenFAST::allocateMemory_postInit(int iTurbLoc) {
             brFSIData[iTurbLoc][k].nac_vel.resize(6);
             brFSIData[iTurbLoc][k].hub_ref_pos.resize(6);
             brFSIData[iTurbLoc][k].bld_pitch.resize(turbineData[iTurbLoc].numBlades);
+            brFSIData[iTurbLoc][k].bld_root_def.resize(6*turbineData[iTurbLoc].numBlades);
         }
     }
 
@@ -2282,6 +2288,10 @@ void fast::OpenFAST::get_data_from_openfast(timeStep t) {
                         brFSIData[iTurb][t].bld_vel[iRunTot*6+3+k] = extld_i_f_FAST[iTurb].bldDef[iRunTot*12+9+k];
                     }
                     iRunTot++;
+                }
+                for (int k=0; k < 3; k++) {
+                    brFSIData[iTurb][t].bld_root_def[i*6+k] = extld_i_f_FAST[iTurb].bldRootDef[i*12+k];
+                    brFSIData[iTurb][t].bld_root_def[i*6+3+k] = extld_i_f_FAST[iTurb].bldRootDef[i*12+6+k];
                 }
             }
 
@@ -2882,6 +2892,21 @@ void fast::OpenFAST::getBladeDisplacements(double* bldDefl, double* bldVel, int 
         }
     }
 
+}
+
+void fast::OpenFAST::getBladeRootDisplacements(double* bldRootDefl, int iTurbGlob, fast::timeStep t, int nSize) {
+
+    assert(nSize==6);
+    int iTurbLoc = get_localTurbNo(iTurbGlob);
+    int nBlades = get_numBladesLoc(iTurbLoc);
+
+    int iRunTot = 0;
+    for (int i=0; i < nBlades; i++) {
+        for (int k=0; k < nSize; k++) {
+            bldRootDefl[iRunTot] = brFSIData[iTurbLoc][t].bld_root_def[iRunTot];
+            iRunTot++;
+        }
+    }
 }
 
 void fast::OpenFAST::getBladePitch(double* bldPitch, int iTurbGlob, int nSize) {
