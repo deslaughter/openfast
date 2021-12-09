@@ -131,8 +131,8 @@ SUBROUTINE BD_InputSolve( p_FAST, BD, y_AD, u_AD, m_ExtLd, y_ExtLd, u_ExtLd, p_E
 
             DO K = 1,p_FAST%nBeams ! Loop through all blades
 
-               CALL Transfer_Line2_to_Line2( y_AD%rotors(1)%BladeLoad(k), BD%Input(1,k)%DistrLoad, MeshMapData%AD_L_2_BDED_B(k), ErrStat2, ErrMsg2, u_AD%rotors(1)%BladeMotion(k), BD%y(k)%BldMotion )
-                  CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+               CALL Transfer_Point_to_Line2( y_ExtLd%BladeLoad(k), BD%Input(1,k)%DistrLoad, MeshMapData%ExtLd_P_2_BDED_B(k), ErrStat2, ErrMsg2, u_ExtLd%BladeMotion(k), BD%y(k)%BldMotion )
+               CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
             END DO
 
@@ -141,10 +141,11 @@ SUBROUTINE BD_InputSolve( p_FAST, BD, y_AD, u_AD, m_ExtLd, y_ExtLd, u_ExtLd, p_E
 
                ! need to transfer the BD output blade motions to nodes on a sibling of the BD blade motion mesh:
                CALL Transfer_Line2_to_Line2( BD%y(k)%BldMotion, MeshMapData%y_BD_BldMotion_4Loads(k), MeshMapData%BD_L_2_BD_L(k), ErrStat2, ErrMsg2 )
-                  CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+               CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
-               CALL Transfer_Line2_to_Line2( y_AD%rotors(1)%BladeLoad(k), BD%Input(1,k)%DistrLoad, MeshMapData%AD_L_2_BDED_B(k), ErrStat2, ErrMsg2, u_AD%rotors(1)%BladeMotion(k), MeshMapData%y_BD_BldMotion_4Loads(k) )
-                  CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+               CALL Transfer_Point_to_Line2( y_ExtLd%BladeLoad(k), BD%Input(1,k)%DistrLoad, MeshMapData%ExtLd_P_2_BDED_B(k), ErrStat2, ErrMsg2, u_ExtLd%BladeMotion(k), MeshMapData%y_BD_BldMotion_4Loads(k) )
+               CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+
             END DO
          end if
 

@@ -90,7 +90,7 @@ void readTurbineData(int iTurb, fast::fastInputs & fi, YAML::Node turbNode) {
 
 }
 
-void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, double *tStart, double * tEnd, int * couplingMode, bool * setExpLawWind, bool * setUniformXBladeForces, int * nIter) {
+void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, double *tStart, double * tEnd, int * couplingMode, bool * setExpLawWind, bool * setUniformXBladeForces, int * nIter, double *xBladeForce) {
 
   fi.comm = MPI_COMM_WORLD;
 
@@ -144,6 +144,8 @@ void readInputFile(fast::fastInputs & fi, std::string cInterfaceInputFile, doubl
         get_required(cDriverInp, "t_max", fi.tMax); // t_max is the total duration to which you want to run FAST. This should be the same or greater than the max time given in the FAST fst file.
         get_if_present(cDriverInp, "set_exp_law_wind", *setExpLawWind, false);
         get_if_present(cDriverInp, "set_uniform_x_blade_forces", *setUniformXBladeForces, false);
+        if (setUniformXBladeForces)
+            get_required(cDriverInp, "x_blade_force", *xBladeForce);
 
         get_if_present(cDriverInp, "super_controller", fi.scStatus, false);
         if(fi.scStatus) {
@@ -194,12 +196,13 @@ int main(int argc, char** argv) {
     bool setExpLawWind; // Set wind speed at Aerodyn nodes based on an exponential profile. Useful for testing the C++ API before running actuator line simulations.
     bool setUniformXBladeForces; // Set uniform X blade forces on all blade nodes
     int nIter;
-
+    double xBladeForce = 0.0;
+    
     std::string cDriverInputFile=argv[1];
     fast::OpenFAST FAST;
     fast::fastInputs fi ;
     try {
-        readInputFile(fi, cDriverInputFile, &tStart, &tEnd, &couplingMode, &setExpLawWind, &setUniformXBladeForces, &nIter);
+        readInputFile(fi, cDriverInputFile, &tStart, &tEnd, &couplingMode, &setExpLawWind, &setUniformXBladeForces, &nIter, &xBladeForce);
     } catch( const std::runtime_error & ex) {
         std::cerr << ex.what() << std::endl ;
         std::cerr << "Program quitting now" << std::endl ;
@@ -236,8 +239,9 @@ int main(int argc, char** argv) {
             // If running with a CFD solver, sample velocities at the actuator/velocity nodes here
             if (setExpLawWind)
                 FAST.setExpLawWindSpeed( (nt+1)*fi.dtDriver );
-            if (setUniformXBladeForces)
-                FAST.setUniformXBladeForces();
+            if (setUniformXBladeForces) {
+                FAST.setUniformXBladeForces(xBladeForce);
+            }
 
             for (int iSubstep=1; iSubstep < nSubsteps; iSubstep++) {
                 FAST.step();
@@ -251,6 +255,9 @@ int main(int argc, char** argv) {
                 // Sample and set velocity at the actuator/velocity nodes after the first cfd predictor
                 if (setExpLawWind)
                     FAST.setExpLawWindSpeed( (nt+1)*fi.dtDriver );
+                if (setUniformXBladeForces) {
+                    FAST.setUniformXBladeForces(xBladeForce);
+                }
                 FAST.update_states_driver_time_step();
             }
             // Call this after enough outer iterations have been done

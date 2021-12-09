@@ -483,7 +483,7 @@ class OpenFAST {
   //! Get the blade deflections array 'bldDefl' of turbine number 'iTurbGlob' at time step 't'
     void getBladeDisplacements(double* bldDefl, double* bldVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=6);
   //! Get the tower reference positions array 'twrRefPos' of turbine number 'iTurbGlob'
-  void getTowerRefPositions(double* twrRefPos, int iTurbGlob, int nSize);
+  void getTowerRefPositions(double* twrRefPos, int iTurbGlob, int nSize=6);
   //! Get the tower deflections array 'twrDefl' of turbine number 'iTurbGlob' at time step 't'
   void getTowerDisplacements(double* twrDefl, double* twrVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=6);
   //! Get the hub reference position array 'hubRefPos' of turbine number 'iTurbGlob'
@@ -608,7 +608,7 @@ class OpenFAST {
  inline
  void getTowerRefPositions(std::vector<double> & twrRefPos, int iTurbGlob)
  {
-   getTowerRefPositions(twrRefPos.data(), iTurbGlob, twrRefPos.size());
+     getTowerRefPositions(twrRefPos.data(), iTurbGlob, 6);
  }
  inline
  void getTowerDisplacements(std::vector<double> & twrDefl, std::vector<double> & twrVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1)
@@ -639,12 +639,12 @@ class OpenFAST {
  inline
  void setBladeForces(std::vector<double> & bldForce, int iTurbGlob, fast::timeStep t = fast::STATE_NP1)
  {
-   setBladeForces(bldForce.data(), iTurbGlob, t, bldForce.size());
+   setBladeForces(bldForce.data(), iTurbGlob, t, 6);
  }
  inline
  void setTowerForces(std::vector<double> & twrForce, int iTurbGlob, fast::timeStep t = fast::STATE_NP1)
  {
-   setTowerForces(twrForce.data(), iTurbGlob, t, twrForce.size());
+   setTowerForces(twrForce.data(), iTurbGlob, t, 6);
  }
  inline
  void computeTorqueThrust(int iTurbGlob, std::vector<double> & torque, std::vector<double> & thrust)
@@ -656,7 +656,7 @@ class OpenFAST {
     void setExpLawWindSpeed(double t) ; // An example to set velocities at the Aerodyn nodes
 
   //! An example function to set a uniform X force at all blade nodes. Safe to call from every MPI rank.
-  void setUniformXBladeForces();
+  void setUniformXBladeForces(double loadX);
 
 
 private:

@@ -609,8 +609,6 @@ void fast::OpenFAST::init() {
 
                 } else if(turbineData[iTurb].sType == EXTLOADS) {
                     FAST_BR_CFD_Restart(&iTurb, tmpRstFileRoot, &AbortErrLev, &turbineData[iTurb].dt, &turbineData[iTurb].numBlades, &ntStart, &extld_i_f_FAST[iTurb], &extld_o_t_FAST[iTurb], &sc->ip_from_FAST[iTurb], &sc->op_to_FAST[iTurb], &ErrStat, ErrMsg);
-                    std::cerr << "numBlade nodes = " << extld_i_f_FAST[iTurb].nBladeNodes[0] << " " << extld_i_f_FAST[iTurb].nBladeNodes[1] << " " << extld_i_f_FAST[iTurb].nBladeNodes[2] << std::endl ;
-
                     turbineData[iTurb].inflowType = 0;
                 }
 
@@ -765,8 +763,6 @@ void fast::OpenFAST::init() {
                             advance_to_next_driver_time_step(false);
                         }
                     }
-
-                    std::cerr << "Done with OpenFAST init" << std::endl ;
 
                     for (int iTurb=0; iTurb < nTurbinesProc; iTurb++)
                         nc_close(velfile_ncid[iTurb]);
@@ -2971,7 +2967,7 @@ void fast::OpenFAST::setTowerForces(double* twrForces, int iTurbGlob, fast::time
 }
 
 //! Sets a uniform X force at all blade nodes
-void fast::OpenFAST::setUniformXBladeForces() {
+void fast::OpenFAST::setUniformXBladeForces(double loadX) {
 
     for (int iTurb=0; iTurb < nTurbinesProc; iTurb++) {
         int iTurbGlob = turbineMapProcToGlob[iTurb];
@@ -2983,6 +2979,7 @@ void fast::OpenFAST::setUniformXBladeForces() {
         size_t nTotPtsBlade = 0;
         for(int iBlade=0; iBlade < nBlades; iBlade++)
             nTotPtsBlade +=  turbineData[iTurb].nBRfsiPtsBlade[iBlade];
+
         std::vector<double> fsiForceBlade(6*nTotPtsBlade, 0.0);
         std::vector<double> dr(nTotPtsBlade, 0.0);
 
@@ -2991,6 +2988,7 @@ void fast::OpenFAST::setUniformXBladeForces() {
             int nBldPts = turbineData[iTurb].nBRfsiPtsBlade[iBlade];
             dr[iNode] = 0.5*(brFSIData[iTurb][3].bld_rloc[iNode+1] - brFSIData[iTurb][3].bld_rloc[iNode]);
             iNode++;
+            
             for(int i=1; i < nBldPts-1; i++) {
                 dr[iNode] = 0.5*(brFSIData[iTurb][3].bld_rloc[iNode+1] - brFSIData[iTurb][3].bld_rloc[iNode-1]);
                 iNode++;
@@ -3000,7 +2998,7 @@ void fast::OpenFAST::setUniformXBladeForces() {
         }
 
         for(int i=0; i < nTotPtsBlade; i++)
-            fsiForceBlade[i*6] = 5e-4 * dr[i]; // X component of force
+            fsiForceBlade[i*6] = loadX * dr[i]; // X component of force
 
         setBladeForces(fsiForceBlade, iTurbGlob, fast::STATE_NP1);
 
