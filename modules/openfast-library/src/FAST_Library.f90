@@ -947,6 +947,8 @@ subroutine SetExtLoads_pointers(iTurb, ExtLd_iFromOF, ExtLd_oToOF)
    ExtLd_iFromOF%nBladeNodes_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nBladeNodes_Len; ExtLd_iFromOF%nBladeNodes = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nBladeNodes
    ExtLd_iFromOF%nTowerNodes_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nTowerNodes_Len; ExtLd_iFromOF%nTowerNodes = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%nTowerNodes
 
+   ExtLd_iFromOF%bldRootDef_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldRootDef_Len; ExtLd_iFromOF%bldRootDef = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%bldRootDef
+
    ExtLd_iFromOF%hubRefPos_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%hubRefPos_Len; ExtLd_iFromOF%hubRefPos = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%hubRefPos
    ExtLd_iFromOF%hubDef_Len = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%hubDef_Len; ExtLd_iFromOF%hubDef = Turbine(iTurb)%ExtLd%u%DX_u%c_obj%hubDef
 
