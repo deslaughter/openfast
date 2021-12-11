@@ -2293,6 +2293,7 @@ void fast::OpenFAST::get_data_from_openfast(timeStep t) {
                     brFSIData[iTurb][t].bld_root_def[i*6+k] = extld_i_f_FAST[iTurb].bldRootDef[i*12+k];
                     brFSIData[iTurb][t].bld_root_def[i*6+3+k] = extld_i_f_FAST[iTurb].bldRootDef[i*12+6+k];
                 }
+                brFSIData[iTurb][t].bld_pitch[i] = extld_i_f_FAST[iTurb].bldPitch[i];
             }
 
             int nPtsTwr = turbineData[iTurb].nBRfsiPtsTwr;
@@ -2804,7 +2805,6 @@ void fast::OpenFAST::get_ref_positions_from_openfast(int iTurb) {
                 brFSIData[iTurb][fast::STATE_NP1].bld_rloc[iRunTot] = extld_i_f_FAST[iTurb].bldRloc[iRunTot];
                 iRunTot++;
             }
-            brFSIData[iTurb][fast::STATE_NP1].bld_pitch[i] = extld_i_f_FAST[iTurb].bldPitch[i];
         }
 
         int nPtsTwr = turbineData[iTurb].nBRfsiPtsTwr;
