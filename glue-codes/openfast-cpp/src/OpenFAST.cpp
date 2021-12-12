@@ -2896,13 +2896,13 @@ void fast::OpenFAST::getBladeDisplacements(double* bldDefl, double* bldVel, int 
 
 void fast::OpenFAST::getBladeRootDisplacements(double* bldRootDefl, int iTurbGlob, fast::timeStep t, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
+    assert(nSize == 6*nBlades);
 
     int iRunTot = 0;
     for (int i=0; i < nBlades; i++) {
-        for (int k=0; k < nSize; k++) {
+        for (int k=0; k < 6; k++) {
             bldRootDefl[iRunTot] = brFSIData[iTurbLoc][t].bld_root_def[iRunTot];
             iRunTot++;
         }
