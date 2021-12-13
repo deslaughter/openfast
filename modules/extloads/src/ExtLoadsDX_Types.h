@@ -39,6 +39,7 @@
     double * bldRloc ;     int bldRloc_Len ;
     double * twrDia ;     int twrDia_Len ;
     double * twrHloc ;     int twrHloc_Len ;
+    double * bldPitch ;     int bldPitch_Len ;
   } ExtLdDX_InputType_t ;
   typedef struct ExtLdDX_OutputType {
     void * object ;

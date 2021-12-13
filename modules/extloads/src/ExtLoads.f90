@@ -461,9 +461,8 @@ subroutine Init_u( u, p, InitInp, errStat, errMsg )
          call SetErrStat( ErrID_Fatal, 'Error allocating u%BladeMotion array.', ErrStat, ErrMsg, RoutineName )
          return
       end if
-      
-      do k=1,p%NumBlds
 
+      do k=1,p%NumBlds
 
          call MeshCreate ( BlankMesh = u%BladeRootMotion(k)     &
               ,IOS       = COMPONENT_INPUT &
@@ -626,11 +625,14 @@ subroutine Init_u( u, p, InitInp, errStat, errMsg )
    CALL AllocPAry( u%DX_u%bldRloc, p%nTotBldNds, 'bldRloc', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    CALL AllocPAry( u%DX_u%twrdia, p%NumTwrNds, 'twrDia', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    CALL AllocPAry( u%DX_u%twrHloc, p%NumTwrNds, 'twrHloc', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   CALL AllocPAry( u%DX_u%bldPitch, p%NumBlds, 'bldPitch', ErrStat2, ErrMsg2 ); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
    ! make sure the C versions are synced with these arrays
    u%DX_u%c_obj%bldChord_Len = p%nTotBldNds; u%DX_u%c_obj%bldChord = C_LOC( u%DX_u%bldChord(1) )
    u%DX_u%c_obj%bldRloc_Len = p%nTotBldNds; u%DX_u%c_obj%bldRloc = C_LOC( u%DX_u%bldRloc(1) )
    u%DX_u%c_obj%twrDia_Len = p%NumTwrNds; u%DX_u%c_obj%twrDia = C_LOC( u%DX_u%twrDia(1) )
    u%DX_u%c_obj%twrHloc_Len = p%NumTwrNds; u%DX_u%c_obj%twrHloc = C_LOC( u%DX_u%twrHloc(1) )
+   u%DX_u%c_obj%bldPitch_Len = p%NumBlds; u%DX_u%c_obj%bldPitch = C_LOC( u%DX_u%bldPitch(1) )
 
    jTot = 1
    do k=1,p%NumBlds

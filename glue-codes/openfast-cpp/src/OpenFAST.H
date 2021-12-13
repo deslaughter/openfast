@@ -180,6 +180,10 @@ struct turbBRfsiDataType {
     std::vector<double> nac_def;
     //! Nacelle velocity
     std::vector<double> nac_vel;
+    //! Blade root deformation
+    std::vector<double> bld_root_def;
+    //! Blade pitch
+    std::vector<double> bld_pitch;
 
     //! Tower loads
     std::vector<double> twr_ld;
@@ -481,7 +485,11 @@ class OpenFAST {
   //! Get the blade reference positions array 'bldRefPos' of turbine number 'iTurbGlob'
   void getBladeRefPositions(double* bldRefPos, int iTurbGlob, int nSize=6);
   //! Get the blade deflections array 'bldDefl' of turbine number 'iTurbGlob' at time step 't'
-    void getBladeDisplacements(double* bldDefl, double* bldVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=6);
+  void getBladeDisplacements(double* bldDefl, double* bldVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=6);
+  //! Get the blade root deflections array 'bldRootDefl' of turbine number 'iTurbGlob' at time step 't'
+  void getBladeRootDisplacements(double* bldRootDefl, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=6);
+  //! Get the blade pitch 'bldPitch' of turbine number 'iTurbGlob'
+  void getBladePitch(double* bldPitch, int iTurbGlob, int nSize);
   //! Get the tower reference positions array 'twrRefPos' of turbine number 'iTurbGlob'
   void getTowerRefPositions(double* twrRefPos, int iTurbGlob, int nSize=6);
   //! Get the tower deflections array 'twrDefl' of turbine number 'iTurbGlob' at time step 't'
@@ -604,6 +612,15 @@ class OpenFAST {
  void getBladeDisplacements(std::vector<double> & bldDefl, std::vector<double> & bldVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1)
  {
    getBladeDisplacements(bldDefl.data(), bldVel.data(), iTurbGlob, t, bldDefl.size());
+ }
+ void getBladeRootDisplacements(std::vector<double> & bldRootDefl, int iTurbGlob, fast::timeStep t = fast::STATE_NP1)
+ {
+   getBladeRootDisplacements(bldRootDefl.data(), iTurbGlob, t, bldRootDefl.size());
+ }
+ inline
+ void getBladePitch(std::vector<double> & bldPitch, int iTurbGlob)
+ {
+     getBladePitch(bldPitch.data(), iTurbGlob, bldPitch.size());
  }
  inline
  void getTowerRefPositions(std::vector<double> & twrRefPos, int iTurbGlob)
