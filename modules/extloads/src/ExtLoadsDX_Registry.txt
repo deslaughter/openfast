@@ -35,6 +35,7 @@ typedef ^       InputType      R8Ki            bldChord      {:}     -       -  
 typedef ^       InputType      R8Ki            bldRloc       {:}     -       -       "Radial location along the blade" m
 typedef ^       InputType      R8Ki            twrDia        {:}     -       -       "Tower diameter" m
 typedef ^       InputType      R8Ki            twrHloc       {:}     -       -       "Height location along the tower" m
+typedef ^       InputType      R8Ki            bldPitch      {:}     -       -       "Pitch angle of blade"
 
 
 # ..... Outputs ...................................................................................................................
