@@ -2894,7 +2894,7 @@ void fast::OpenFAST::getBladeRootDisplacements(double* bldRootDefl, int iTurbGlo
 
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
-    assert(nSize == 6*nBlades);
+    assert(nSize == 6);
 
     int iRunTot = 0;
     for (int i=0; i < nBlades; i++) {
