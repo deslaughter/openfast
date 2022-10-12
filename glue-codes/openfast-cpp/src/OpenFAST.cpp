@@ -150,11 +150,14 @@ void fast::OpenFAST::prepareRestartFile(int iTurbLoc) {
         ncRstDimIDs_["n_twr_data"] = tmpDimID;
         ierr = nc_def_dim(ncid,"n_bld_data", turbineData[iTurbLoc].nTotBRfsiPtsBlade*6, &tmpDimID);
         ncRstDimIDs_["n_bld_data"] = tmpDimID;
+        ierr = nc_def_dim(ncid,"n_bld_root_data", turbineData[iTurbLoc].numBlades*6, &tmpDimID);
+        ncRstDimIDs_["n_bld_root_data"] = tmpDimID;
         ierr = nc_def_dim(ncid,"n_pt_data", 6, &tmpDimID);
         ncRstDimIDs_["n_pt_data"] = tmpDimID;
 
         const std::vector<int> twrDefLoadsDims{ncRstDimIDs_["n_tsteps"], ncRstDimIDs_["n_states"], ncRstDimIDs_["n_twr_data"]};
         const std::vector<int> bldDefLoadsDims{ncRstDimIDs_["n_tsteps"], ncRstDimIDs_["n_states"], ncRstDimIDs_["n_bld_data"]};
+        const std::vector<int> bldRootDefLoadsDims{ncRstDimIDs_["n_tsteps"], ncRstDimIDs_["n_states"], ncRstDimIDs_["n_bld_root_data"]};
         const std::vector<int> ptDefLoadsDims{ncRstDimIDs_["n_tsteps"], ncRstDimIDs_["n_states"], ncRstDimIDs_["n_pt_data"],};
 
         ierr = nc_def_var(ncid, "twr_def", NC_DOUBLE, 3, twrDefLoadsDims.data(), &tmpVarID);
@@ -177,6 +180,8 @@ void fast::OpenFAST::prepareRestartFile(int iTurbLoc) {
         ncRstVarIDs_["nac_def"] = tmpVarID;
         ierr = nc_def_var(ncid, "nac_vel", NC_DOUBLE, 3, ptDefLoadsDims.data(), &tmpVarID);
         ncRstVarIDs_["nac_vel"] = tmpVarID;
+        ierr = nc_def_var(ncid, "bld_root_def", NC_DOUBLE, 3, bldRootDefLoadsDims.data(), &tmpVarID);
+        ncRstVarIDs_["bld_root_def"] = tmpVarID;        
 
     } else if (turbineData[iTurbLoc].sType == EXTINFLOW) {
 
@@ -2359,8 +2364,10 @@ void fast::OpenFAST::readRestartFile(int iTurbLoc, int n_t_global) {
 
         int nBRfsiPtsTwr = turbineData[iTurbLoc].nBRfsiPtsTwr;
         int nTotBRfsiPtsBlade = turbineData[iTurbLoc].nTotBRfsiPtsBlade;
+        int nBlades = turbineData[iTurbLoc].numBlades;
         const std::vector<size_t> twrDataDims{1, 1, static_cast<size_t>(6*nBRfsiPtsTwr)};
         const std::vector<size_t> bldDataDims{1, 1, static_cast<size_t>(6*nTotBRfsiPtsBlade)};
+        const std::vector<size_t> bldRootDataDims{1, 1, static_cast<size_t>(6*nBlades)};
         const std::vector<size_t> ptDataDims{1, 1, 6};
 
         for (size_t j=0; j < 4; j++) {  // Loop over states - NM2, STATE_NM1, N, NP1
@@ -2380,6 +2387,8 @@ void fast::OpenFAST::readRestartFile(int iTurbLoc, int n_t_global) {
 
             ierr = nc_get_vara_double(ncid, ncRstVarIDs_["nac_def"], start_dim.data(), ptDataDims.data(), brFSIData[iTurbLoc][j].nac_def.data());
             ierr = nc_get_vara_double(ncid, ncRstVarIDs_["nac_vel"], start_dim.data(), ptDataDims.data(), brFSIData[iTurbLoc][j].nac_vel.data());
+
+            ierr = nc_get_vara_double(ncid, ncRstVarIDs_["bld_root_def"], start_dim.data(), bldRootDataDims.data(), brFSIData[iTurbLoc][j].bld_root_def.data());
 
         }
 
@@ -2751,8 +2760,10 @@ void fast::OpenFAST::writeRestartFile(int iTurbLoc, int n_t_global) {
 
         int nPtsTwr = turbineData[iTurbLoc].nBRfsiPtsTwr;
         int nTotBldPts = turbineData[iTurbLoc].nTotBRfsiPtsBlade;
+        int nBlades = turbineData[iTurbLoc].numBlades;
         const std::vector<size_t> twrDataDims{1, 1, static_cast<size_t>(6*nPtsTwr)};
         const std::vector<size_t> bldDataDims{1, 1, static_cast<size_t>(6*nTotBldPts)};
+        const std::vector<size_t> bldRootDataDims{1, 1, static_cast<size_t>(6*nBlades)};        
         const std::vector<size_t> ptDataDims{1, 1, 6};
 
         for (size_t j=0; j < 4; j++) { // Loop over states - STATE_NM2, STATE_NM1, STATE_N, STATE_NP1
@@ -2772,6 +2783,8 @@ void fast::OpenFAST::writeRestartFile(int iTurbLoc, int n_t_global) {
 
             ierr = nc_put_vara_double(ncid, ncRstVarIDs_["nac_def"], start_dim.data(), ptDataDims.data(), brFSIData[iTurbLoc][j].nac_def.data());
             ierr = nc_put_vara_double(ncid, ncRstVarIDs_["nac_vel"], start_dim.data(), ptDataDims.data(), brFSIData[iTurbLoc][j].nac_vel.data());
+
+            ierr = nc_put_vara_double(ncid, ncRstVarIDs_["bld_root_def"], start_dim.data(), bldRootDataDims.data(), brFSIData[iTurbLoc][j].bld_root_def.data());
         }
 
     }
