@@ -180,6 +180,8 @@ struct turbBRfsiDataType {
     std::vector<double> nac_def;
     //! Nacelle velocity
     std::vector<double> nac_vel;
+    //! Blade root reference position
+    std::vector<double> bld_root_ref_pos;
     //! Blade root deformation
     std::vector<double> bld_root_def;
     //! Blade pitch
@@ -484,6 +486,8 @@ class OpenFAST {
   void getBladeRloc(std::vector<double> & bldRloc, int iTurbGlob);
   //! Get the blade reference positions array 'bldRefPos' of turbine number 'iTurbGlob'
   void getBladeRefPositions(double* bldRefPos, int iTurbGlob, int nSize=6);
+  //! Get the blade root reference positions array 'bldRootRefPos' of turbine number 'iTurbGlob'    
+  void getBladeRootRefPositions(double* bldRootRefPos, int iTurbGlob, int nSize=6);    
   //! Get the blade deflections array 'bldDefl' of turbine number 'iTurbGlob' at time step 't'
   void getBladeDisplacements(double* bldDefl, double* bldVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=6);
   //! Get the blade root deflections array 'bldRootDefl' of turbine number 'iTurbGlob' at time step 't'
@@ -612,6 +616,10 @@ class OpenFAST {
  void getBladeDisplacements(std::vector<double> & bldDefl, std::vector<double> & bldVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1)
  {
    getBladeDisplacements(bldDefl.data(), bldVel.data(), iTurbGlob, t, bldDefl.size());
+ }
+ inline
+ void getBladeRootRefPositions(std::vector<double> & bldRootRefPos, int iTurbGlob){
+     getBladeRootRefPositions(bldRootRefPos.data(), iTurbGlob);
  }
  void getBladeRootDisplacements(std::vector<double> & bldRootDefl, int iTurbGlob, fast::timeStep t = fast::STATE_NP1)
  {

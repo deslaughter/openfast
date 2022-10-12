@@ -706,8 +706,8 @@ subroutine ExtLd_ConvertInpDataForExtProg(u, p, errStat, errMsg )
       end do
    end do
       
-   open(53, file = 'bld_orient.csv', status='old')
-   write(53,*) 'x, y, z, n11, n12, n13, n21, n22, n23, n31, n32, n33, w11, w12, w13, w21, w22, w23, w31, w32, w33'
+   open(53, file = 'bld_orient.csv', status='replace')
+   write(53,*) 'x, dx, y, dy, z, dz, n11, n12, n13, n21, n22, n23, n31, n32, n33, w11, w12, w13, w21, w22, w23, w31, w32, w33'
    do k=1,p%NumBlds
       do j=1,p%NumBldNds(k)
          call BD_CrvExtractCrv(u%BladeMotion(k)%Orientation(:,:,j), wm_crv, ErrStat2, ErrMsg2)
@@ -723,7 +723,7 @@ subroutine ExtLd_ConvertInpDataForExtProg(u, p, errStat, errMsg )
          cref(2) = 0.0
          cref(3) = 1.0
          call apply_wm(wm_crv, cref, zloc, -1.0)
-         write(53,*) u%BladeMotion(k)%Position(1,j) +  u%BladeMotion(k)%TranslationDisp(1,j), ', ', u%BladeMotion(k)%Position(2,j) +  u%BladeMotion(k)%TranslationDisp(2,j), ', ', u%BladeMotion(k)%Position(3,j) +  u%BladeMotion(k)%TranslationDisp(3,j), ', ', u%BladeMotion(k)%Orientation(1,1,j), ', ', u%BladeMotion(k)%Orientation(1,2,j), ', ', u%BladeMotion(k)%Orientation(1,3,j), ', ', u%BladeMotion(k)%Orientation(2,1,j), ', ', u%BladeMotion(k)%Orientation(2,2,j), ', ', u%BladeMotion(k)%Orientation(2,3,j), ', ', u%BladeMotion(k)%Orientation(3,1,j), ', ', u%BladeMotion(k)%Orientation(3,2,j), ', ', u%BladeMotion(k)%Orientation(3,3,j), ', ', xloc(1), ', ', xloc(2), ', ', xloc(3), ', ', yloc(1), ', ', yloc(2), ', ', yloc(3), ', ', zloc(1), ', ', zloc(2), ', ', zloc(3)
+         write(53,*) u%BladeMotion(k)%Position(1,j), ', ', u%BladeMotion(k)%TranslationDisp(1,j), ', ', u%BladeMotion(k)%Position(2,j), ', ', u%BladeMotion(k)%TranslationDisp(2,j), ', ', u%BladeMotion(k)%Position(3,j), ', ', u%BladeMotion(k)%TranslationDisp(3,j), ', ', u%BladeMotion(k)%Orientation(1,1,j), ', ', u%BladeMotion(k)%Orientation(1,2,j), ', ', u%BladeMotion(k)%Orientation(1,3,j), ', ', u%BladeMotion(k)%Orientation(2,1,j), ', ', u%BladeMotion(k)%Orientation(2,2,j), ', ', u%BladeMotion(k)%Orientation(2,3,j), ', ', u%BladeMotion(k)%Orientation(3,1,j), ', ', u%BladeMotion(k)%Orientation(3,2,j), ', ', u%BladeMotion(k)%Orientation(3,3,j), ', ', xloc(1), ', ', xloc(2), ', ', xloc(3), ', ', yloc(1), ', ', yloc(2), ', ', yloc(3), ', ', zloc(1), ', ', zloc(2), ', ', zloc(3)
       end do
    end do
    close(53)
@@ -742,6 +742,8 @@ subroutine ExtLd_ConvertInpDataForExtProg(u, p, errStat, errMsg )
    u%DX_u%nacDef(7:9) = wm_crv
    u%DX_u%nacDef(10:12) = u%NacelleMotion%RotationVel(:,1)
 
+   open(53, file = 'bld_root_orient.csv', status='old', access='append')
+   write(53,*) 'x, dx, y, dy, z, dz, n11, n12, n13, n21, n22, n23, n31, n32, n33, w11, w12, w13, w21, w22, w23, w31, w32, w33'
    do k=1,p%NumBlds
       call BD_CrvExtractCrv(u%BladeRootMotion(k)%Orientation(:,:,1), wm_crv, ErrStat2, ErrMsg2)
       call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -749,7 +751,9 @@ subroutine ExtLd_ConvertInpDataForExtProg(u, p, errStat, errMsg )
       u%DX_u%bldRootDef( (k-1)*12+4:(k-1)*12+6 ) = u%BladeRootMotion(k)%TranslationVel(:,1)
       u%DX_u%bldRootDef( (k-1)*12+7:(k-1)*12+9 ) = wm_crv
       u%DX_u%bldRootDef( (k-1)*12+10:(k-1)*12+12 ) = u%BladeRootMotion(k)%RotationVel(:,1)
+      write(53, *) u%BladeRootMotion(k)%TranslationDisp(1,1), ' ', u%BladeRootMotion(k)%TranslationDisp(2,1), ' ', u%BladeRootMotion(k)%TranslationDisp(3,1), ' ', wm_crv(1), ' ', wm_crv(2), ' ', wm_crv(3)
    end do
+   close(53)   
    
 end subroutine ExtLd_ConvertInpDataForExtProg
 !----------------------------------------------------------------------------------------------------------------------------------
