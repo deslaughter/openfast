@@ -269,11 +269,9 @@ void fast::OpenFAST::findOutputFile(int iTurbLoc) {
     }
 
     ierr = nc_inq_dimlen(ncid, ncOutDimIDs_["n_tsteps"], &n_tsteps);
-    std::cerr << "n_tsteps = " << n_tsteps << std::endl;
     check_nc_error(ierr, "nc_inq_dimlen");
     n_tsteps -= 1; //To account for 0 based indexing
     ierr = nc_get_vara_double(ncid, ncOutVarIDs_["time"], &n_tsteps, &count1, &latest_time);
-    std::cerr <<  "latest_time from nc file = " << latest_time << std::endl;
     check_nc_error(ierr, "nc_get_vara_double - getting latest time");
     nc_close(ncid);
 
@@ -1777,7 +1775,6 @@ void fast::OpenFAST::interpolateVel_ForceToVelNodes() {
 }
 
 void fast::OpenFAST::computeTorqueThrust(int iTurbGlob, double* torque, double* thrust, int nSize) {
-    assert(nSize==3);
 
     int iTurbLoc = get_localTurbNo(iTurbGlob) ;
     if (turbineData[iTurbLoc].sType != EXTINFLOW)
@@ -2857,7 +2854,7 @@ void fast::OpenFAST::get_ref_positions_from_openfast(int iTurb) {
 
 }
 
-void fast::OpenFAST::getBladeChord(std::vector<double> & bldChord, int iTurbGlob) {
+void fast::OpenFAST::getBladeChord(double * bldChord, int iTurbGlob) {
 
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
@@ -2871,7 +2868,7 @@ void fast::OpenFAST::getBladeChord(std::vector<double> & bldChord, int iTurbGlob
     }
 }
 
-void fast::OpenFAST::getBladeRloc(std::vector<double> & bldRloc, int iTurbGlob) {
+void fast::OpenFAST::getBladeRloc(double * bldRloc, int iTurbGlob) {
 
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
@@ -2887,7 +2884,6 @@ void fast::OpenFAST::getBladeRloc(std::vector<double> & bldRloc, int iTurbGlob) 
 
 void fast::OpenFAST::getBladeRefPositions(double* bldRefPos, int iTurbGlob, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
     int iRunTot = 0;
@@ -2905,7 +2901,6 @@ void fast::OpenFAST::getBladeRefPositions(double* bldRefPos, int iTurbGlob, int 
 
 void fast::OpenFAST::getBladeRootRefPositions(double* bldRootRefPos, int iTurbGlob, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
     int iRunTot = 0;
@@ -2919,7 +2914,6 @@ void fast::OpenFAST::getBladeRootRefPositions(double* bldRootRefPos, int iTurbGl
 
 void fast::OpenFAST::getBladeDisplacements(double* bldDefl, double* bldVel, int iTurbGlob, fast::timeStep t, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
     int iRunTot = 0;
@@ -2961,17 +2955,15 @@ void fast::OpenFAST::getBladeRootDisplacements(double* bldRootDefl, int iTurbGlo
 
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
-    assert(nSize == 6);
 
     for (int i=0; i < nBlades; i++) {
-        for (int k=0; k < 6; k++)
+        for (int k=0; k < nSize; k++)
             bldRootDefl[i*6+k] = brFSIData[iTurbLoc][t].bld_root_def[i*6+k];
     }
 }
 
 void fast::OpenFAST::getBladePitch(double* bldPitch, int iTurbGlob, int nSize) {
 
-    assert(nSize==3);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     for (int j=0; j < nSize; j++)
         bldPitch[j] = brFSIData[iTurbLoc][fast::STATE_NP1].bld_pitch[j] * 180/M_PI;
@@ -2980,7 +2972,6 @@ void fast::OpenFAST::getBladePitch(double* bldPitch, int iTurbGlob, int nSize) {
 
 void fast::OpenFAST::getTowerRefPositions(double* twrRefPos, int iTurbGlob, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nPtsTwr = turbineData[iTurbLoc].nBRfsiPtsTwr;
     for (int i=0; i < nPtsTwr; i++) {
@@ -2993,11 +2984,10 @@ void fast::OpenFAST::getTowerRefPositions(double* twrRefPos, int iTurbGlob, int 
 
 void fast::OpenFAST::getTowerDisplacements(double* twrDefl, double* twrVel, int iTurbGlob, fast::timeStep t, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nPtsTwr = turbineData[iTurbLoc].nBRfsiPtsTwr;
     for (int i=0; i < nPtsTwr; i++) {
-        for (int j=0; j < 6; j++) {
+        for (int j=0; j < nSize; j++) {
             twrDefl[i*6+j] = brFSIData[iTurbLoc][t].twr_def[i*6+j];
             twrVel[i*6+j] = brFSIData[iTurbLoc][t].twr_vel[i*6+j];
         }
@@ -3007,16 +2997,14 @@ void fast::OpenFAST::getTowerDisplacements(double* twrDefl, double* twrVel, int 
 
 void fast::OpenFAST::getHubRefPosition(double* hubRefPos, int iTurbGlob, int nSize) {
 
-    assert(nSize==6); // shouldn't this be 3?
     int iTurbLoc = get_localTurbNo(iTurbGlob);
-    for (int j=0; j < 6; j++)
+    for (int j=0; j < nSize; j++)
         hubRefPos[j] = brFSIData[iTurbLoc][fast::STATE_NP1].hub_ref_pos[j];
 
 }
 
 void fast::OpenFAST::getHubDisplacement(double* hubDefl, double* hubVel, int iTurbGlob, fast::timeStep t, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     for (int j=0; j < nSize; j++) {
         hubDefl[j] = brFSIData[iTurbLoc][t].hub_def[j];
@@ -3027,7 +3015,6 @@ void fast::OpenFAST::getHubDisplacement(double* hubDefl, double* hubVel, int iTu
 
 void fast::OpenFAST::getNacelleRefPosition(double* nacRefPos, int iTurbGlob, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     for (int j=0; j < nSize; j++)
         nacRefPos[j] = brFSIData[iTurbLoc][fast::STATE_NP1].nac_ref_pos[j];
@@ -3037,7 +3024,6 @@ void fast::OpenFAST::getNacelleRefPosition(double* nacRefPos, int iTurbGlob, int
 
 void fast::OpenFAST::getNacelleDisplacement(double* nacDefl, double* nacVel, int iTurbGlob, fast::timeStep t, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     for (int j=0; j < nSize; j++) {
         nacDefl[j] = brFSIData[iTurbLoc][t].nac_def[j];
@@ -3047,7 +3033,7 @@ void fast::OpenFAST::getNacelleDisplacement(double* nacDefl, double* nacVel, int
 }
 
 void fast::OpenFAST::setBladeForces(double* bldForces, int iTurbGlob, fast::timeStep t, int nSize) {
-    assert(nSize==6);
+
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nBlades = get_numBladesLoc(iTurbLoc);
     int iRunTot = 0;
@@ -3066,7 +3052,6 @@ void fast::OpenFAST::setBladeForces(double* bldForces, int iTurbGlob, fast::time
 
 void fast::OpenFAST::setTowerForces(double* twrForces, int iTurbGlob, fast::timeStep t, int nSize) {
 
-    assert(nSize==6);
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     int nPtsTwr = turbineData[iTurbLoc].nBRfsiPtsTwr;
     for (int i=0; i < nPtsTwr; i++)

@@ -481,9 +481,9 @@ class OpenFAST {
   int getProc(int iTurbGlob) {return turbineMapGlobToProc[iTurbGlob];}
 
   //! Get the blade chord array 'bldRloc' of turbine number 'iTurbGlob'
-  void getBladeChord(std::vector<double> & bldChord, int iTurbGlob);
+  void getBladeChord(double * bldChord, int iTurbGlob);
   //! Get the blade node radial locations array 'bldRloc' of turbine number 'iTurbGlob'
-  void getBladeRloc(std::vector<double> & bldRloc, int iTurbGlob);
+  void getBladeRloc(double * bldRloc, int iTurbGlob);
   //! Get the blade reference positions array 'bldRefPos' of turbine number 'iTurbGlob'
   void getBladeRefPositions(double* bldRefPos, int iTurbGlob, int nSize=6);
   //! Get the blade root reference positions array 'bldRootRefPos' of turbine number 'iTurbGlob'    
@@ -493,7 +493,7 @@ class OpenFAST {
   //! Get the blade root deflections array 'bldRootDefl' of turbine number 'iTurbGlob' at time step 't'
   void getBladeRootDisplacements(double* bldRootDefl, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=6);
   //! Get the blade pitch 'bldPitch' of turbine number 'iTurbGlob'
-  void getBladePitch(double* bldPitch, int iTurbGlob, int nSize);
+  void getBladePitch(double* bldPitch, int iTurbGlob, int nSize=3);
   //! Get the tower reference positions array 'twrRefPos' of turbine number 'iTurbGlob'
   void getTowerRefPositions(double* twrRefPos, int iTurbGlob, int nSize=6);
   //! Get the tower deflections array 'twrDefl' of turbine number 'iTurbGlob' at time step 't'
