@@ -39,7 +39,7 @@ fast::OpenFAST::OpenFAST()
     ncRstVarNames_ = {"time", "rst_filename", "twr_ref_pos", "bld_ref_pos", "nac_ref_pos", "hub_ref_pos", "twr_def", "twr_vel", "twr_ld", "bld_def", "bld_vel", "bld_ld", "hub_def", "hub_vel", "nac_def", "nac_vel", "bld_root_def", "bld_pitch", "x_vel", "xdot_vel", "vel_vel", "x_force", "xdot_force", "orient_force", "vel_force", "force"};
     ncRstDimNames_ = {"n_tsteps", "n_states", "n_twr_data", "n_bld_data", "n_pt_data", "n_bld_root_data", "n_bld_pitch_data", "n_vel_pts_data", "n_force_pts_data", "n_force_pts_orient_data"};
 
-    ncOutVarNames_ = {"time", "twr_ref_pos", "twr_ref_orient", "bld_chord", "bld_rloc", "bld_ref_pos", "bld_ref_orient", "hub_ref_pos", "hub_ref_orient", "nac_ref_pos", "nac_ref_orient", "twr_disp", "twr_orient", "twr_vel", "twr_rotvel", "twr_ld", "twr_moment", "bld_disp", "bld_orient", "bld_vel", "bld_rotvel", "bld_ld", "bld_ld_loc", "bld_moment", "hub_disp", "hub_orient", "hub_vel", "hub_rotvel", "nac_disp", "nac_orient", "nac_vel", "nac_rotvel"};
+    ncOutVarNames_ = {"time", "twr_ref_pos", "twr_ref_orient", "bld_chord", "bld_rloc", "bld_ref_pos", "bld_ref_orient", "hub_ref_pos", "hub_ref_orient", "nac_ref_pos", "nac_ref_orient", "twr_disp", "twr_orient", "twr_vel", "twr_rotvel", "twr_ld", "twr_moment", "bld_disp", "bld_orient", "bld_vel", "bld_rotvel", "bld_ld", "bld_ld_loc", "bld_moment", "hub_disp", "hub_orient", "hub_vel", "hub_rotvel", "nac_disp", "nac_orient", "nac_vel", "nac_rotvel", "bld_root_ref_pos", "bld_root_ref_orient", "bld_root_disp", "bld_root_orient"};
     ncOutDimNames_ = {"n_tsteps", "n_dim", "n_twr_nds", "n_blds", "n_bld_nds"};
 }
 
@@ -319,7 +319,9 @@ void fast::OpenFAST::prepareOutputFile(int iTurbLoc) {
         const std::vector<int> twrDefLoadsDims{ncOutDimIDs_["n_tsteps"], ncOutDimIDs_["n_dim"], ncOutDimIDs_["n_twr_nds"]};
         const std::vector<int> bldParamDims{ncOutDimIDs_["n_blds"], ncOutDimIDs_["n_bld_nds"]};
         const std::vector<int> bldRefDims{ncOutDimIDs_["n_blds"], ncOutDimIDs_["n_dim"], ncOutDimIDs_["n_bld_nds"]};
+        const std::vector<int> bldRootRefDims{ncOutDimIDs_["n_blds"], ncOutDimIDs_["n_dim"]};
         const std::vector<int> bldDefLoadsDims{ncOutDimIDs_["n_tsteps"], ncOutDimIDs_["n_blds"], ncOutDimIDs_["n_dim"], ncOutDimIDs_["n_bld_nds"]};
+        const std::vector<int> bldRootDefDims{ncOutDimIDs_["n_tsteps"], ncOutDimIDs_["n_blds"], ncOutDimIDs_["n_dim"]};
         const std::vector<int> ptRefDims{ncOutDimIDs_["n_dim"]};
         const std::vector<int> ptDefLoadsDims{ncOutDimIDs_["n_tsteps"], ncOutDimIDs_["n_dim"]};
 
@@ -335,6 +337,12 @@ void fast::OpenFAST::prepareOutputFile(int iTurbLoc) {
         ncOutVarIDs_["bld_ref_pos"] = tmpVarID;
         ierr = nc_def_var(ncid, "bld_ref_orient", NC_DOUBLE, 3, bldRefDims.data(), &tmpVarID);
         ncOutVarIDs_["bld_ref_orient"] = tmpVarID;
+
+        ierr = nc_def_var(ncid, "bld_root_ref_pos", NC_DOUBLE, 2, bldRootRefDims.data(), &tmpVarID);
+        ncOutVarIDs_["bld_root_ref_pos"] = tmpVarID;
+        ierr = nc_def_var(ncid, "bld_root_ref_orient", NC_DOUBLE, 2, bldRootRefDims.data(), &tmpVarID);
+        ncOutVarIDs_["bld_root_ref_orient"] = tmpVarID;
+
         ierr = nc_def_var(ncid, "hub_ref_pos", NC_DOUBLE, 1, ptRefDims.data(), &tmpVarID);
         ncOutVarIDs_["hub_ref_pos"] = tmpVarID;
         ierr = nc_def_var(ncid, "hub_ref_orient", NC_DOUBLE, 1, ptRefDims.data(), &tmpVarID);
@@ -365,6 +373,12 @@ void fast::OpenFAST::prepareOutputFile(int iTurbLoc) {
         ncOutVarIDs_["bld_vel"] = tmpVarID;
         ierr = nc_def_var(ncid, "bld_rotvel", NC_DOUBLE, 4, bldDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["bld_rotvel"] = tmpVarID;
+
+        ierr = nc_def_var(ncid, "bld_root_disp", NC_DOUBLE, 3, bldRootDefDims.data(), &tmpVarID);
+        ncOutVarIDs_["bld_root_disp"] = tmpVarID;
+        ierr = nc_def_var(ncid, "bld_root_orient", NC_DOUBLE, 3, bldRootDefDims.data(), &tmpVarID);
+        ncOutVarIDs_["bld_root_orient"] = tmpVarID;
+
         ierr = nc_def_var(ncid, "bld_ld", NC_DOUBLE, 4, bldDefLoadsDims.data(), &tmpVarID);
         ncOutVarIDs_["bld_ld"] = tmpVarID;
         ierr = nc_def_var(ncid, "bld_ld_loc", NC_DOUBLE, 4, bldDefLoadsDims.data(), &tmpVarID);
@@ -534,6 +548,20 @@ void fast::OpenFAST::prepareOutputFile(int iTurbLoc) {
                 ierr = nc_put_vara_double(ncid, ncOutVarIDs_["bld_rloc"], start_dim.data(),
                                           param_count_dim.data(), tmpArray.data());
             }
+        }
+
+        for (size_t iBlade=0; iBlade < nBlades; iBlade++) {
+            std::vector<size_t> start_dim{iBlade,0};
+            std::vector<size_t> count_dim{1,3};
+            ierr = nc_put_vara_double(ncid, ncOutVarIDs_["bld_root_ref_pos"],
+                                     start_dim.data(),
+                                     count_dim.data(),
+                                     &brFSIData[iTurbLoc][3].bld_root_ref_pos[iBlade*6+0]);
+
+            ierr = nc_put_vara_double(ncid, ncOutVarIDs_["bld_root_ref_orient"],
+                                     start_dim.data(),
+                                     count_dim.data(),
+                                     &brFSIData[iTurbLoc][3].bld_root_ref_pos[iBlade*6+3]);
         }
 
         ierr = nc_put_var_double(ncid, ncOutVarIDs_["nac_ref_pos"],
@@ -2312,6 +2340,13 @@ void fast::OpenFAST::get_data_from_openfast(timeStep t) {
                 }
             }
 
+            for (int j = 0; j < 3; j++) {
+                brFSIData[iTurb][t].hub_def[j] = extld_i_f_FAST[iTurb].hubDef[j];
+                brFSIData[iTurb][t].hub_def[3+j] = extld_i_f_FAST[iTurb].hubDef[6+j];
+                brFSIData[iTurb][t].nac_def[j] = extld_i_f_FAST[iTurb].nacDef[j];
+                brFSIData[iTurb][t].nac_def[3+j] = extld_i_f_FAST[iTurb].nacDef[6+j];
+            }
+
             //TODO: May be calculate the residual here as well
         }
     }
@@ -2569,8 +2604,12 @@ void fast::OpenFAST::writeOutputFile(int iTurbLoc, int n_t_global) {
         tmpArray.resize(nTwrPts);
         std::vector<size_t> count_dim{1,1,static_cast<size_t>(nTwrPts)};
         for (size_t iDim=0;iDim < 3; iDim++) {
-            for (auto i=0; i < nTwrPts; i++)
+            for (auto i=0; i < nTwrPts; i++) {
                 tmpArray[i] = brFSIData[iTurbLoc][3].twr_def[i*6+iDim] ;
+                // std::cerr << "Twr displacement Node " << i << ", dimension " << iDim << " = "
+                //           << brFSIData[iTurbLoc][3].twr_ref_pos[i*6+iDim] <<  " "
+                //           << brFSIData[iTurbLoc][3].twr_def[i*6+iDim] << std::endl;
+            }
             std::vector<size_t> start_dim{n_tsteps,iDim,0};
             ierr = nc_put_vara_double(ncid, ncOutVarIDs_["twr_disp"], start_dim.data(), count_dim.data(), tmpArray.data());
         }
@@ -2694,6 +2733,24 @@ void fast::OpenFAST::writeOutputFile(int iTurbLoc, int n_t_global) {
             }
         }
 
+    }
+
+    {
+        for (size_t iBlade=0; iBlade < nBlades; iBlade++) {
+
+            std::vector<size_t> start_dim{n_tsteps, iBlade, 0};
+            std::vector<size_t> count_dim{1,1,3};
+
+            ierr = nc_put_vara_double(ncid, ncOutVarIDs_["bld_root_disp"],
+                                      start_dim.data(),
+                                      count_dim.data(),
+                                      &brFSIData[iTurbLoc][3].bld_root_def[iBlade*6+0]);
+
+            ierr = nc_put_vara_double(ncid, ncOutVarIDs_["bld_root_orient"],
+                                      start_dim.data(),
+                                      count_dim.data(),
+                                      &brFSIData[iTurbLoc][3].bld_root_def[iBlade*6+3]);
+        }
     }
 
     {
@@ -2966,7 +3023,7 @@ void fast::OpenFAST::getBladePitch(double* bldPitch, int iTurbGlob, int nSize) {
 
     int iTurbLoc = get_localTurbNo(iTurbGlob);
     for (int j=0; j < nSize; j++)
-        bldPitch[j] = brFSIData[iTurbLoc][fast::STATE_NP1].bld_pitch[j] * 180/M_PI;
+        bldPitch[j] = brFSIData[iTurbLoc][fast::STATE_NP1].bld_pitch[j];
 
 }
 

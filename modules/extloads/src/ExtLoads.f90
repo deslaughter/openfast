@@ -125,7 +125,7 @@ subroutine ExtLd_Init( InitInp, u, xd, p, y, m, interval, InitOut, ErrStat, ErrM
    p%NumBldNds(:) = InitInp%NumBldNodes(:)
    p%nTotBldNds = sum(p%NumBldNds(:))
    p%NumTwrNds = InitInp%NumTwrNds
-   p%TwrAero = .false.
+   p%TwrAero = .true.
 
    p%az_blend_mean = InitInp%az_blend_mean
    p%az_blend_delta = InitInp%az_blend_delta
@@ -706,24 +706,6 @@ subroutine ExtLd_ConvertInpDataForExtProg(u, p, errStat, errMsg )
       end do
    end do
       
-   do k=1,p%NumBlds
-      do j=1,p%NumBldNds(k)
-         call BD_CrvExtractCrv(u%BladeMotion(k)%Orientation(:,:,j), wm_crv, ErrStat2, ErrMsg2)
-         cref(1) = 1.0
-         cref(2) = 0.0
-         cref(3) = 0.0
-         call apply_wm(wm_crv, cref, xloc, -1.0)
-         cref(1) = 0.0
-         cref(2) = 1.0
-         cref(3) = 0.0
-         call apply_wm(wm_crv, cref, yloc, -1.0)
-         cref(1) = 0.0
-         cref(2) = 0.0
-         cref(3) = 1.0
-         call apply_wm(wm_crv, cref, zloc, -1.0)
-      end do
-   end do
-
    call BD_CrvExtractCrv(u%HubMotion%Orientation(:,:,1), wm_crv, ErrStat2, ErrMsg2)
    call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    u%DX_u%hubDef(1:3) = u%HubMotion%TranslationDisp(:,1)
