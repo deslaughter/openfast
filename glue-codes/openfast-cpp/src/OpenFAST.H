@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <set>
 #include <map>
+#include <memory>
 #include "netcdf.h"
 #include "dlfcn.h"
 //TODO: The skip MPICXX is put in place primarily to get around errors in OpenFOAM. This will cause problems if the driver program uses C++ API for MPI.
@@ -357,7 +358,7 @@ class OpenFAST {
   create_sc_t * create_SuperController;
   typedef void destroy_sc_t(SuperController *);
   destroy_sc_t * destroy_SuperController;
-  SuperController * sc;
+  std::unique_ptr<SuperController> sc;
 
   // MPI related book keeping for all processors containing turbines
   //! Number of processors in a fastMPIGroup
@@ -486,8 +487,8 @@ class OpenFAST {
   void getBladeRloc(double * bldRloc, int iTurbGlob);
   //! Get the blade reference positions array 'bldRefPos' of turbine number 'iTurbGlob'
   void getBladeRefPositions(double* bldRefPos, int iTurbGlob, int nSize=6);
-  //! Get the blade root reference positions array 'bldRootRefPos' of turbine number 'iTurbGlob'    
-  void getBladeRootRefPositions(double* bldRootRefPos, int iTurbGlob, int nSize=6);    
+  //! Get the blade root reference positions array 'bldRootRefPos' of turbine number 'iTurbGlob'
+  void getBladeRootRefPositions(double* bldRootRefPos, int iTurbGlob, int nSize=6);
   //! Get the blade deflections array 'bldDefl' of turbine number 'iTurbGlob' at time step 't'
   void getBladeDisplacements(double* bldDefl, double* bldVel, int iTurbGlob, fast::timeStep t = fast::STATE_NP1, int nSize=6);
   //! Get the blade root deflections array 'bldRootDefl' of turbine number 'iTurbGlob' at time step 't'
