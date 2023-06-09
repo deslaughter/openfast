@@ -30,6 +30,7 @@ matlab_add_mex(
     ${PROJECT_SOURCE_DIR}/modules/openfast-library/src/FAST_Solver.f90
     ${PROJECT_SOURCE_DIR}/modules/openfast-library/src/FAST_Library.f90
   LINK_TO 
+    $<TARGET_FILE:nwtclibs_c>
     $<TARGET_FILE:nwtclibs-matlab>  # MATLAB Specific
     $<TARGET_FILE:versioninfolib>
     $<TARGET_FILE:aerodyn14lib>

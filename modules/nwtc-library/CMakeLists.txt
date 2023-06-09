@@ -98,7 +98,18 @@ set(NWTCLIBS_SOURCES
   src/NetLib/slatec/i1mach.f
   src/NetLib/slatec/j4save.f
   src/NetLib/slatec/xgetua.f
-  src/NetLib/slatec/xermsg.f  
+  src/NetLib/slatec/xermsg.f
+
+  # SQLite Fortran Interface
+  src/sqlite/sqlite3.f90
+  src/sqlite/sqlite3_util.f90
+)
+
+set(NWTCLIBS_C_SOURCES
+
+  # SQLite C library
+  src/sqlite/sqlite3.c
+  src/sqlite/sqlite3.h
 )
 
 get_filename_component(FCNAME ${CMAKE_Fortran_COMPILER} NAME)
@@ -135,9 +146,13 @@ if (CMAKE_BUILD_TYPE MATCHES Debug)
    endif()
 endif()
 
-# Create NWTC Library
+# NWTC C library
+add_library(nwtclibs_c ${NWTCLIBS_C_SOURCES})
+
+# NWTC Library
 add_library(nwtclibs ${NWTC_SYS_FILE} ${NWTCLIBS_SOURCES})
 target_link_libraries(nwtclibs PUBLIC
+  nwtclibs_c
   ${LAPACK_LIBRARIES} 
   ${CMAKE_DL_LIBS} 
   ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES}
@@ -150,7 +165,7 @@ if (USE_LOCAL_STATIC_LAPACK)
 endif()
 
 # Install libraries
-install(TARGETS nwtclibs
+install(TARGETS nwtclibs nwtclibs_c
   EXPORT "${CMAKE_PROJECT_NAME}Libraries"
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
