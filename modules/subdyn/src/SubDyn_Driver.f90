@@ -316,20 +316,22 @@ CONTAINS
 
    !-------------------------------------------------------------------------------------------------------------------------------
    SUBROUTINE ReadDriverInputFile( inputFile, InitInp)
+      use YAML_Inp
       CHARACTER(*),                 INTENT( IN    )   :: inputFile
       TYPE(SD_dvr_InitInput),       INTENT(   OUT )   :: InitInp
-      ! Local variables  
-      INTEGER                                          :: I                    ! generic integer for counting
-      INTEGER                                          :: J                    ! generic integer for counting
+      
       INTEGER                                          :: iDummy               ! dummy integer
       CHARACTER(   2)                                  :: strI                 ! string version of the loop counter
-
       CHARACTER(1024)                                  :: EchoFile             ! Name of SubDyn echo file  
       CHARACTER(1024)                                  :: Line                 ! String to temporarially hold value of read line   
+      CHARACTER(1024)                                  :: UnsteadyFile         ! Path for unsteady input file   
       CHARACTER(1024)                                  :: TmpPath              ! Temporary storage for relative path name
       CHARACTER(1024)                                  :: TmpFmt               ! Temporary storage for format statement
       CHARACTER(1024)                                  :: FileName             ! Name of SubDyn input file  
-      CHARACTER(1024)                                  :: PriPath             ! Path Name of SubDyn input file  
+      CHARACTER(1024)                                  :: PriPath              ! Path Name of SubDyn input file  
+
+      TYPE(YAML_tree) :: inpTree, elem
+      integer(IntKi)  :: nLoads
    
       UnEcho=-1
       UnIn  =-1
@@ -337,77 +339,135 @@ CONTAINS
       FileName = TRIM(inputFile)
       ! Primary path, relative files will be based on it
       CALL GetPath( FileName, PriPath )
-   
-      CALL GetNewUnit( UnIn )   
-      CALL OpenFInpFile( UnIn, FileName, ErrStat2, ErrMsg2);
-      call AbortIfFailed()
-   
       CALL WrScr( 'Opening SubDyn Driver input file:  '//FileName )
-      
-      ! Read until "echo"
-      CALL ReadCom( UnIn, FileName, 'SubDyn Driver input file header line 1', ErrStat2, ErrMsg2); call AbortIfFailed()
-      CALL ReadCom( UnIn, FileName, 'SubDyn Driver input file header line 2', ErrStat2, ErrMsg2); call AbortIfFailed()
-      CALL ReadVar ( UnIn, FileName, InitInp%Echo, 'Echo', 'Echo Input', ErrStat2, ErrMsg2); call AbortIfFailed()
-      ! If we echo, we rewind
-      IF ( InitInp%Echo ) THEN
-         EchoFile = TRIM(FileName)//'.echo'
-         CALL GetNewUnit( UnEcho )   
-         CALL OpenEcho ( UnEcho, EchoFile, ErrStat, ErrMsg ); call AbortIfFailed()
-         REWIND(UnIn)
-         CALL ReadCom( UnIn, FileName, 'SubDyn Driver input file header line 1', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-         CALL ReadCom( UnIn, FileName, 'SubDyn Driver input file header line 2', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-         CALL ReadVar ( UnIn, FileName, InitInp%Echo, 'Echo', 'Echo the input file data', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      END IF
-      !---------------------- ENVIRONMENTAL CONDITIONS -------------------------------------------------
-      CALL ReadCom( UnIn, FileName, 'Environmental conditions header', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%Gravity, 'Gravity', 'Gravity', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%WtrDpth, 'WtrDpth', 'WtrDpth', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      !---------------------- SubDyn -------------------------------------------------------------------
-      CALL ReadCom( UnIn, FileName, 'SubDyn header', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%SDInputFile, 'HDInputFile', 'SubDyn input filename', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%OutRootName, 'OutRootName', 'SubDyn output root filename', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%NSteps     , 'NSteps', 'Number of time steps in the SubDyn simulation', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%TimeInterval, 'TimeInterval', 'Time interval for any SubDyn inputs', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadAry( UnIn, FileName, InitInp%TP_RefPoint, 3, 'TP reference point', 'TP reference point', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%SubRotateZ, 'SubRotateZ', 'Rotation angle in degrees about Z axis.', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      !---------------------- INPUTS -------------------------------------------------------------------
-      CALL ReadCom( UnIn, FileName, 'INPUTS header', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%InputsMod , 'InputsMod', 'Model for the inputs', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar( UnIn, FileName, InitInp%InputsFile, 'InputsFile', 'Filename for the SubDyn inputs', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      !---------------------- STEADY INPUTS (for InputsMod = 1) ----------------------------------------
-      CALL ReadCom( UnIn, FileName, 'STEADY STATE INPUTS header', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      IF ( InitInp%InputsMod == 1 ) THEN
-         CALL ReadAry ( UnIn, FileName, InitInp%uTPInSteady      , 6, 'uInSteady',         'Steady-state TP displacements and rotations.', ErrStat2,  ErrMsg2, UnEcho)         
-         CALL ReadAry ( UnIn, FileName, InitInp%uDotTPInSteady   , 6, 'uDotTPInSteady',    'Steady-state TP translational and rotational velocities.', ErrStat2,  ErrMsg2, UnEcho)         
-         CALL ReadAry ( UnIn, FileName, InitInp%uDotDotTPInSteady, 6, 'uDotDotTPInSteady', 'Steady-state TP translational and rotational accelerations.', ErrStat2,  ErrMsg2, UnEcho)         
-      ELSE
-         InitInp%uTPInSteady       = 0.0
-         InitInp%uDotTPInSteady    = 0.0
-         InitInp%uDotDotTPInSteady = 0.0
-         CALL ReadCom( UnIn, FileName, '0.0   0.0   0.0   0.0   0.0   0.0   uTPInSteady     ', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-         CALL ReadCom( UnIn, FileName, '0.0   0.0   0.0   0.0   0.0   0.0   uDotTPInSteady  ', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-         CALL ReadCom( UnIn, FileName, '0.0   0.0   0.0   0.0   0.0   0.0   uDotTPInSteady  ', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      END IF
-      CALL AbortIfFailed()
-      !---------------------- FORCES ----------------------------------------
-      CALL ReadCom( UnIn, FileName, '--- FORCES INPUTS header', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-      CALL ReadVar ( UnIn, FileName, iDummy,  'nApplied Forces', 'Number of applied forces', ErrStat2,  ErrMsg2, UnEcho); 
-      !call AbortIfFailed()
-      if (ErrStat2/=ErrID_None) then
-         ! TODO Temporary
-         call LegacyWarning('Applied loads input missing.')
-         allocate(InitInp%AppliedLoads(0), stat=ErrStat2); ErrMsg2='Allocating Forces'; call AbortIfFailed()
-      else
-         allocate(InitInp%AppliedLoads(iDummy), stat=ErrStat2); ErrMsg2='Allocating Forces'; call AbortIfFailed()
-         CALL ReadCom( UnIn, FileName, 'JointID    Fx     Fy    Fz     Mx     My     Mz', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-         CALL ReadCom( UnIn, FileName, ' (-)       (N)   (N)    (N)   (Nm)   (Nm)   (Nm)', ErrStat2, ErrMsg2, UnEcho); call AbortIfFailed()
-         do i=1,iDummy
-            ! Read line and extract loads
-            read(UnIn, fmt='(A)', iostat=ErrStat2) Line ; ErrMsg2='Erro reading force input line'//num2lstr(i); call AbortIfFailed()
-            call readAppliedForce(Line, InitInp%AppliedLoads(i), PriPath, Errstat2, ErrMsg2); call AbortIfFailed()
-         enddo
-      endif
 
+      call YAML_ParsePath(FileName, inpTree, ErrStat2, ErrMsg2); call AbortIfFailed()
+
+      if (YAML_HasKey(inpTree, "Echo")) then
+         call YAML_Get(inpTree, "Echo", InitInp%Echo, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%Echo = .false.
+      end if
+
+      if (YAML_HasKey(inpTree, "Gravity")) then
+         call YAML_Get(inpTree, "Gravity", InitInp%Gravity, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%Gravity = 0.0_ReKi
+      end if
+
+      if (YAML_HasKey(inpTree, "WtrDpth")) then
+         call YAML_Get(inpTree, "WtrDpth", InitInp%WtrDpth, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%WtrDpth = 0.0_ReKi
+      end if
+
+      if (YAML_HasKey(inpTree, "SDInputFile")) then
+         call YAML_Get(inpTree, "SDInputFile", InitInp%SDInputFile, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%SDInputFile = ""
+      end if
+
+      if (YAML_HasKey(inpTree, "OutRootName")) then
+         call YAML_Get(inpTree, "OutRootName", InitInp%OutRootName, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%OutRootName = ""
+      end if
+
+      if (YAML_HasKey(inpTree, "NSteps")) then
+         call YAML_Get(inpTree, "NSteps", InitInp%NSteps, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%NSteps = 0
+      end if
+
+      if (YAML_HasKey(inpTree, "TimeInterval")) then
+         call YAML_Get(inpTree, "TimeInterval", InitInp%TimeInterval, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%TimeInterval = 0.0_DbKi
+      end if
+
+      if (YAML_HasKey(inpTree, "TP_RefPoint")) then
+         call YAML_Get(inpTree, "TP_RefPoint", InitInp%TP_RefPoint, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%TP_RefPoint = 0.0_ReKi
+      end if
+
+      if (YAML_HasKey(inpTree, "SubRotateZ")) then
+         call YAML_Get(inpTree, "SubRotateZ", InitInp%SubRotateZ, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%SubRotateZ = 0.0_ReKi
+      end if
+
+      if (YAML_HasKey(inpTree, "InputsMod")) then
+         call YAML_Get(inpTree, "InputsMod", InitInp%InputsMod, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%InputsMod = 0
+      end if
+
+      if (YAML_HasKey(inpTree, "InputsFile")) then
+         call YAML_Get(inpTree, "InputsFile", InitInp%InputsFile, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%InputsFile = ""
+      end if
+
+      if (YAML_HasKey(inpTree, "uTPInSteady")) then
+         call YAML_Get(inpTree, "uTPInSteady", InitInp%uTPInSteady, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%uTPInSteady = 0.0_ReKi
+      end if
+
+      if (YAML_HasKey(inpTree, "uDotTPInSteady")) then
+         call YAML_Get(inpTree, "uDotTPInSteady", InitInp%uDotTPInSteady, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%uDotTPInSteady = 0.0_ReKi
+      end if
+
+      if (YAML_HasKey(inpTree, "uDotTPInSteady")) then
+         call YAML_Get(inpTree, "uDotTPInSteady", InitInp%uDotTPInSteady, ErrStat2, ErrMsg2); call AbortIfFailed()
+      else
+         InitInp%uDotTPInSteady = 0.0_ReKi
+      end if
+
+      if (YAML_HasKey(inpTree, "AppliedLoads")) then
+         call YAML_ListSize(inpTree, "AppliedLoads", nLoads, ErrStat2, ErrMsg2); call AbortIfFailed()
+         allocate(InitInp%AppliedLoads(nLoads), stat=ErrStat2); ErrMsg2='Allocating Forces'; call AbortIfFailed()
+         do i = 1, nLoads
+            call YAML_Get(inpTree, "AppliedLoads", i, elem, ErrStat2, ErrMsg2); call AbortIfFailed()
+            call YAML_Get(elem, "ALJointID", InitInp%AppliedLoads(i)%NodeID, ErrStat2, ErrMsg2); call AbortIfFailed()
+            InitInp%AppliedLoads(i)%SteadyLoad = 0.0_ReKi
+            if (YAML_HasKey(elem, "Fx")) then
+               call YAML_Get(elem, "Fx", InitInp%AppliedLoads(i)%SteadyLoad(1), ErrStat2, ErrMsg2); call AbortIfFailed()
+            end if
+            if (YAML_HasKey(elem, "Fy")) then
+               call YAML_Get(elem, "Fy", InitInp%AppliedLoads(i)%SteadyLoad(2), ErrStat2, ErrMsg2); call AbortIfFailed()
+            end if
+            if (YAML_HasKey(elem, "Fz")) then
+               call YAML_Get(elem, "Fz", InitInp%AppliedLoads(i)%SteadyLoad(3), ErrStat2, ErrMsg2); call AbortIfFailed()
+            end if
+            if (YAML_HasKey(elem, "Mx")) then
+               call YAML_Get(elem, "Mx", InitInp%AppliedLoads(i)%SteadyLoad(4), ErrStat2, ErrMsg2); call AbortIfFailed()
+            end if
+            if (YAML_HasKey(elem, "My")) then
+               call YAML_Get(elem, "My", InitInp%AppliedLoads(i)%SteadyLoad(5), ErrStat2, ErrMsg2); call AbortIfFailed()
+            end if
+            if (YAML_HasKey(elem, "Mz")) then
+               call YAML_Get(elem, "Mz", InitInp%AppliedLoads(i)%SteadyLoad(6), ErrStat2, ErrMsg2); call AbortIfFailed()
+            end if
+            if (YAML_HasKey(elem, "UnsteadyFile")) then
+               call YAML_Get(elem, "UnsteadyFile", UnsteadyFile, ErrStat2, ErrMsg2); call AbortIfFailed()
+               ErrMsg = 'Unsteady load file not yet supported but the input file `'//trim(UnsteadyFile)//'` was given.'
+               call ReadDelimFile(UnsteadyFile, 7, InitInp%AppliedLoads(i)%UnsteadyLoad, ErrStat2, ErrMsg2, 1, priPath); call AbortIfFailed()
+               return
+            end if
+         end do
+      else
+         call LegacyWarning('Applied loads input missing.')
+         allocate(InitInp%AppliedLoads(0), stat=ErrStat2)
+         ErrMsg2 = 'Allocating Forces'
+         call AbortIfFailed()
+      end if
+
+      call YAML_DestroyTree(inpTree, ErrStat2, ErrMsg2)
+      call AbortIfFailed()
    
       if(UnEcho>0) CLOSE( UnEcho )
       if(UnIn>0)   CLOSE( UnIn   )
