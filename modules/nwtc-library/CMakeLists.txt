@@ -19,6 +19,12 @@ if (GENERATE_TYPES)
 endif()
 
 #-------------------------------------------------------------------------------
+# paraconf (YAML parser)
+#-------------------------------------------------------------------------------
+
+add_subdirectory(src/paraconf)
+
+#-------------------------------------------------------------------------------
 # NWTC System File
 #-------------------------------------------------------------------------------
 
@@ -73,6 +79,7 @@ set(NWTCLIBS_SOURCES
   src/NWTC_Library_Types.f90
   src/VTK.f90
   src/YAML.f90
+  src/YAML_Inp.f90
   src/JSON.f90
 
   # RanLux sources
@@ -149,6 +156,7 @@ target_link_libraries(nwtclibs PUBLIC
   ${LAPACK_LIBRARIES} 
   ${CMAKE_DL_LIBS} 
   ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES}
+  paraconf
 )
 if (USE_DLL_INTERFACE)
   target_compile_definitions(nwtclibs PRIVATE USE_DLL_INTERFACE)
