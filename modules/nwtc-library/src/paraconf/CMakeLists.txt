@@ -33,6 +33,8 @@ set_target_properties(libyaml PROPERTIES
 # paraconf libraries
 #-------------------------------------------------------------------------------
 
+find_package(Threads REQUIRED)
+
 add_library(paraconf
 	paraconf/src/api.c
 	paraconf/src/status.c
