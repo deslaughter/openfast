@@ -27,6 +27,41 @@ jobs:
 
   ### BUILD JOBS
 
+  build-all-debug-vs:
+    # Tests compiling code in debug using Visual Studio projects (vs-build directory)
+    runs-on: windows-2022
+    steps:
+      - name: Setup Fortran
+        uses: fortran-lang/setup-fortran@v1.3
+        with:
+          compiler: intel-classic
+      - name: Checkout
+        uses: actions/checkout@main
+      - name: Build AeroDyn_Driver
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/AeroDyn/AeroDyn_Driver.sln /p:Configuration=Debug
+      - name: Build AeroDyn_Inflow_c_binding
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/AeroDyn_Inflow_c_binding/AeroDyn_Inflow_c_binding.sln /p:Configuration=Debug
+      - name: Build Beamdyn-w-registry
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/Beamdyn/Beamdyn-w-registry.sln /p:Configuration=Debug
+      - name: Build Discon
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/Discon/Discon.sln /p:Configuration=Debug
+      - name: Build FAST
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/FAST/FAST.sln /p:Configuration=Debug
+      - name: Build FAST-Farm
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/FAST-Farm/FAST-Farm.sln /p:Configuration=Debug
+      - name: Build HydroDynDriver
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/HydroDyn/HydroDynDriver.sln /p:Configuration=Debug
+      - name: Build HydroDyn_c_binding
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/HydroDyn_c_binding/HydroDyn_c_binding.sln /p:Configuration=Debug
+      - name: Build InflowWind_driver
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/InflowWind/InflowWind_driver.sln /p:Configuration=Debug
+      - name: Build InflowWind_c_binding
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/InflowWind_c_binding/InflowWind_c_binding.sln /p:Configuration=Debug
+      - name: Build MoorDynDriver
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/MoorDyn/MoorDynDriver.sln /p:Configuration=Debug
+      - name: Build TurbSim
+        run: msbuild ${{runner.workspace}}/openfast/vs-build/TurbSim/TurbSim.sln /p:Configuration=Debug
+
 
   build-all-debug:
     # Tests compiling in debug mode.
