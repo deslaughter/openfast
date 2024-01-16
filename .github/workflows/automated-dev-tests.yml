@@ -39,8 +39,8 @@ jobs:
         uses: actions/checkout@main
       - name: Build FAST
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.vfproj /upgrade
-          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.vfproj /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.sln /build "Debug|x64"
 
 
   build-all-debug:
