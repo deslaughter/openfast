@@ -34,9 +34,9 @@ jobs:
       - name: Setup Fortran
         run: |
           curl.exe --output webimage.exe --url https://registrationcenter-download.intel.com/akdlm/IRC_NAS/b5a4ff98-2c98-4b28-87f7-32082cac359e/w_onemkl_p_2024.0.0.49672_offline.exe
-          Start-Process -Wait .\webimage.exe -s -a --silent --action install --eula=accept -p=NEED_VS2017_INTEGRATION=0 -p=NEED_VS2019_INTEGRATION=0 -p=NEED_VS2022_INTEGRATION=1 --log-dir=.
+          Start-Process -Wait -FilePath .\webimage.exe -ArgumentList "-s -a --silent --action install --eula=accept -p=NEED_VS2017_INTEGRATION=0 -p=NEED_VS2019_INTEGRATION=0 -p=NEED_VS2022_INTEGRATION=1 --log-dir=."
           curl.exe --output webimage2.exe --url https://registrationcenter-download.intel.com/akdlm/IRC_NAS/3a64aab4-3c35-40ba-bc9c-f80f136a8005/w_fortran-compiler_p_2024.0.2.27_offline.exe
-          Start-Process -Wait .\webimage2.exe -s -a --silent --action install --eula=accept -p=NEED_VS2017_INTEGRATION=0 -p=NEED_VS2019_INTEGRATION=0 -p=NEED_VS2022_INTEGRATION=1 --log-dir=.
+          Start-Process -Wait -FilePath .\webimage2.exe -ArgumentList "-s -a --silent --action install --eula=accept -p=NEED_VS2017_INTEGRATION=0 -p=NEED_VS2019_INTEGRATION=0 -p=NEED_VS2022_INTEGRATION=1 --log-dir=."
       - name: Checkout
         uses: actions/checkout@main
       - name: Build FAST
