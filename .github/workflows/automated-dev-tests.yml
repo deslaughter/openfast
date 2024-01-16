@@ -32,9 +32,15 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: Setup Fortran
-        uses: fortran-lang/setup-fortran@v1.3
-        with:
-          compiler: intel-classic
+        run: |
+          curl.exe --output webimage.exe --url https://registrationcenter-download.intel.com/akdlm/IRC_NAS/62641e01-1e8d-4ace-91d6-ae03f7f8a71f/w_BaseKit_p_2024.0.0.49563_offline.exe
+          start /b /wait webimage.exe -s -x -f webimage_extracted --log extract.log
+          del webimage.exe
+          webimage_extracted\bootstrapper.exe -s --action install --components=intel.oneapi.win.mkl.devel --eula=accept -p=NEED_VS2017_INTEGRATION=0 -p=NEED_VS2019_INTEGRATION=0 -p=NEED_VS2022_INTEGRATION=1 --log-dir=.
+          curl.exe --output webimage2.exe --url https://registrationcenter-download.intel.com/akdlm/IRC_NAS/5b36181e-4974-4733-91c7-0c10c54900a5/w_HPCKit_p_2024.0.0.49588_offline.exe
+          start /b /wait webimage2.exe -s -x -f webimage2_extracted --log extract.log
+          del webimage2.exe
+          webimage2_extracted\bootstrapper.exe -s --action install --components=intel.oneapi.win.ifort-compiler --eula=accept -p=NEED_VS2017_INTEGRATION=0 -p=NEED_VS2019_INTEGRATION=0 -p=NEED_VS2022_INTEGRATION=1 --log-dir=.
       - name: Checkout
         uses: actions/checkout@main
       - name: Build FAST
