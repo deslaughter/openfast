@@ -39,40 +39,52 @@ jobs:
         uses: actions/checkout@main
       - name: Build AeroDyn_Driver
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/AeroDyn/AeroDyn_Driver.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/AeroDyn/AeroDyn_Driver.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/AeroDyn/AeroDyn_Driver.sln /build "Debug|x64"
       - name: Build AeroDyn_Inflow_c_binding
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/AeroDyn_Inflow_c_binding/AeroDyn_Inflow_c_binding.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/AeroDyn_Inflow_c_binding/AeroDyn_Inflow_c_binding.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/AeroDyn_Inflow_c_binding/AeroDyn_Inflow_c_binding.sln /build "Debug|x64"
       - name: Build Beamdyn-w-registry
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/Beamdyn/Beamdyn-w-registry.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/Beamdyn/Beamdyn-w-registry.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/Beamdyn/Beamdyn-w-registry.sln /build "Debug|x64"
       - name: Build Discon
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/Discon/Discon.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/Discon/Discon.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/Discon/Discon.sln /build "Debug|x64"
       - name: Build FAST
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.sln /build "Debug|x64"
       - name: Build FAST-Farm
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/FAST-Farm/FAST-Farm.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/FAST-Farm/FAST-Farm.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/FAST-Farm/FAST-Farm.sln /build "Debug|x64"
       - name: Build HydroDynDriver
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/HydroDyn/HydroDynDriver.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/HydroDyn/HydroDynDriver.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/HydroDyn/HydroDynDriver.sln /build "Debug|x64"
       - name: Build HydroDyn_c_binding
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/HydroDyn_c_binding/HydroDyn_c_binding.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/HydroDyn_c_binding/HydroDyn_c_binding.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/HydroDyn_c_binding/HydroDyn_c_binding.sln /build "Debug|x64"
       - name: Build InflowWind_driver
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/InflowWind/InflowWind_driver.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/InflowWind/InflowWind_driver.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/InflowWind/InflowWind_driver.sln /build "Debug|x64"
       - name: Build InflowWind_c_binding
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/InflowWind_c_binding/InflowWind_c_binding.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/InflowWind_c_binding/InflowWind_c_binding.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/InflowWind_c_binding/InflowWind_c_binding.sln /build "Debug|x64"
       - name: Build MoorDynDriver
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/MoorDyn/MoorDynDriver.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/MoorDyn/MoorDynDriver.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/MoorDyn/MoorDynDriver.sln /build "Debug|x64"
       - name: Build TurbSim
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/TurbSim/TurbSim.sln /upgrade /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/TurbSim/TurbSim.sln /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/TurbSim/TurbSim.sln /build "Debug|x64"
 
 
   build-all-debug:
