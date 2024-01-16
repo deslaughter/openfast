@@ -37,10 +37,10 @@ jobs:
           compiler: intel-classic
       - name: Checkout
         uses: actions/checkout@main
-      - name: Build AeroDyn_Driver
+      - name: Build FAST
         run: |
-          devenv ${{runner.workspace}}/openfast/vs-build/AeroDyn/AeroDyn_Driver.vfproj /upgrade
-          devenv ${{runner.workspace}}/openfast/vs-build/AeroDyn/AeroDyn_Driver.vfproj /build "Debug|x64"
+          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.vfproj /upgrade
+          devenv ${{runner.workspace}}/openfast/vs-build/FAST/FAST.vfproj /build "Debug|x64"
 
 
   build-all-debug:
