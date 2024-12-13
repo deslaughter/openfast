@@ -10326,10 +10326,12 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
 
       ! local variables
    INTEGER(IntKi)                          :: i_turb
+   INTEGER(IntKi)                          :: i_ext
    INTEGER(IntKi)                          :: n_t_global          !< loop counter
    INTEGER(IntKi)                          :: NumTurbines         ! Number of turbines in this simulation
    INTEGER(IntKi)                          :: ErrStat2            ! local error status
    CHARACTER(ErrMsgLen)                    :: ErrMsg2             ! local error message
+   CHARACTER(1024)                         :: OutFileRoot
    CHARACTER(*),             PARAMETER     :: RoutineName = 'FAST_RestoreForVTKModeShape_Tary'
 
 
@@ -10346,10 +10348,14 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
    CALL ReadModeShapeFile( Turbine(1)%p_FAST, trim(InputFileName), ErrStat2, ErrMsg2, checkpointOnly=.true. )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       if (ErrStat >= AbortErrLev) return
+   
+   ! Save checkpoint root path as read from mode shape file and remove extension
+   OutFileRoot = Turbine(1)%p_FAST%VTK_modes%CheckpointRoot
+   i_ext = index(OutFileRoot, '.ModeShapeVTK', back=.true.)
+   if (i_ext > 1) OutFileRoot = OutFileRoot(:i_ext - 1)
 
    CALL FAST_RestoreFromCheckpoint_Tary( t_initial, n_t_global, Turbine, trim(Turbine(1)%p_FAST%VTK_modes%CheckpointRoot), ErrStat2, ErrMsg2, silent=.true. )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
 
    DO i_turb = 1,NumTurbines
       if (.not. allocated(Turbine(i_turb)%m_FAST%Lin%LinTimes)) then
@@ -10363,6 +10369,9 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
                   Turbine(i_turb)%SeaSt, Turbine(i_turb)%HD, Turbine(i_turb)%SD, Turbine(i_turb)%ExtPtfm, Turbine(i_turb)%MAP, Turbine(i_turb)%FEAM, Turbine(i_turb)%MD, Turbine(i_turb)%Orca, &
                   Turbine(i_turb)%IceF, Turbine(i_turb)%IceD, Turbine(i_turb)%MeshMapData, trim(InputFileName), ErrStat2, ErrMsg2 )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
+      ! If extension was found, overwrite saved out file root
+      if (i_ext > 1) Turbine(i_turb)%p_FAST%OutFileRoot = OutFileRoot
    END DO
 
 
