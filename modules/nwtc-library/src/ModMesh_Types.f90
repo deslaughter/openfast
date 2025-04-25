@@ -151,41 +151,41 @@ MODULE ModMesh_Types
 
 CONTAINS
 !> This function returns the number of nodes in a given type of element.
-   INTEGER FUNCTION NumNodes( Xelement )
+   INTEGER FUNCTION NumElemNodes( Xelement )
      INTEGER, INTENT(IN) :: Xelement !< type of element
 
      SELECT CASE ( Xelement )
        CASE ( ELEMENT_POINT )
-         NumNodes = 1
+         NumElemNodes = 1
        CASE ( ELEMENT_LINE2 )
-         NumNodes = 2
+         NumElemNodes = 2
        CASE ( ELEMENT_LINE3 )
-         NumNodes = 3
+         NumElemNodes = 3
        CASE ( ELEMENT_TRI3 )
-         NumNodes = 3
+         NumElemNodes = 3
        CASE ( ELEMENT_TRI6 )
-         NumNodes = 6
+         NumElemNodes = 6
        CASE ( ELEMENT_QUAD4 )
-         NumNodes = 4
+         NumElemNodes = 4
        CASE ( ELEMENT_QUAD8 )
-         NumNodes = 8
+         NumElemNodes = 8
        CASE ( ELEMENT_TET4 )
-         NumNodes = 4
+         NumElemNodes = 4
        CASE ( ELEMENT_TET10 )
-         NumNodes = 10
+         NumElemNodes = 10
        CASE ( ELEMENT_HEX8 )
-         NumNodes = 8
+         NumElemNodes = 8
        CASE ( ELEMENT_HEX20 )
-         NumNodes = 20
+         NumElemNodes = 20
        CASE ( ELEMENT_WEDGE6 )
-         NumNodes = 6
+         NumElemNodes = 6
        CASE ( ELEMENT_WEDGE15 )
-         NumNodes = 15
+         NumElemNodes = 15
        CASE DEFAULT
-          NumNodes = 0
+          NumElemNodes = 0
          CALL ProgAbort(' NumNodes: invalid argument Xelement = '//TRIM(Num2LStr(Xelement)))
      END SELECT
-   END FUNCTION NumNodes
+   END FUNCTION NumElemNodes
 
 !> This function determines if a mesh contains any motion field (translational/rotational positions, velocities, accelerations or scalars).
    LOGICAL FUNCTION HasMotionFields(Mesh)

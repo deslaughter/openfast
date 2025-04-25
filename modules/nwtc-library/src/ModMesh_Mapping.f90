@@ -1261,7 +1261,7 @@ SUBROUTINE Transfer_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg 
          !if ( MeshMap%MapMotions(i)%OtherMesh_Element < 1 )  CYCLE
 
             ! add the translation displacement portion part
-         do j=1,NumNodes(ELEMENT_LINE2) ! number of nodes per line2 element
+         do j=1,NumElemNodes(ELEMENT_LINE2) ! number of nodes per line2 element
             n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
          
             FieldValue(:,j) = Src%TranslationDisp(:,n)
@@ -1271,7 +1271,7 @@ SUBROUTINE Transfer_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg 
             ! if Src mesh has orientation, superpose Dest displacement with translation due to rotation and couple arm
          if ( Src%FieldMask(MASKID_Orientation) ) then
 
-            do j=1,NumNodes(ELEMENT_LINE2) ! number of nodes per line2 element
+            do j=1,NumElemNodes(ELEMENT_LINE2) ! number of nodes per line2 element
                n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
          
                   !Calculate RotationMatrix as O_S^T*O_SR
@@ -1369,7 +1369,7 @@ SUBROUTINE Transfer_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg 
       DO i = 1,Dest%Nnodes
          !if ( MeshMap%MapMotions(i)%OtherMesh_Element < 1 )  CYCLE
       
-         DO j=1,NumNodes(ELEMENT_LINE2) ! number of nodes per line2 element
+         DO j=1,NumElemNodes(ELEMENT_LINE2) ! number of nodes per line2 element
             n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
          
             MeshMap%DisplacedPosition(:,i,j) =    Src%Position(:,n) +  Src%TranslationDisp(:,n)  &
@@ -1552,7 +1552,7 @@ SUBROUTINE Linearize_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg
    MeshMap%dM%mi = 0.0_R8Ki
    do i=1, Dest%Nnodes
                   
-      do j=1,NumNodes(ELEMENT_LINE2)
+      do j=1,NumElemNodes(ELEMENT_LINE2)
             
          n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
             
@@ -1573,7 +1573,7 @@ SUBROUTINE Linearize_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg
          ! calculate displaced positions at operating point:                           
       DO i = 1,Dest%Nnodes
       
-         DO j=1,NumNodes(ELEMENT_LINE2) ! number of nodes per line2 element
+         DO j=1,NumElemNodes(ELEMENT_LINE2) ! number of nodes per line2 element
             n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
          
             MeshMap%DisplacedPosition(:,i,j) =     Src%Position(:,n) +  Src%TranslationDisp(:,n)  &
@@ -1597,7 +1597,7 @@ SUBROUTINE Linearize_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg
          d_start = (i-1)*3+1
          d_end   = d_start+2
             
-         do j=1,NumNodes(ELEMENT_LINE2) 
+         do j=1,NumElemNodes(ELEMENT_LINE2) 
                
             n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
                
@@ -1635,7 +1635,7 @@ SUBROUTINE Linearize_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg
                d_start = (i-1)*3+1
                d_end   = d_start+2
                   
-               do j=1,NumNodes(ELEMENT_LINE2) 
+               do j=1,NumElemNodes(ELEMENT_LINE2) 
                
                   n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
                   
@@ -1685,7 +1685,7 @@ SUBROUTINE Linearize_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg
                d_start = (i-1)*3+1
                d_end   = d_start+2
                   
-               do j=1,NumNodes(ELEMENT_LINE2) 
+               do j=1,NumElemNodes(ELEMENT_LINE2) 
                
                   n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
                   
@@ -1707,7 +1707,7 @@ SUBROUTINE Linearize_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg
                d_start = (i-1)*3+1
                d_end   = d_start+2
                   
-               do j=1,NumNodes(ELEMENT_LINE2) 
+               do j=1,NumElemNodes(ELEMENT_LINE2) 
                
                   n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
                   s_start = (n - 1)*3+1
@@ -1747,7 +1747,7 @@ SUBROUTINE Linearize_Motions_Line2_to_Point( Src, Dest, MeshMap, ErrStat, ErrMsg
                d_start = (i-1)*3+1
                d_end   = d_start+2
                   
-               do j=1,NumNodes(ELEMENT_LINE2) 
+               do j=1,NumElemNodes(ELEMENT_LINE2) 
                
                   n = Src%ElemTable(ELEMENT_LINE2)%Elements(MeshMap%MapMotions(i)%OtherMesh_Element)%ElemNodes(j)
                   
@@ -3850,7 +3850,7 @@ SUBROUTINE Linearize_Loads_Point_to_Line2( Src, Dest, MeshMap, ErrStat, ErrMsg, 
    do i = 1, Src%NNodes
          
       jElem = MeshMap%MapLoads(i)%OtherMesh_Element
-      do j=1,NumNodes(ELEMENT_LINE2)
+      do j=1,NumElemNodes(ELEMENT_LINE2)
          n = Dest%ElemTable(ELEMENT_LINE2)%Elements(jElem)%ElemNodes(j)
       
          do k=1,3
@@ -3900,7 +3900,7 @@ SUBROUTINE Linearize_Loads_Point_to_Line2( Src, Dest, MeshMap, ErrStat, ErrMsg, 
          s_start = (i-1)*3+1
          s_end   = s_start+2         
          
-         do j=1,NumNodes(ELEMENT_LINE2)
+         do j=1,NumElemNodes(ELEMENT_LINE2)
             n = Dest%ElemTable(ELEMENT_LINE2)%Elements(jElem)%ElemNodes(j)
             
             d_start = (n-1)*3+1
@@ -3936,7 +3936,7 @@ SUBROUTINE Linearize_Loads_Point_to_Line2( Src, Dest, MeshMap, ErrStat, ErrMsg, 
                
          s_start = (i - 1)*3+1
          s_end   = s_start+2         
-         do j=1,NumNodes(ELEMENT_LINE2)
+         do j=1,NumElemNodes(ELEMENT_LINE2)
             n = Dest%ElemTable(ELEMENT_LINE2)%Elements(jElem)%ElemNodes(j)
             
             d_start = (n-1)*3+1
@@ -4252,7 +4252,7 @@ SUBROUTINE Create_Augmented_Ln2_Src_Mesh(Src, Dest, MeshMap, Dest_TYPE, ErrStat,
          
    ! first, we need to know how many (additional) nodes we might need:
    !   each node of each destination element could potentially split each element of the source mesh
-   max_new_nodes = (NumNodes( Dest_TYPE ) * dest%ElemTable(Dest_TYPE)%nelem) * src%ElemTable(ELEMENT_LINE2)%nelem     ! max number of new nodes
+   max_new_nodes = (NumElemNodes( Dest_TYPE ) * dest%ElemTable(Dest_TYPE)%nelem) * src%ElemTable(ELEMENT_LINE2)%nelem     ! max number of new nodes
    max_nodes     = max_new_nodes + Src%nnodes                                                                         ! max total number of nodes in new mesh
       
    ! create a temporary mesh that we can work with (add nodes and split elements):
@@ -4347,7 +4347,7 @@ SUBROUTINE Create_Augmented_Ln2_Src_Mesh(Src, Dest, MeshMap, Dest_TYPE, ErrStat,
             
   
          IF ( .NOT. EqualRealNos( denom, 0.0_ReKi) ) THEN ! we ignore source elements that are parallel to the destination element (i.e., denom == 0)
-            DO jNode = j, NumNodes( Dest_TYPE ) ! check each node of the destination element
+            DO jNode = j, NumElemNodes( Dest_TYPE ) ! check each node of the destination element
                n1S_nD_vector =            dest%Position(:, dest%ElemTable(Dest_TYPE)%Elements(jElem)%ElemNodes(jNode)) &
                                 - Temp_Ln2_Src%Position(:, Temp_Ln2_Src%ElemTable(ELEMENT_LINE2)%Elements(iElem)%ElemNodes(1))
                
@@ -4446,7 +4446,7 @@ SUBROUTINE Create_Augmented_Ln2_Src_Mesh(Src, Dest, MeshMap, Dest_TYPE, ErrStat,
                            END IF
                      
                         ! if we have to check a second node, we need to first recalculate p_eS and denom on Temp_Ln2_Src:
-                        IF ( jNode < NumNodes( Dest_TYPE )) THEN
+                        IF ( jNode < NumElemNodes( Dest_TYPE )) THEN
                            j = jNode+1 ! start on the next node
                            CYCLE Src_Elements 
                         END IF
@@ -4761,7 +4761,7 @@ SUBROUTINE Linearize_Src_To_Augmented_Ln2_Src( Src, MeshMap, ErrStat, ErrMsg, Sr
    do i = (Src%NNodes+1),MeshMap%Augmented_Ln2_Src%NNodes
          
       iElem = MeshMap%MapSrcToAugmt(i)%OtherMesh_Element                  
-      do n1=1,NumNodes(ELEMENT_LINE2)
+      do n1=1,NumElemNodes(ELEMENT_LINE2)
             
          n = SrcDisp%ElemTable(ELEMENT_LINE2)%Elements(iElem)%ElemNodes(n1)
             

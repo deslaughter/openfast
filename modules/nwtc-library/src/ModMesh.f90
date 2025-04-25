@@ -2150,7 +2150,7 @@ SUBROUTINE MeshWrVTK_PointSurface ( RefPoint, M, FileRootName, VTKcount, OutputF
       NodeInElement = .FALSE.
       DO i = 1, NELEMKINDS
          DO j = 1, Mesh%ElemTable(i)%nelem
-            DO n1 = 1,NumNodes( Mesh%ElemTable(i)%XElement )
+            DO n1 = 1,NumElemNodes( Mesh%ElemTable(i)%XElement )
                n2 = Mesh%ElemTable(i)%Elements(j)%ElemNodes(n1)
                NodeInElement( n2 ) = .TRUE.
             END DO
