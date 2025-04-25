@@ -49,19 +49,7 @@ MODULE BeamDyn
                                                !   (Xd), and constraint - state(Z) functions all with respect to the constraint
                                                !   states(z)
 
-   PUBLIC :: BD_UpdateGlobalRef      !< update the BeamDyn reference.  The reference for the calculations follows u%RootMotionMesh
-                                               !  and therefore x%q must be updated from T -> T+DT to include the root motion from T->T+DT
-
-   ! The original formulation kept all states in the inertial reference frame.  This has been leading to convergence issues
-   ! when there is a large rotational change from the reference frame (i.e. large turbine yaw, large blade pitch).  During
-   ! the development of the tight coupling algorithm for OpenFAST, we decided to try changing all the states in BeamDyn to
-   ! follow the moving BladeRootMotion mesh.  This requires changing the states after an UpdateStates call to be relative to
-   ! the new BladeRootMotion mesh orientation and position.
-   ! Update the reference frame after each State update (or use the old method)?
-   LOGICAL, PARAMETER :: ChangeRefFrame = .true.
-
 CONTAINS
-
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This routine is called at the start of the simulation to perform initialization steps.
@@ -88,59 +76,46 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
    INTEGER(IntKi),                    INTENT(  OUT)  :: ErrStat     !< Error status of the operation
    CHARACTER(*),                      INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
-   ! local variables
+   character(*), parameter :: RoutineName = 'BD_Init'
+   INTEGER(IntKi)          :: ErrStat2                     ! Temporary Error status
+   CHARACTER(ErrMsgLen)    :: ErrMsg2                      ! Temporary Error message
+   INTEGER(IntKi)          :: nelem
    TYPE(BD_InputFile)      :: InputFileData     ! Data stored in the module's input file
    REAL(BDKi)              :: temp_CRV(3)
    REAL(BDKi),ALLOCATABLE  :: GLL_nodes(:)
    REAL(BDKi)              :: TmpDCM(3,3)
    LOGICAL                 :: QuasiStaticInitialized      !< True if quasi-static solution was found
 
-
-   INTEGER(IntKi)          :: nelem
-   INTEGER(IntKi)          :: ErrStat2                     ! Temporary Error status
-   CHARACTER(ErrMsgLen)    :: ErrMsg2                      ! Temporary Error message
-   character(*), parameter :: RoutineName = 'BD_Init'
-
-
-
-  ! Initialize ErrStat
-
    ErrStat = ErrID_None
    ErrMsg  = ""
 
    ! Initialize the NWTC Subroutine Library
-
    CALL NWTC_Init( )
 
    ! Display the module information
-
    CALL DispNVD( BeamDyn_Ver )
 
    CALL BD_ReadInput(InitInp%InputFile,InputFileData,InitInp%RootName,Interval,ErrStat2,ErrMsg2); if (Failed()) return
    CALL BD_ValidateInputData( InitInp, InputFileData, ErrStat2, ErrMsg2 ); if (Failed()) return
 
-
-      ! The reference frame is set by the root motion mesh initial position
+   ! The reference frame is set by the root motion mesh initial position
    call InitRefFrame( InitInp, OtherState, ErrStat2, ErrMsg2 ); if (Failed()) return
 
-      ! this routine sets *some* of the parameters (basically the "easy" ones)
+   ! this routine sets *some* of the parameters (basically the "easy" ones)
    call SetParameters(InitInp, InputFileData, p, OtherState, ErrStat2, ErrMsg2); if (Failed()) return
-
 
    ! Temporary GLL point intrinsic coordinates array
    CALL BD_GenerateGLL(p%nodes_per_elem,GLL_nodes,ErrStat2,ErrMsg2); if (Failed()) return
 
    ! In the following, trapezoidalpointweight should be generalized to multi-element; likewise for gausspointweight
-
-   IF(p%quadrature .EQ. GAUSS_QUADRATURE) THEN
-
+   select case (p%quadrature)
+   case (GAUSS_QUADRATURE)
        CALL BD_GaussPointWeight(p%nqp,p%QPtN,p%QPtWeight,ErrStat2,ErrMsg2); if (Failed()) return !calculates p%QPtN and p%QPtWeight
-
-   ELSEIF(p%quadrature .EQ. TRAP_QUADRATURE) THEN
-
+   case (TRAP_QUADRATURE)
       CALL BD_TrapezoidalPointWeight(p,  InputFileData%InpBl%station_eta, InputFileData%InpBl%station_total) ! computes p%QPtN and p%QPtWeight
-
-   ENDIF
+   case default
+      call SetErrStat(ErrID_Fatal, "Invalid value of p%quadrature", ErrStat, ErrMsg, RoutineName)
+   end select
 
       ! compute physical distances to set positions of p%uuN0 (FE GLL_Nodes) (depends on p%SP_Coef):
    call InitializeNodalLocations(InputFileData%member_total,InputFileData%kp_member,InputFileData%kp_coordinate,p,GLL_nodes,ErrStat2,ErrMsg2); if (Failed()) return
@@ -154,8 +129,8 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
       ! Set the initial displacements: p%uu0, p%rrN0, p%E10
    CALL BD_QuadraturePointDataAt0(p)
 
-
-   call Initialize_FEweights(p,GLL_nodes,ErrStat2,ErrMsg2); if (Failed()) return ! set p%FEweight; needs p%uuN0 and p%uu0
+      ! Set p%FEweight; needs p%uuN0 and p%uu0
+   call Initialize_FEweights(p,GLL_nodes,ErrStat2,ErrMsg2); if (Failed()) return 
       
       ! compute blade mass, CG, and IN for summary file:
    CALL BD_ComputeBladeMassNew( p, ErrStat2, ErrMsg2 ); if (Failed()) return !computes p%blade_mass,p%blade_CG,p%blade_IN
@@ -884,17 +859,13 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
    integer(IntKi),               intent(  out)  :: ErrStat           !< Error status of the operation
    character(*),                 intent(  out)  :: ErrMsg            !< Error message if ErrStat /= ErrID_None
 
-
-   !local variables
+   character(*), parameter                      :: RoutineName = 'SetParameters'
+   integer(intKi)                               :: ErrStat2          ! temporary Error status
+   character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
    INTEGER(IntKi)                               :: i, j              ! generic counter index
    INTEGER(IntKi)                               :: indx              ! counter into index array (p%NdIndx)
    INTEGER(IntKi)                               :: nUniqueQP         ! number of unique quadrature points (not double-counting nodes at element boundaries)
    REAL(BDKi)                                   :: denom
-   integer(intKi)                               :: ErrStat2          ! temporary Error status
-   character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
-   character(*), parameter                      :: RoutineName = 'SetParameters'
-
-
 
    ErrStat = ErrID_None
    ErrMsg  = ""
@@ -1175,23 +1146,18 @@ subroutine Init_y( p, OtherState, u, y, ErrStat, ErrMsg)
    integer(IntKi),               intent(  out)  :: ErrStat           !< Error status of the operation
    character(*),                 intent(  out)  :: ErrMsg            !< Error message if ErrStat /= ErrID_None
 
-      ! local variables
    real(R8Ki)                                   :: DCM(3,3)          ! must be same type as mesh orientation fields
    real(ReKi)                                   :: Pos(3)            ! must be same type as mesh position fields
 
-
+   character(*), parameter                      :: RoutineName = 'Init_y'
+   integer(intKi)                               :: ErrStat2          ! temporary Error status
+   character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
    integer(intKi)                               :: temp_id
    integer(intKi)                               :: i,j               ! loop counters
    integer(intKi)                               :: NNodes            ! number of nodes in mesh
-   integer(intKi)                               :: ErrStat2          ! temporary Error status
-   character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
-   character(*), parameter                      :: RoutineName = 'Init_y'
-
-
 
    ErrStat = ErrID_None
    ErrMsg  = ""
-
 
    !.................................
    ! y%ReactionForce (for coupling with ElastoDyn)
@@ -1575,17 +1541,14 @@ subroutine Init_MiscVars( p, u, y, m, ErrStat, ErrMsg )
    integer(IntKi),               intent(  out)  :: ErrStat           !< Error status of the operation
    character(*),                 intent(  out)  :: ErrMsg            !< Error message if ErrStat /= ErrID_None
 
-
-
+   character(*), parameter                      :: RoutineName = 'Init_MiscVars'
    integer(intKi)                               :: ErrStat2          ! temporary Error status
    character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
-   character(*), parameter                      :: RoutineName = 'Init_MiscVars'
 
    ErrStat = ErrID_None
    ErrMsg  = ""
 
    m%Un_Sum = -1
-
 
 ! NOTE:
 !        p%nodes_per_elem    =  nodes per element, read in
@@ -1757,11 +1720,9 @@ subroutine Init_OtherStates( u, p, OtherState, ErrStat, ErrMsg )
    integer(IntKi),               intent(  out)  :: ErrStat           !< Error status of the operation
    character(*),                 intent(  out)  :: ErrMsg            !< Error message if ErrStat /= ErrID_None
 
-
-
+   character(*), parameter                      :: RoutineName = 'Init_OtherStates'
    integer(intKi)                               :: ErrStat2          ! temporary Error status
    character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
-   character(*), parameter                      :: RoutineName = 'Init_OtherStates'
 
    ErrStat = ErrID_None
    ErrMsg  = ""
@@ -1798,12 +1759,10 @@ subroutine Init_ContinuousStates( p, u, x, OtherState, ErrStat, ErrMsg )
    integer(IntKi),               intent(  out)  :: ErrStat           !< Error status of the operation
    character(*),                 intent(  out)  :: ErrMsg            !< Error message if ErrStat /= ErrID_None
 
-
-   TYPE(BD_InputType)                           :: u_tmp             ! A copy of the initial input (guess), converted to BeamDyn internal coordinates
+   character(*), parameter                      :: RoutineName = 'Init_ContinuousStates'
    integer(intKi)                               :: ErrStat2          ! temporary Error status
    character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
-   character(*), parameter                      :: RoutineName = 'Init_ContinuousStates'
-
+   TYPE(BD_InputType)                           :: u_tmp             ! A copy of the initial input (guess), converted to BeamDyn internal coordinates
 
    ErrStat = ErrID_None
    ErrMsg  = ""
@@ -1860,9 +1819,6 @@ SUBROUTINE BD_End( u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
    INTEGER(IntKi),               INTENT(  OUT)  :: ErrStat     !< Error status of the operation
    CHARACTER(*),                 INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
-
-   ! Initialize ErrStat
-
    ErrStat = ErrID_None
    ErrMsg  = ""
 
@@ -1871,17 +1827,13 @@ SUBROUTINE BD_End( u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
    ! Close files here:
    if (m%Un_Sum > 0) CLOSE(m%Un_Sum)
 
-
    ! Destroy the input data:
-
    CALL BD_DestroyInput( u, ErrStat, ErrMsg )
 
    ! Destroy the parameter data:
-
    CALL BD_DestroyParam( p, ErrStat, ErrMsg )
 
    ! Destroy the state data:
-
    CALL BD_DestroyContState(   x,           ErrStat, ErrMsg )
    CALL BD_DestroyDiscState(   xd,          ErrStat, ErrMsg )
    CALL BD_DestroyConstrState( z,           ErrStat, ErrMsg )
@@ -1891,7 +1843,6 @@ SUBROUTINE BD_End( u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
    CALL BD_DestroyMisc(  m,  ErrStat, ErrMsg )
 
    ! Destroy the output data:
-
    CALL BD_DestroyOutput( y, ErrStat, ErrMsg )
 
 END SUBROUTINE BD_End
@@ -1919,23 +1870,20 @@ SUBROUTINE BD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat
    INTEGER(IntKi),                  INTENT(  OUT) :: ErrStat    !< Error status of the operation
    CHARACTER(*),                    INTENT(  OUT) :: ErrMsg     !< Error message if ErrStat /= ErrID_None
 
+   CHARACTER(*), PARAMETER                        :: RoutineName = 'BD_UpdateStates'
    INTEGER(IntKi)                                 :: ErrStat2   ! Temporary Error status
    CHARACTER(ErrMsgLen)                           :: ErrMsg2    ! Temporary Error message
 
-   ! Initialize ErrStat
    ErrStat = ErrID_None
    ErrMsg  = ""
 
-   IF(p%analysis_type /= BD_STATIC_ANALYSIS) THEN ! dynamic analysis
-      CALL BD_GA2( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat2, ErrMsg2 )
-      call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,'');  if (ErrStat >= AbortErrLev) return
-
-      ! change reference frame to root motion at t=T+DT (u(1)%RootMotionMesh)
-      call BD_UpdateGlobalRef(u(1),p,x,OtherState,ErrStat2,ErrMsg2)
-      call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,'')
-   ELSE !IF(p%analysis_type == BD_STATIC_ANALYSIS) THEN
-      CALL BD_Static( t, u, utimes, p, x, OtherState, m, ErrStat, ErrMsg )
-   ENDIF
+   select case (p%analysis_type)
+   case (BD_DYNAMIC_ANALYSIS)
+      call BD_GA2(t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat2, ErrMsg2)
+   case (BD_STATIC_ANALYSIS)
+      call BD_Static(t, u, utimes, p, x, OtherState, m, ErrStat2, ErrMsg2)
+   end select
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
 END SUBROUTINE BD_UpdateStates
 
@@ -1958,14 +1906,14 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
    CHARACTER(*),                 INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
    LOGICAL,          OPTIONAL,   INTENT(IN   )  :: NeedWriteOutput     !< Flag to determine if WriteOutput values need to be calculated in this call
 
+   CHARACTER(*), PARAMETER                      :: RoutineName = 'BD_CalcOutput'
+   INTEGER(IntKi)                               :: ErrStat2                     ! Temporary Error status
+   CHARACTER(ErrMsgLen)                         :: ErrMsg2                      ! Temporary Error message
    TYPE(BD_ContinuousStateType)                 :: x_tmp
    TYPE(BD_OtherStateType)                      :: OtherState_tmp
    INTEGER(IntKi)                               :: i           ! generic loop counter
    INTEGER(IntKi)                               :: nelem       ! loop over elements
    REAL(ReKi)                                   :: AllOuts(0:MaxOutPts)
-   INTEGER(IntKi)                               :: ErrStat2                     ! Temporary Error status
-   CHARACTER(ErrMsgLen)                         :: ErrMsg2                      ! Temporary Error message
-   CHARACTER(*), PARAMETER                      :: RoutineName = 'BD_CalcOutput'
    LOGICAL                                      :: IsFullLin
 
    ! Initialize ErrStat
@@ -1981,11 +1929,11 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
 
       ! Since x is passed in, but we need to update it, we must work with a copy.
    CALL BD_CopyContState(x, x_tmp, MESH_NEWCOPY, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
       ! we may change the inputs (u) by applying the pitch actuator, so we will use m%u in this routine
    CALL BD_CopyInput(u, m%u, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
    ! Actuator
    IF( p%UsePitchAct ) THEN
@@ -1995,7 +1943,7 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
 
 
    CALL BD_CopyInput(m%u, m%u2, MESH_UPDATECOPY, ErrStat2, ErrMsg2) ! this is a copy of the inputs after the pitch actuator has been applied, but before converting to BD coordinates. will use this for computing WriteOutput values.
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
       if (ErrStat >= AbortErrLev) then
          call cleanup()
@@ -2131,12 +2079,9 @@ SUBROUTINE BD_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrSta
    INTEGER(IntKi),               INTENT(  OUT)  :: ErrStat     !< Error status of the operation
    CHARACTER(*),                 INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
-      ! LOCAL variables
+   CHARACTER(*), PARAMETER                :: RoutineName = 'BD_CalcContStateDeriv'
    INTEGER(IntKi)                         :: ErrStat2          ! The error status code
    CHARACTER(ErrMsgLen)                   :: ErrMsg2           ! The error message, if an error occurred
-   CHARACTER(*), PARAMETER                :: RoutineName = 'BD_CalcContStateDeriv'
-
-   ! Initialize ErrStat
 
    ErrStat = ErrID_None
    ErrMsg  = ""
@@ -6333,7 +6278,7 @@ END SUBROUTINE BD_JacobianPContState
 !> Routine to compute the Jacobians of the output (Y), continuous- (X), discrete- (Xd), and constraint-state (Z) functions
 !! with respect to the discrete states (xd). The partial derivatives dY/dxd, dX/dxd, dXd/dxd, and DZ/dxd are returned.
 SUBROUTINE BD_JacobianPDiscState(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdxd, dXdxd, dXddxd, dZdxd )
-!..................................................................................................................................
+
    TYPE(ModVarsType),                    INTENT(IN   )           :: Vars       !< Module variables
    REAL(DbKi),                           INTENT(IN   )           :: t          !< Time in seconds at operating point
    TYPE(BD_InputType),                   INTENT(IN   )           :: u          !< Inputs at operating point (may change to inout if a mesh copy is required)
@@ -6362,45 +6307,30 @@ SUBROUTINE BD_JacobianPDiscState(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrS
                                                                                !!   functions (Z) with respect to the
                                                                                !!   discrete states (xd) [intent in to avoid deallocation]
 
-
-      ! Initialize ErrStat
+   character(*), parameter                                       :: RoutineName = 'BD_JacobianPDiscState'
 
    ErrStat = ErrID_None
    ErrMsg  = ''
 
-
-   IF ( PRESENT( dYdxd ) ) THEN
-
-      ! Calculate the partial derivative of the output functions (Y) with respect to the discrete states (xd) here:
-
-      ! allocate and set dYdxd
-
+   ! Calculate the partial derivative of the output functions (Y) with respect to the discrete states (xd) here:
+   IF (PRESENT(dYdxd)) THEN
+      if (allocated(dYdxd)) deallocate(dYdxd)
    END IF
 
-   IF ( PRESENT( dXdxd ) ) THEN
-
-      ! Calculate the partial derivative of the continuous state functions (X) with respect to the discrete states (xd) here:
-
-      ! allocate and set dXdxd
-
+   ! Calculate the partial derivative of the continuous state functions (X) with respect to the discrete states (xd) here:
+   IF (PRESENT(dXdxd)) THEN
+      if (allocated(dXdxd)) deallocate(dXdxd)
    END IF
 
-   IF ( PRESENT( dXddxd ) ) THEN
-
-      ! Calculate the partial derivative of the discrete state functions (Xd) with respect to the discrete states (xd) here:
-
-      ! allocate and set dXddxd
-
+   ! Calculate the partial derivative of the discrete state functions (Xd) with respect to the discrete states (xd) here:
+   IF (PRESENT(dXddxd)) THEN
+      if (allocated(dXddxd)) deallocate(dXddxd)
    END IF
 
-   IF ( PRESENT( dZdxd ) ) THEN
-
-      ! Calculate the partial derivative of the constraint state functions (Z) with respect to the discrete states (xd) here:
-
-      ! allocate and set dZdxd
-
+   ! Calculate the partial derivative of the constraint state functions (Z) with respect to the discrete states (xd) here:
+   IF (PRESENT(dZdxd)) THEN
+      if (allocated(dZdxd)) deallocate(dZdxd)
    END IF
-
 
 END SUBROUTINE BD_JacobianPDiscState
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -6436,36 +6366,33 @@ SUBROUTINE BD_JacobianPConstrState(Vars, t, u, p, x, xd, z, OtherState, y, m, Er
                                                                                !! state functions (Z) with respect to
                                                                                !!  the constraint states (z) [intent in to avoid deallocation]
 
-      ! local variables
    character(*), parameter                                       :: RoutineName = 'BD_JacobianPConstrState'
    
-      ! Initialize ErrStat
-
    ErrStat = ErrID_None
    ErrMsg  = ''
-   
 
-   IF ( PRESENT( dYdz ) ) THEN
+   if (present(dYdz)) then
+      if (allocated(dYdz)) deallocate(dYdz)
+   end if
 
-   END IF
-
-   IF ( PRESENT( dXdz ) ) THEN
+   if (present(dXdz)) then
       if (allocated(dXdz)) deallocate(dXdz)
-   END IF
+   end if
 
-   IF ( PRESENT( dXddz ) ) THEN
+   if (present(dXddz)) then
       if (allocated(dXddz)) deallocate(dXddz)
-   END IF
+   end if
 
-   IF ( PRESENT(dZdz) ) THEN
-   END IF
+   if (present(dZdz)) then
+      if (allocated(dZdz)) deallocate(dZdz)
+   end if
 
 END SUBROUTINE BD_JacobianPConstrState
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++   
 
 
-SUBROUTINE BD_WriteMassStiff( p, m, ErrStat, ErrMsg )
+SUBROUTINE BD_WriteMassStiff(p, m, ErrStat, ErrMsg)
    use YAML, only: yaml_write_array
    TYPE(BD_ParameterType),              INTENT(IN   ) :: p           !< Parameters
    TYPE(BD_MiscVarType),                INTENT(INOUT) :: m           !< misc/optimization variables ! intent(out) so that we can update the accelerations here...
@@ -6474,8 +6401,6 @@ SUBROUTINE BD_WriteMassStiff( p, m, ErrStat, ErrMsg )
 
    CHARACTER(*), PARAMETER                            :: RoutineName = 'BD_WriteMassStiff'
 
-
-      ! Initialize ErrStat
    ErrStat = ErrID_None
    ErrMsg  = ""
 
@@ -6484,18 +6409,17 @@ SUBROUTINE BD_WriteMassStiff( p, m, ErrStat, ErrMsg )
       RETURN
    ENDIF
 
-
-      ! Write out the mass and stiffness in the calculation frame
+   ! Write out the mass and stiffness in the calculation frame
    WRITE(m%Un_Sum,'()')
    call yaml_write_array(m%Un_Sum, 'K_BD', RESHAPE(m%StifK, (/p%dof_total, p%dof_total/)), p%OutFmt, ErrStat, ErrMsg, comment='Full stiffness matrix (BD calculation coordinate frame).')
    WRITE(m%Un_Sum,'()')
    call yaml_write_array(m%Un_Sum, 'M_BD', RESHAPE(m%MassM, (/p%dof_total, p%dof_total/)), p%OutFmt, ErrStat, ErrMsg, comment='Full mass matrix (BD calculation coordinate frame)')
 
 END SUBROUTINE BD_WriteMassStiff
+
 !----------------------------------------------------------------------------------------------------------------------------------
 
-
-SUBROUTINE BD_WriteMassStiffInFirstNodeFrame( p, x, m, ErrStat, ErrMsg )
+SUBROUTINE BD_WriteMassStiffInFirstNodeFrame(p, x, m, ErrStat, ErrMsg)
    use YAML, only: yaml_write_array
    TYPE(BD_ParameterType),              INTENT(IN   ) :: p           !< Parameters
    TYPE(BD_ContinuousStateType),        INTENT(IN   ) :: x           !< Continuous states at t
@@ -6547,111 +6471,14 @@ SUBROUTINE BD_WriteMassStiffInFirstNodeFrame( p, x, m, ErrStat, ErrMsg )
    call yaml_write_array(m%Un_Sum, 'K_IEC', TmpStifK, p%OutFmt, ErrStat, ErrMsg, comment='Full stiffness matrix (IEC blade first node coordinate frame)')
    call yaml_write_array(m%Un_Sum, 'M_IEC', TmpMassM, p%OutFmt, ErrStat, ErrMsg, comment='Full mass matrix (IEC blade first node coordinate frame)')
 
-
-
    CALL Cleanup()
-   RETURN
 
-
-   CONTAINS
-      SUBROUTINE Cleanup()
-         IF (ALLOCATED( TmpStifK ))   DEALLOCATE( TmpStifK )
-         IF (ALLOCATED( TmpMassM ))   DEALLOCATE( TmpMassM )
-      END SUBROUTINE cleanup
+CONTAINS
+   SUBROUTINE Cleanup()
+      if (allocated(TmpStifK)) deallocate(TmpStifK)
+      if (allocated(TmpMassM)) deallocate(TmpMassM)
+   END SUBROUTINE Cleanup
 END SUBROUTINE BD_WriteMassStiffInFirstNodeFrame
-!----------------------------------------------------------------------------------------------------------------------------------
-
-!----------------------------------------------------------------------------------------------------------------------------------
-!> Update the state information to follow the blade rootmotion mesh.
-!!    - move the state information in x from the previous reference frame at time T (u(2)%rootmotion) to the new reference frame at T+dt (u(1)%rootmation)
-!!    - the GlbRot, GlbPos, and Glb_crv values are stored as otherstates and updated
-!!    - 
-subroutine BD_UpdateGlobalRef(u, p, x, OtherState, ErrStat, ErrMsg)
-   type(BD_InputType),           intent(in   ) :: u          !< Inputs at utimes
-   type(BD_ParameterType),       intent(in   ) :: p          !< Parameters
-   type(BD_ContinuousStateType), intent(inout) :: x          !< Input: Continuous states at t;
-   type(BD_OtherStateType),      intent(inout) :: OtherState !< Other states: Other states at t;
-   integer(IntKi),               intent(  out) :: ErrStat    !< Error status of the operation
-   character(*),                 intent(  out) :: ErrMsg     !< Error message if ErrStat /=
-
-   character(*), parameter       :: RoutineName = 'BD_UpdateGlobalRef'
-   integer(IntKi)                :: ErrStat2
-   character(ErrMsgLen)          :: ErrMsg2    ! Temporary Error message
-   real(R8Ki)                    :: GlbWM_old(3), GlbWM_new(3), GlbWM_diff(3)
-   real(R8Ki)                    :: GlbRot_old(3, 3), GlbRot_new(3, 3), GlbRot_diff(3, 3)
-   real(R8Ki)                    :: NodeRot_old(3)
-   real(R8Ki)                    :: GlbPos_old(3), GlbPos_new(3)
-   integer(IntKi)                :: i, j, temp_id
-
-   ErrStat  = ErrID_None
-   ErrMsg   = ""
-
-   ! If reference frame shouldn't be changed, return
-   if (.not. ChangeRefFrame) return
-
-   ! Save old global position, rotation, and WM
-   GlbPos_old = OtherState%GlbPos
-   GlbRot_old = OtherState%GlbRot
-   GlbWM_old  = OtherState%Glb_crv
-
-   ! Calculate new global position, rotation, and WM from root motion -- u must be in the global frame for the     SetRefFrame routine
-   call SetRefFrame(u, OtherState%GlbPos, OtherState%GlbRot, OtherState%Glb_Crv, ErrStat2,ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      if (ErrStat >= AbortErrLev) return
-   GlbPos_new = OtherState%GlbPos
-   GlbRot_new = OtherState%GlbRot
-   GlbWM_new  = OtherState%Glb_crv
-
-   ! Calculate differences between old and new reference
-   call BD_CrvCompose(GlbWM_diff, GlbWM_new, GlbWM_old, FLAG_R1TR2)
-   call BD_CrvMatrixR(GlbWM_diff, GlbRot_diff)
-
-   do i = 1, p%elem_total
-      do j = 1, p%nodes_per_elem
-
-         ! The last node of the first element is used as the first node in the second element.
-         temp_id = (i - 1)*(p%nodes_per_elem - 1) + j 
-
-         ! Calculate displacement in terms of new root motion mesh position
-         x%q(1:3, temp_id) =  matmul(transpose(GlbRot_new), &
-                                    GlbPos_old - GlbPos_new + &
-                                    matmul(GlbRot_old, p%uuN0(1:3, j, i) + x%q(1:3, temp_id)) - &
-                                    matmul(GlbRot_new, p%uuN0(1:3, j, i)))
-
-         ! Update the node orientation rotation of the node
-         NodeRot_old = x%q(4:6, temp_id)
-         call BD_CrvCompose(x%q(4:6, temp_id), GlbWM_diff, NodeRot_old, FLAG_R1R2)
-      end do
-   end do
-
-   ! Update the translational velocity
-   x%dqdt(1:3, :) = matmul(GlbRot_diff, x%dqdt(1:3, :))
-
-   ! Update the rotational velocity
-   x%dqdt(4:6, :) = matmul(GlbRot_diff, x%dqdt(4:6, :))
-   
-   ! Update the translational and rotational acceleration for GA2 algorithm
-   OtherState%acc(1:3, 1) = matmul(u%RootMotion%TranslationAcc(:, 1), GlbRot_new)
-   OtherState%acc(4:6, 1) = matmul(u%RootMotion%RotationAcc(:, 1), GlbRot_new)
-   OtherState%acc(1:3, 2:) = matmul(GlbRot_diff, OtherState%acc(1:3, 2:))
-   OtherState%acc(4:6, 2:) = matmul(GlbRot_diff, OtherState%acc(4:6, 2:))
-
-   ! Update the translational and rotational algorithm acceleration for GA2 algorithm
-   OtherState%xcc(1:3, :) = matmul(GlbRot_diff, OtherState%xcc(1:3, :))
-   OtherState%xcc(4:6, :) = matmul(GlbRot_diff, OtherState%xcc(4:6, :))
-
-   ! Root node is always aligned with root motion mesh 
-   x%q(:, 1) = 0.0_R8Ki
-   x%dqdt(1:3, 1) = matmul(u%RootMotion%TranslationVel(:, 1), GlbRot_new)
-   x%dqdt(4:6, 1) = matmul(u%RootMotion%RotationVel(:, 1), GlbRot_new)
-
-end subroutine
-
-
-
-
-
-
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 END MODULE BeamDyn
