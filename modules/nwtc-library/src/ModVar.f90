@@ -37,7 +37,7 @@ public :: MV_Perturb, MV_ComputeCentralDiff, MV_ComputeDiff, MV_ExtrapInterp, MV
 public :: MV_HasFlagsAll, MV_HasFlagsAny, MV_SetFlags, MV_ClearFlags
 public :: MV_NumVars, MV_NumVals, MV_FindVarDatLoc
 public :: LoadFields, MotionFields, TransFields, AngularFields
-public :: quat_to_dcm, dcm_to_quat, quat_inv, quat_to_rvec, wm_to_quat, quat_to_wm, wm_inv, quat_compose
+public :: quat_to_dcm, dcm_to_quat, quat_inv, quat_to_rvec, wm_to_quat, quat_to_wm, wm_inv, quat_compose, quat_rotate_vec
 public :: rvec_to_quat, rvec_to_tan_inv, rvec_to_tan
 public :: MV_FieldString, MV_IsLoad, MV_IsMotion, IdxStr
 public :: DumpMatrix, MV_AddModule
@@ -50,10 +50,10 @@ integer(IntKi), parameter :: AngularFields(*) = [FieldOrientation, FieldAngularV
 integer(IntKi), parameter :: MotionFields(*) = [FieldTransDisp, FieldOrientation, FieldTransVel, &
                                                 FieldAngularVel, FieldTransAcc, FieldAngularAcc]
 
-real(R8Ki), parameter :: I33(3,3) = reshape([1.0_R8Ki, 0.0_R8Ki, 0.0_R8Ki, &
-                                             0.0_R8Ki, 1.0_R8Ki, 0.0_R8Ki, &
-                                             0.0_R8Ki, 0.0_R8Ki, 1.0_R8Ki], &
-                                             [3,3])
+real(R8Ki), parameter :: I33(3, 3) = reshape([1.0_R8Ki, 0.0_R8Ki, 0.0_R8Ki, &
+                                              0.0_R8Ki, 1.0_R8Ki, 0.0_R8Ki, &
+                                              0.0_R8Ki, 0.0_R8Ki, 1.0_R8Ki], &
+                                             [3, 3])
 
 logical, parameter   :: UseSmallRotAngles = .false.
 
@@ -418,10 +418,10 @@ subroutine MV_AddModule(ModDataAry, ModID, ModAbbr, Instance, ModDT, SolverDT, V
    !----------------------------------------------------------------------------
 
    if (.not. allocated(ModDataAry)) then
-      allocate(ModDataAry(1), source=ModData)
+      allocate (ModDataAry(1), source=ModData)
    else
       call move_alloc(ModDataAry, ModDataAryTmp)
-      allocate(ModDataAry(size(ModDataAryTmp) + 1))
+      allocate (ModDataAry(size(ModDataAryTmp) + 1))
       ModDataAry(:size(ModDataAryTmp)) = ModDataAryTmp
       ModDataAry(size(ModDataAry)) = ModData
    end if
@@ -938,11 +938,11 @@ subroutine MV_AddVar(VarAry, Name, Field, DL, Num, iAry, jAry, kAry, Flags, Deri
    ! Append Var to VarArray
    if (allocated(VarAry)) then
       call move_alloc(VarAry, VarAryTmp)
-      allocate(VarAry(size(VarAryTmp) + 1))
+      allocate (VarAry(size(VarAryTmp) + 1))
       VarAry(:size(VarAryTmp)) = VarAryTmp
       VarAry(size(VarAry)) = Var
    else
-      allocate(VarAry(1), source=Var)
+      allocate (VarAry(1), source=Var)
    end if
 
 end subroutine
@@ -1308,32 +1308,32 @@ end function
 ! https://doi.org/10.1007/s11044-024-09970-8 (Appendix A)
 pure function rvec_to_tan(rvec) result(T)
    real(R8Ki), intent(in)  :: rvec(3)
-   real(R8Ki)              :: theta, a, b, rv_tilde(3,3), T(3,3)
+   real(R8Ki)              :: theta, a, b, rv_tilde(3, 3), T(3, 3)
    theta = sqrt(dot_product(rvec, rvec))
    rv_tilde = SkewSymMat(rvec)
    if (theta < 0.01_R8Ki) then
       a = -0.5_R8Ki + theta**2/24.0_R8Ki - theta**4/720.0_R8Ki
-      b = 1.0_R8Ki / 6.0_R8Ki - theta**2/120.0_R8Ki + theta**4/5040.0_R8Ki
+      b = 1.0_R8Ki/6.0_R8Ki - theta**2/120.0_R8Ki + theta**4/5040.0_R8Ki
    else
-      a = (cos(theta) - 1.0_R8Ki) / theta**2
-      b = (theta - sin(theta)) / theta**3
+      a = (cos(theta) - 1.0_R8Ki)/theta**2
+      b = (theta - sin(theta))/theta**3
    end if
-   T = I33 + a * rv_tilde + b * matmul(rv_tilde, rv_tilde)
+   T = I33 + a*rv_tilde + b*matmul(rv_tilde, rv_tilde)
 end function
 
 ! Returns the tangent inverse (T^-1) matrix
 ! https://doi.org/10.1007/s11044-024-09970-8 (Appendix A)
 pure function rvec_to_tan_inv(rvec) result(T)
    real(R8Ki), intent(in)  :: rvec(3)
-   real(R8Ki)              :: theta, a, rv_tilde(3,3), T(3,3)
+   real(R8Ki)              :: theta, a, rv_tilde(3, 3), T(3, 3)
    theta = sqrt(dot_product(rvec, rvec))
    rv_tilde = SkewSymMat(rvec)
    if (theta < 0.01_R8Ki) then
-      a = 1.0_R8Ki / 12.0_R8Ki + theta**2/720.0_R8Ki + theta**4/30240.0_R8Ki
+      a = 1.0_R8Ki/12.0_R8Ki + theta**2/720.0_R8Ki + theta**4/30240.0_R8Ki
    else
-      a = (1.0_R8Ki - 0.5_R8Ki * theta * cotan(0.5_R8Ki * theta)) / theta**2
+      a = (1.0_R8Ki - 0.5_R8Ki*theta*cotan(0.5_R8Ki*theta))/theta**2
    end if
-   T = I33 + 0.5_R8Ki * rv_tilde + a * matmul(rv_tilde, rv_tilde)
+   T = I33 + 0.5_R8Ki*rv_tilde + a*matmul(rv_tilde, rv_tilde)
 end function
 
 pure function wm_to_quat(c) result(q)
@@ -1363,6 +1363,25 @@ pure function cross(a, b) result(c)
    real(R8Ki), intent(in) :: a(3), b(3)
    real(R8Ki)             :: c(3)
    c = [a(2)*b(3) - a(3)*b(2), a(3)*b(1) - a(1)*b(3), a(1)*b(2) - b(1)*a(2)]
+end function
+
+pure function quat_rotate_vec(q, v) result(v_out)
+   real(R8Ki), intent(in)  :: q(3), v(3)
+   real(R8Ki)              :: v_out(3), q0, q0q0, q1q1, q2q2, q3q3, q1q2, q1q3, q2q3, q0q1, q0q2, q0q3
+   q0 = quat_scalar(q)
+   q0q0 = q0**2
+   q1q1 = q(1)**2
+   q2q2 = q(2)**2
+   q3q3 = q(3)**2
+   q0q1 = q0*q(1)
+   q0q2 = q0*q(2)
+   q0q3 = q0*q(3)
+   q1q2 = q(1)*q(2)
+   q1q3 = q(1)*q(3)
+   q2q3 = q(2)*q(3)
+   v_out(1) = (q0q0 + q1q1 - q2q2 - q3q3)*v(1) + 2*(q1q2 - q0q3)*v(2) + 2*(q1q3 + q0q2)*v(3); 
+   v_out(2) = 2*(q1q2 + q0q3)*v(1) + (q0q0 - q1q1 + q2q2 - q3q3)*v(2) + 2*(q2q3 - q0q1)*v(3); 
+   v_out(3) = 2*(q1q3 - q0q2)*v(1) + 2*(q2q3 + q0q1)*v(2) + (q0q0 - q1q1 - q2q2 + q3q3)*v(3); 
 end function
 
 !-------------------------------------------------------------------------------

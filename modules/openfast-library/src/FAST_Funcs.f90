@@ -40,6 +40,8 @@ use AeroDyn, only:   AD_JacobianPInput, &
 use BeamDyn, only:   BD_JacobianPInput, &
                      BD_JacobianPContState, &
                      BD_CalcContStateDeriv, &
+                     BD_ContStateToInertialFrame, &
+                     BD_ContStateToRotatingFrame, &
                      BD_CalcOutput, &
                      BD_End
 
@@ -792,7 +794,7 @@ subroutine FAST_CalcOutput(ModData, Mappings, ThisTime, iInput, iState, T, ErrSt
 end subroutine
 
 subroutine FAST_GetOP(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, &
-                      u_op, y_op, x_op, dx_op, z_op, u_glue, y_glue, x_glue, dx_glue, z_glue)
+                      u_op, y_op, x_op, dx_op, z_op, u_glue, y_glue, x_glue, dx_glue, z_glue, RotStates)
    use AeroDyn, only: AD_CalcWind_Rotor
    type(ModDataType), intent(in)                      :: ModData     !< Module information
    real(DbKi), intent(in)                             :: ThisTime    !< Time
@@ -811,11 +813,13 @@ subroutine FAST_GetOP(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, &
    real(R8Ki), optional, intent(inout)                :: x_glue(:)
    real(R8Ki), optional, intent(inout)                :: dx_glue(:)
    real(R8Ki), optional, intent(inout)                :: z_glue(:)
+   logical, optional, intent(in)                      :: RotStates
 
    character(*), parameter    :: RoutineName = 'FAST_GetOP'
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
    integer(IntKi)             :: i
+   logical                    :: RotStatesLoc
 
    ErrStat = ErrID_None
    ErrMsg = ''
@@ -952,7 +956,19 @@ subroutine FAST_GetOP(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, &
       case (Module_ADsk)
          call ADsk_VarsPackContState(ModData%Vars, T%ADsk%x(iState), x_op)
       case (Module_BD)
-         call BD_VarsPackContState(ModData%Vars, T%BD%x(ModData%Ins, iState), x_op)
+         if (present(RotStates)) then
+            RotStatesLoc = RotStates
+         else
+            RotStatesLoc = T%BD%p(ModData%Ins)%RotStates
+         end if
+         if (RotStatesLoc) then
+            call BD_ContStateToRotatingFrame(T%BD%p(ModData%Ins), T%BD%Input(iInput, ModData%Ins), &
+                                             T%BD%OtherSt(ModData%Ins, iState), T%BD%x(ModData%Ins, iState), &
+                                             T%BD%m(ModData%Ins)%x_perturb)
+            call BD_VarsPackContState(ModData%Vars, T%BD%m(ModData%Ins)%x_perturb, x_op)
+         else
+            call BD_VarsPackContState(ModData%Vars, T%BD%x(ModData%Ins, iState), x_op)
+         end if
       case (Module_ED)
          call ED_VarsPackContState(ModData%Vars, T%ED%x(ModData%Ins, iState), x_op)
       case (Module_SED)
@@ -1038,7 +1054,7 @@ subroutine FAST_GetOP(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, &
                                     T%BD%OtherSt(ModData%Ins, iState), &
                                     T%BD%m(ModData%Ins), &
                                     T%BD%m(ModData%Ins)%dxdt_lin, &
-                                    ErrStat2, ErrMsg2)
+                                    ErrStat2, ErrMsg2, RotStates=RotStates)
          if (Failed()) return
          call BD_VarsPackContStateDeriv(ModData%Vars, T%BD%m(ModData%Ins)%dxdt_lin, dx_op)
 
@@ -1143,7 +1159,7 @@ contains
 end subroutine
 
 subroutine FAST_SetOP(ModData, iInput, iState, T, ErrStat, ErrMsg, &
-                      u_op, x_op, z_op, u_glue, x_glue, z_glue)
+                      u_op, x_op, z_op, u_glue, x_glue, z_glue, RotStates)
    type(ModDataType), intent(in)                      :: ModData     !< Module information
    integer(IntKi), intent(in)                         :: iInput  !< Input index
    integer(IntKi), intent(in)                         :: iState  !< State index
@@ -1153,10 +1169,12 @@ subroutine FAST_SetOP(ModData, iInput, iState, T, ErrStat, ErrMsg, &
    real(R8Ki), allocatable, optional, intent(inout)   :: u_op(:), u_glue(:)     !< values of linearized inputs
    real(R8Ki), allocatable, optional, intent(inout)   :: x_op(:), x_glue(:)     !< values of linearized continuous states
    real(R8Ki), allocatable, optional, intent(inout)   :: z_op(:), z_glue(:)     !< values of linearized constraint states
+   logical, optional, intent(in)                      :: RotStates
 
    character(*), parameter    :: RoutineName = 'FAST_SetOP'
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
+   logical                    :: RotStatesLoc
    integer(IntKi)             :: i
 
    ErrStat = ErrID_None
@@ -1226,7 +1244,19 @@ subroutine FAST_SetOP(ModData, iInput, iState, T, ErrStat, ErrMsg, &
       case (Module_ADsk)
          call ADsk_VarsUnpackContState(ModData%Vars, x_op, T%ADsk%x(iState))
       case (Module_BD)
-         call BD_VarsUnpackContState(ModData%Vars, x_op, T%BD%x(ModData%Ins, iState))
+         if (present(RotStates)) then
+            RotStatesLoc = RotStates
+         else
+            RotStatesLoc = T%BD%p(ModData%Ins)%RotStates
+         end if
+         if (RotStatesLoc) then
+            call BD_VarsUnpackContState(ModData%Vars, x_op, T%BD%m(ModData%Ins)%x_perturb)
+            call BD_ContStateToRotatingFrame(T%BD%p(ModData%Ins), T%BD%Input(iInput, ModData%Ins), &
+                                             T%BD%OtherSt(ModData%Ins, iState), T%BD%m(ModData%Ins)%x_perturb, &
+                                             T%BD%x(ModData%Ins, iState))
+         else
+            call BD_VarsUnpackContState(ModData%Vars, x_op, T%BD%x(ModData%Ins, iState))
+         end if
       case (Module_ED)
          call ED_VarsUnpackContState(ModData%Vars, x_op, T%ED%x(ModData%Ins, iState))
       case (Module_SED)
@@ -1271,7 +1301,7 @@ contains
    end function
 end subroutine
 
-subroutine FAST_JacobianPInput(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, dYdu, dXdu, dYdu_glue, dXdu_glue)
+subroutine FAST_JacobianPInput(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, dYdu, dXdu, dYdu_glue, dXdu_glue, RotStates)
    type(ModDataType), intent(in)                      :: ModData     !< Module data
    real(DbKi), intent(in)                             :: ThisTime    !< Time
    integer(IntKi), intent(in)                         :: iInput      !< Input index
@@ -1283,6 +1313,7 @@ subroutine FAST_JacobianPInput(ModData, ThisTime, iInput, iState, T, ErrStat, Er
    real(R8Ki), allocatable, optional, intent(inout)   :: dXdu(:, :)
    real(R8Ki), optional, intent(inout)                :: dYdu_glue(:, :)
    real(R8Ki), optional, intent(inout)                :: dXdu_glue(:, :)
+   logical, optional, intent(in)                      :: RotStates
 
    character(*), parameter    :: RoutineName = 'FAST_JacobianPInput'
    integer(IntKi)             :: ErrStat2
@@ -1309,7 +1340,7 @@ subroutine FAST_JacobianPInput(ModData, ThisTime, iInput, iState, T, ErrStat, Er
                              T%BD%x(ModData%Ins, iState), T%BD%xd(ModData%Ins, iState), &
                              T%BD%z(ModData%Ins, iState), T%BD%OtherSt(ModData%Ins, iState), &
                              T%BD%y(ModData%Ins), T%BD%m(ModData%Ins), ErrStat2, ErrMsg2, &
-                             dYdu=dYdu, dXdu=dXdu)
+                             dYdu=dYdu, dXdu=dXdu, RotStates=RotStates)
 
    case (Module_ED)
       call ED_JacobianPInput(ModData%Vars, ThisTime, T%ED%Input(iInput, ModData%Ins), T%ED%p(ModData%Ins), &
@@ -1379,7 +1410,7 @@ subroutine FAST_JacobianPInput(ModData, ThisTime, iInput, iState, T, ErrStat, Er
 
 end subroutine
 
-subroutine FAST_JacobianPContState(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, dYdx, dXdx, dYdx_glue, dXdx_glue)
+subroutine FAST_JacobianPContState(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, dYdx, dXdx, dYdx_glue, dXdx_glue, RotStates)
    type(ModDataType), intent(inout)                   :: ModData     !< Module data
    real(DbKi), intent(in)                             :: ThisTime    !< Time
    integer(IntKi), intent(in)                         :: iInput      !< Input index
@@ -1391,6 +1422,7 @@ subroutine FAST_JacobianPContState(ModData, ThisTime, iInput, iState, T, ErrStat
    real(R8Ki), allocatable, optional, intent(inout)   :: dXdx(:, :)
    real(R8Ki), optional, intent(inout)                :: dYdx_glue(:, :)
    real(R8Ki), optional, intent(inout)                :: dXdx_glue(:, :)
+   logical, optional, intent(in)                      :: RotStates
 
    character(*), parameter    :: RoutineName = 'FAST_JacobianPContState'
    integer(IntKi)             :: ErrStat2
@@ -1416,7 +1448,7 @@ subroutine FAST_JacobianPContState(ModData, ThisTime, iInput, iState, T, ErrStat
                                  T%BD%x(ModData%Ins, iState), T%BD%xd(ModData%Ins, iState), &
                                  T%BD%z(ModData%Ins, iState), T%BD%OtherSt(ModData%Ins, iState), &
                                  T%BD%y(ModData%Ins), T%BD%m(ModData%Ins), ErrStat2, ErrMsg2, &
-                                 dYdx=dYdx, dXdx=dXdx)
+                                 dYdx=dYdx, dXdx=dXdx, RotStates=RotStates)
 
    case (Module_ED)
       call ED_JacobianPContState(ModData%Vars, ThisTime, T%ED%Input(iInput, ModData%Ins), T%ED%p(ModData%Ins), &

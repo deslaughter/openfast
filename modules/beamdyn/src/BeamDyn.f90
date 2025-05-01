@@ -48,7 +48,8 @@ MODULE BeamDyn
    PUBLIC :: BD_JacobianPConstrState           ! Routine to compute the Jacobians of the output(Y), continuous - (X), discrete -
                                                !   (Xd), and constraint - state(Z) functions all with respect to the constraint
                                                !   states(z)
-
+   PUBLIC :: BD_ContStateToRotatingFrame
+   PUBLIC :: BD_ContStateToInertialFrame
 CONTAINS
 
 !-----------------------------------------------------------------------------------------------------------------------------------
@@ -1314,6 +1315,10 @@ subroutine Init_u( InitInp, p, OtherState, u, ErrStat, ErrMsg )
                    ,NNodes           = 1                  &
                    , TranslationDisp = .TRUE.             &
                    , Orientation     = .TRUE.             &
+                   , TranslationVel  = .TRUE.             &
+                   , RotationVel     = .TRUE.             &
+                   , TranslationAcc  = .TRUE.             &
+                   , RotationAcc     = .TRUE.             &
                    ,ErrStat          = ErrStat2           &
                    ,ErrMess          = ErrMsg2            )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -2064,7 +2069,7 @@ END SUBROUTINE BD_CalcOutput
 
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Tight coupling routine for computing derivatives of continuous states.
-SUBROUTINE BD_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrStat, ErrMsg )
+SUBROUTINE BD_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrStat, ErrMsg, RotStates )
 !..................................................................................................................................
 
    REAL(DbKi),                   INTENT(IN   )  :: t           !< Current simulation time in seconds
@@ -2078,13 +2083,21 @@ SUBROUTINE BD_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrSta
    TYPE(BD_ContinuousStateType), INTENT(INOUT)  :: dxdt        !< Continuous state derivatives at t [intent in so we don't need to allocate/deallocate constantly]
    INTEGER(IntKi),               INTENT(  OUT)  :: ErrStat     !< Error status of the operation
    CHARACTER(*),                 INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
+   LOGICAL, OPTIONAL,            INTENT(IN   )  :: RotStates   !< Flag to put states in rotating frame
 
    CHARACTER(*), PARAMETER                :: RoutineName = 'BD_CalcContStateDeriv'
    INTEGER(IntKi)                         :: ErrStat2          ! The error status code
    CHARACTER(ErrMsgLen)                   :: ErrMsg2           ! The error message, if an error occurred
+   logical                                :: RotStatesLoc
 
    ErrStat = ErrID_None
    ErrMsg  = ""
+
+   if (present(RotStates)) then
+      RotStatesLoc = RotStates
+   else
+      RotStatesLoc = p%RotStates
+   end if
 
       ! we may change the inputs (u) by applying the pitch actuator, so we will use m%u in this routine
    CALL BD_CopyInput(u, m%u, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
@@ -2138,6 +2151,12 @@ SUBROUTINE BD_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrSta
       ! constraint state (which is not necessary, but I'll just add it here anyway)
    dxdt%dqdt(1:3,1)    = u%RootMotion%TranslationAcc(:,1)
    dxdt%dqdt(4:6,1)    = u%RootMotion%RotationAcc(   :,1)
+
+   ! If rotating states is enabled
+   if (RotStatesLoc) then
+      call BD_CopyContState(dxdt, m%x_rot, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
+      call BD_ContStateDerivToRotatingFrame(p, u, OtherState, m%x_rot, dxdt)
+   end if
 
 END SUBROUTINE BD_CalcContStateDeriv
 
@@ -5906,6 +5925,16 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
                       Perturbs=[MaxThrust/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes), &  ! FieldForce
                                 MaxTorque/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes)])   ! FieldMoment
 
+   ! call MV_AddMeshVar(InitOut%Vars%u, "HubMotion", MotionFields, &
+   !                    DatLoc(BD_u_HubMotion), &
+   !                    Mesh=u%HubMotion, &
+   !                    Perturbs=[0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransDisp
+   !                              0.2_R8Ki*D2R_D, &                     ! FieldOrientation
+   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransVel
+   !                              0.2_R8Ki*D2R_D, &                     ! FieldAngularVel
+   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransAcc
+   !                              0.2_R8Ki*D2R_D])                      ! FieldAngularAcc
+
    !----------------------------------------------------------------------------
    ! Output variables
    !----------------------------------------------------------------------------
@@ -5944,6 +5973,7 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
 
    CALL MV_InitVarsJac(InitOut%Vars, m%Jac, Linearize .or. p%CompAeroMaps, ErrStat2, ErrMsg2); if (Failed()) return
 
+   call BD_CopyContState(x, m%x_rot, MESH_NEWCOPY, ErrStat2, ErrMsg2); if (Failed()) return
    call BD_CopyContState(x, m%x_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2); if (Failed()) return
    call BD_CopyContState(x, m%dxdt_lin, MESH_NEWCOPY, ErrStat2, ErrMsg2); if (Failed()) return
    call BD_CopyInput(u, m%u_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2); if (Failed()) return
@@ -5987,6 +6017,273 @@ contains
    end function Failed
 end subroutine
 
+subroutine BD_ContStateToRotatingFrame(p, u, OtherState, xi, xr)
+   type(BD_ParameterType), intent(in)           :: p
+   type(BD_InputType), intent(in)               :: u
+   type(BD_OtherStateType), intent(in)          :: OtherState
+   type(BD_ContinuousStateType), intent(in)     :: xi    ! States in inertial frame
+   type(BD_ContinuousStateType), intent(inout)  :: xr    ! States in rotating frame
+
+   real(R8Ki)        :: HubPos0(3), HubPos(3)
+   real(R8Ki)        :: HubOri0(3), HubOri(3)
+   real(R8Ki)        :: HubOmega(3), ShaftAxis(3), HubRotDisp(3)
+   real(ReKi)        :: NodePos0(3), NodePos(3)
+   real(R8Ki)        :: NodeRotDisp(3), NodeTransVel(3), NodeRotVel(3)
+   real(ReKi)        :: vHubNode0(3), vHubNode(3)
+   real(R8Ki)        :: GlbRot(3)
+   integer(IntKi)    :: i, j, NodeIndex
+
+   ! Rotation from blade reference frame to initial inertial as quaternion
+   GlbRot = wm_to_quat(OtherState%Glb_crv)
+   
+   ! The shaft axis is the hub's x axis
+   ShaftAxis = u%HubMotion%Orientation(1,:,1)
+
+   ! Hub initial position, translational displacement, and current position
+   HubPos0 = u%HubMotion%Position(:,1)
+   HubPos = HubPos0 + u%HubMotion%TranslationDisp(:,1)
+   
+   ! Difference in rotation between hub initial orientation and current orientation
+   HubOri0 = quat_inv(dcm_to_quat(u%HubMotion%RefOrientation(:,:,1)))
+   HubOri = quat_inv(dcm_to_quat(u%HubMotion%Orientation(:,:,1)))
+   HubRotDisp = quat_compose(HubOri, -HubOri0)
+   
+   ! Calculate hub rotational velocity about
+   HubOmega = dot_product(u%HubMotion%RotationVel(:,1), ShaftAxis) * ShaftAxis
+
+   ! Loop through elements
+   do i = 1, p%elem_total
+
+      ! Loop through nodes in element
+      do j = 1, p%nodes_per_elem
+
+         ! Node index in state arrays
+         NodeIndex = (i - 1) * (p%nodes_per_elem - 1) + j
+         
+         ! Skip root node
+         if (NodeIndex == 1) cycle
+
+         ! Calculate initial node position (inertial frame)
+         NodePos0 = OtherState%GlbPos + quat_rotate_vec(GlbRot, p%uuN0(1:3, j, i)) 
+
+         ! Calculate current node position (inertial frame)
+         NodePos = OtherState%GlbPos + quat_rotate_vec(GlbRot, p%uuN0(1:3, j, i) + xi%q(1:3, NodeIndex))
+
+         ! Vector from hub initial position to node initial position in blade frame
+         ! rNode0 = quat_rotate_vec(-GlbRotQ, NodePos0 - HubPos0)
+         vHubNode0 = NodePos0 - HubPos0
+
+         ! Vector from hub current position to node current position in blade frame
+         ! rNode = quat_rotate_vec(-GlbRotQ, NodePos - HubPos)
+         vHubNode = NodePos - HubPos
+
+         ! Calculate node displacement from rigid body rotation in blade reference frame
+         xr%q(1:3,NodeIndex) = quat_rotate_vec(-GlbRot, quat_rotate_vec(-HubRotDisp, vHubNode) - vHubNode0)
+
+         ! Get node rotational displacement (inertial frame)
+         NodeRotDisp = quat_compose(GlbRot, wm_to_quat(xi%q(4:6, NodeIndex)))
+
+         ! Calculate node rotational displacement (blade frame)
+         xr%q(4:6,NodeIndex) = quat_to_wm(quat_compose(-GlbRot, quat_compose(-HubRotDisp, NodeRotDisp)))
+
+         ! Node translational velocity with effect of hub rotation velocity removed (inertial frame)
+         NodeTransVel = quat_rotate_vec(GlbRot, xi%dqdt(1:3,NodeIndex)) - Cross_Product(HubOmega, vHubNode) 
+
+         ! Node translational velocity (blade frame)
+         xr%dqdt(1:3,NodeIndex) = quat_rotate_vec(-GlbRot, quat_rotate_vec(-HubRotDisp, NodeTransVel))
+
+         ! Node rotational velocity with hub rotation velocity removed (inertial frame)
+         NodeRotVel = quat_rotate_vec(GlbRot, xi%dqdt(4:6,NodeIndex)) - HubOmega
+
+         ! Node rotational velocity (blade frame)
+         ! xr%dqdt(4:6,NodeIndex) = quat_rotate_vec(-GlbRot, quat_rotate_vec(-HubRotDisp, NodeRotVel))
+         xr%dqdt(4:6,NodeIndex) = quat_rotate_vec(-GlbRot, NodeRotVel)
+
+      end do
+   end do
+
+end subroutine
+
+
+subroutine BD_ContStateDerivToRotatingFrame(p, u, OtherState, xi, xr)
+   type(BD_ParameterType), intent(in)           :: p
+   type(BD_InputType), intent(in)               :: u
+   type(BD_OtherStateType), intent(in)          :: OtherState
+   type(BD_ContinuousStateType), intent(in)     :: xi    ! States in inertial frame
+   type(BD_ContinuousStateType), intent(inout)  :: xr    ! States in rotating frame
+
+   real(R8Ki)        :: HubPos0(3), HubPos(3)
+   real(R8Ki)        :: HubOri0(3), HubOri(3)
+   real(R8Ki)        :: HubOmega(3), HubAlpha(3), ShaftAxis(3), HubRotDisp(3)
+   real(ReKi)        :: NodePos0(3), NodePos(3)
+   real(R8Ki)        :: NodeRotDisp(3)
+   real(R8Ki)        :: NodeTransVel(3), NodeRotVel(3)
+   real(R8Ki)        :: NodeRotAcc(3), NodeTransAcc(3)
+   real(ReKi)        :: vHubNode0(3), vHubNode(3)
+   real(R8Ki)        :: GlbRot(3)
+   integer(IntKi)    :: i, j, NodeIndex
+
+   ! Rotation from blade reference frame to initial inertial as quaternion
+   GlbRot = wm_to_quat(OtherState%Glb_crv)
+   
+   ! The shaft axis is the hub's x axis
+   ShaftAxis = u%HubMotion%Orientation(1,:,1)
+
+   ! Hub initial position, translational displacement, and current position
+   HubPos0 = u%HubMotion%Position(:,1)
+   HubPos = HubPos0 + u%HubMotion%TranslationDisp(:,1)
+   
+   ! Difference in rotation between hub initial orientation and current orientation
+   HubOri0 = quat_inv(dcm_to_quat(u%HubMotion%RefOrientation(:,:,1)))
+   HubOri = quat_inv(dcm_to_quat(u%HubMotion%Orientation(:,:,1)))
+   HubRotDisp = quat_compose(HubOri, -HubOri0)
+   
+   ! Calculate rotational velocity about hub axis
+   HubOmega = dot_product(u%HubMotion%RotationVel(:,1), ShaftAxis) * ShaftAxis
+
+   ! Calculate rotational acceleration about hub axis
+   HubAlpha = dot_product(u%HubMotion%RotationAcc(:,1), ShaftAxis) * ShaftAxis
+
+   ! Loop through elements
+   do i = 1, p%elem_total
+
+      ! Loop through nodes in element
+      do j = 1, p%nodes_per_elem
+
+         ! Node index in state arrays
+         NodeIndex = (i - 1) * (p%nodes_per_elem - 1) + j
+         
+         ! Skip root node
+         if (NodeIndex == 1) cycle
+
+         ! Calculate initial node position (inertial frame)
+         NodePos0 = OtherState%GlbPos + quat_rotate_vec(GlbRot, p%uuN0(1:3, j, i)) 
+
+         ! Calculate current node position (inertial frame)
+         NodePos = OtherState%GlbPos + quat_rotate_vec(GlbRot, p%uuN0(1:3, j, i) + xi%q(1:3, NodeIndex))
+
+         ! Vector from hub initial position to node initial position in blade frame
+         vHubNode0 = NodePos0 - HubPos0
+
+         ! Vector from hub current position to node current position in blade frame
+         vHubNode = NodePos - HubPos
+
+         ! Node translational velocity with effect of hub rotation velocity removed (inertial frame)
+         NodeTransVel = quat_rotate_vec(GlbRot, xi%q(1:3,NodeIndex)) - Cross_Product(HubOmega, vHubNode) 
+
+         ! Node translational velocity (blade frame)
+         xr%q(1:3,NodeIndex) = quat_rotate_vec(-GlbRot, quat_rotate_vec(-HubRotDisp, NodeTransVel))
+
+         ! Node rotational velocity with hub rotation velocity removed (inertial frame)
+         NodeRotVel = quat_rotate_vec(GlbRot, xi%q(4:6,NodeIndex)) - HubOmega
+
+         ! Node rotational velocity (blade frame)
+         ! xr%q(4:6,NodeIndex) = quat_rotate_vec(-GlbRot, quat_rotate_vec(-HubRotDisp, NodeRotVel))
+         xr%q(4:6,NodeIndex) = quat_rotate_vec(-GlbRot, NodeRotVel)
+
+         ! Node translational acceleration with effect of hub rotation acceleration removed (inertial frame)
+         NodeTransAcc = quat_rotate_vec(GlbRot, xi%dqdt(1:3,NodeIndex)) - &
+                        Cross_Product(2.0_R8Ki*HubOmega, NodeTransVel) - &
+                        Cross_Product(HubOmega, Cross_Product(HubOmega, vHubNode)) - &
+                        Cross_Product(HubAlpha, vHubNode)
+
+         ! Node translational acceleration (blade frame)
+         xr%dqdt(1:3,NodeIndex) = quat_rotate_vec(-GlbRot, quat_rotate_vec(-HubRotDisp, NodeTransAcc))
+
+         ! Node rotational acceleration with hub rotation acceleration removed (inertial frame)
+         NodeRotAcc = quat_rotate_vec(GlbRot, xi%dqdt(4:6,NodeIndex)) - HubAlpha
+
+         ! Node rotational acceleration (blade frame)
+         xr%dqdt(4:6,NodeIndex) = quat_rotate_vec(-GlbRot, quat_rotate_vec(-HubRotDisp, NodeRotAcc))
+
+      end do
+   end do
+
+end subroutine
+
+subroutine BD_ContStateToInertialFrame(p, u, OtherState, xr, xi)
+   type(BD_ParameterType), intent(in)           :: p
+   type(BD_InputType), intent(in)               :: u
+   type(BD_OtherStateType), intent(in)          :: OtherState
+   type(BD_ContinuousStateType), intent(in)     :: xr    ! States in rotating frame
+   type(BD_ContinuousStateType), intent(inout)  :: xi    ! States in inertial frame
+
+   real(R8Ki)        :: HubPos0(3), HubPos(3)
+   real(R8Ki)        :: HubOri0(3), HubOri(3)
+   real(R8Ki)        :: HubOmega(3), ShaftAxis(3), HubRotDisp(3)
+   real(ReKi)        :: NodePos0(3), NodePos(3)
+   real(R8Ki)        :: NodeRotDisp(3), NodeTransVel(3), NodeRotVel(3)
+   real(ReKi)        :: vHubNode0(3), vHubNode(3)
+   real(R8Ki)        :: GlbRot(3)
+   integer(IntKi)    :: i, j, NodeIndex
+
+   ! Rotation from blade reference frame to initial inertial as quaternion
+   GlbRot = wm_to_quat(OtherState%Glb_crv)
+   
+   ! The shaft axis is the hub's x axis
+   ShaftAxis = u%HubMotion%Orientation(1,:,1)
+
+   ! Hub initial position, translational displacement, and current position
+   HubPos0 = u%HubMotion%Position(:,1)
+   HubPos = HubPos0 + u%HubMotion%TranslationDisp(:,1)
+   
+   ! Difference in rotation between hub initial orientation and current orientation
+   HubOri0 = quat_inv(dcm_to_quat(u%HubMotion%RefOrientation(:,:,1)))
+   HubOri = quat_inv(dcm_to_quat(u%HubMotion%Orientation(:,:,1)))
+   HubRotDisp = quat_compose(HubOri, -HubOri0)
+   
+   ! Calculate hub rotational velocity about
+   HubOmega = dot_product(u%HubMotion%RotationVel(:,1), ShaftAxis) * ShaftAxis
+
+   ! Loop through elements
+   do i = 1, p%elem_total
+
+      ! Loop through nodes in element
+      do j = 1, p%nodes_per_elem
+
+         ! Node index in state arrays
+         NodeIndex = (i - 1) * (p%nodes_per_elem - 1) + j
+         
+         ! Skip root node
+         if (NodeIndex == 1) cycle
+
+         ! Calculate initial node position (inertial frame)
+         NodePos0 = OtherState%GlbPos + quat_rotate_vec(GlbRot, p%uuN0(1:3, j, i)) 
+
+         ! Vector from hub initial position to node initial position (inertial frame)
+         vHubNode0 = NodePos0 - HubPos0
+
+         ! Calculate vector from hub to node current position (inertial frame)
+         vHubNode = quat_rotate_vec(HubRotDisp, quat_rotate_vec(GlbRot, xr%q(1:3,NodeIndex)) + vHubNode0)
+
+         ! Calculate node current position (inertial frame)
+         NodePos = vHubNode + HubPos
+
+         ! Calculate node displacement (inertial frame)
+         xi%q(1:3, NodeIndex) = quat_rotate_vec(-GlbRot, NodePos - OtherState%GlbPos) - p%uuN0(1:3, j, i)
+
+         ! Calculate node rotational displacement (inertial frame)
+         NodeRotDisp = quat_compose(HubRotDisp, quat_compose(GlbRot, wm_to_quat(xr%q(4:6,NodeIndex))))
+
+         ! Get node rotational displacement relate to blade reference (inertial frame)
+         xi%q(4:6, NodeIndex) = quat_to_wm(quat_compose(-GlbRot, NodeRotDisp))
+
+         ! Node translational velocity (inertial frame)
+         NodeTransVel = quat_rotate_vec(GlbRot, quat_rotate_vec(HubRotDisp, xr%dqdt(1:3,NodeIndex)))
+
+         ! Node translational velocity with effect of hub rotation velocity added (inertial frame)
+         xi%dqdt(1:3,NodeIndex) = quat_rotate_vec(-GlbRot, NodeTransVel + Cross_Product(HubOmega, vHubNode))
+
+         ! Node rotational velocity (inertial frame)
+         NodeRotVel = quat_rotate_vec(GlbRot, xr%dqdt(4:6,NodeIndex))
+         
+         ! Node rotational velocity with hub rotation velocity removed (inertial frame)
+         xi%dqdt(4:6,NodeIndex) = quat_rotate_vec(-GlbRot, NodeRotVel + HubOmega)
+
+      end do
+   end do
+
+end subroutine
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! ###### The following four routines are Jacobian routines for linearization capabilities #######
@@ -5994,7 +6291,7 @@ end subroutine
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine to compute the Jacobians of the output (Y), continuous- (X), discrete- (Xd), and constraint-state (Z) functions
 !! with respect to the inputs (u). The partial derivatives dY/du, dX/du, dXd/du, and DZ/du are returned.
-SUBROUTINE BD_JacobianPInput(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdu, dXdu, dXddu, dZdu)
+SUBROUTINE BD_JacobianPInput(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdu, dXdu, dXddu, dZdu, RotStates)
 
    type(ModVarsType),                    INTENT(IN   )           :: Vars       !< Module variables
    REAL(DbKi),                           INTENT(IN   )           :: t          !< Time in seconds at operating point
@@ -6015,16 +6312,23 @@ SUBROUTINE BD_JacobianPInput(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat,
    REAL(R8Ki), ALLOCATABLE, OPTIONAL,    INTENT(INOUT)           :: dXdu(:,:)  !< Partial derivatives of continuous state functions (X) with respect to the inputs (u) [intent in to avoid deallocation]
    REAL(R8Ki), ALLOCATABLE, OPTIONAL,    INTENT(INOUT)           :: dXddu(:,:) !< Partial derivatives of discrete state functions (Xd) with respect to the inputs (u) [intent in to avoid deallocation]
    REAL(R8Ki), ALLOCATABLE, OPTIONAL,    INTENT(INOUT)           :: dZdu(:,:)  !< Partial derivatives of constraint state functions (Z) with respect to the inputs (u) [intent in to avoid deallocation]
-   
+   LOGICAL, OPTIONAL,                    INTENT(IN   )           :: RotStates
+
    character(*), parameter       :: RoutineName = 'BD_JacobianPInput'
    integer(intKi)                :: ErrStat2
    character(ErrMsgLen)          :: ErrMsg2
-   REAL(R8Ki)                    :: RotateStates(3,3)
+   logical                       :: RotStatesLoc
    logical                       :: NeedWriteOutput
    INTEGER(IntKi)                :: i, j, col
 
    ErrStat = ErrID_None
    ErrMsg  = ''
+
+   if (present(RotStates)) then
+      RotStatesLoc = RotStates
+   else
+      RotStatesLoc = p%RotStates
+   end if
 
    ! Get OP values here
    call BD_CalcOutput(t, u, p, x, xd, z, OtherState, y, m, ErrStat2, ErrMsg2); if (Failed()) return
@@ -6098,13 +6402,15 @@ SUBROUTINE BD_JacobianPInput(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat,
             ! Calculate positive perturbation
             call MV_Perturb(Vars%u(i), j, 1, m%Jac%u, m%Jac%u_perturb)
             call BD_VarsUnpackInput(Vars, m%Jac%u_perturb, m%u_perturb)
-            call BD_CalcContStateDeriv(t, m%u_perturb, p, x, xd, z, OtherState, m, m%dxdt_lin, ErrStat2, ErrMsg2); if (Failed()) return
+            call BD_CalcContStateDeriv(t, m%u_perturb, p, x, xd, z, OtherState, m, m%dxdt_lin, &
+                                       ErrStat2, ErrMsg2, RotStatesLoc); if (Failed()) return
             call BD_VarsPackContState(Vars, m%dxdt_lin, m%Jac%x_pos)
 
             ! Calculate negative perturbation
             call MV_Perturb(Vars%u(i), j, -1, m%Jac%u, m%Jac%u_perturb)
             call BD_VarsUnpackInput(Vars, m%Jac%u_perturb, m%u_perturb)
-            call BD_CalcContStateDeriv(t, m%u_perturb, p, x, xd, z, OtherState, m, m%dxdt_lin, ErrStat2, ErrMsg2); if (Failed()) return
+            call BD_CalcContStateDeriv(t, m%u_perturb, p, x, xd, z, OtherState, m, m%dxdt_lin, &
+                                       ErrStat2, ErrMsg2, RotStatesLoc); if (Failed()) return
             call BD_VarsPackContState(Vars, m%dxdt_lin, m%Jac%x_neg)
 
             ! Get partial derivative via central difference and store in full linearization array
@@ -6136,7 +6442,7 @@ END SUBROUTINE BD_JacobianPInput
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine to compute the Jacobians of the output (Y), continuous- (X), discrete- (Xd), and constraint-state (Z) functions
 !! with respect to the continuous states (x). The partial derivatives dY/dx, dX/dx, dXd/dx, and dZ/dx are returned.
-SUBROUTINE BD_JacobianPContState(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdx, dXdx, dXddx, dZdx)
+SUBROUTINE BD_JacobianPContState(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdx, dXdx, dXddx, dZdx, RotStates)
 
    TYPE(ModVarsType),                    INTENT(IN   )      :: Vars               !< Module variables
    REAL(DbKi),                           INTENT(IN   )      :: t                  !< Time in seconds at operating point
@@ -6157,21 +6463,33 @@ SUBROUTINE BD_JacobianPContState(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrS
    REAL(R8Ki), ALLOCATABLE, OPTIONAL,    INTENT(INOUT)      :: dXdx(:,:)          !< Partial derivatives of continuous state functions (X) with respect to the continuous states (x)
    REAL(R8Ki), ALLOCATABLE, OPTIONAL,    INTENT(INOUT)      :: dXddx(:,:)         !< Partial derivatives of discrete state functions (Xd) with respect to the continuous states (x)
    REAL(R8Ki), ALLOCATABLE, OPTIONAL,    INTENT(INOUT)      :: dZdx(:,:)          !< Partial derivatives of constraint state functions (Z) with respect to the continuous states (x)
+   LOGICAL, OPTIONAL,                    INTENT(IN   )      :: RotStates
 
    CHARACTER(*), PARAMETER       :: RoutineName = 'BD_JacobianPContState'
    INTEGER(IntKi)                :: ErrStat2
    CHARACTER(ErrMsgLen)          :: ErrMsg2
-   REAL(R8Ki)                    :: RotateStates(3,3)
-   REAL(R8Ki)                    :: RotateStatesTranspose(3,3)
    INTEGER(IntKi)                :: i, j, col
+   logical                       :: RotStatesLoc
    logical                       :: NeedWriteOutput
 
    ErrStat = ErrID_None
    ErrMsg  = ''
 
-   ! Copy state values
+   if (present(RotStates)) then
+      RotStatesLoc = RotStates
+   else
+      RotStatesLoc = p%RotStates
+   end if
+
+   ! Copy state values to perturbation states
    call BD_CopyContState(x, m%x_perturb, MESH_UPDATECOPY, ErrStat2, ErrMsg2); if (Failed()) return
-   call BD_VarsPackContState(Vars, x, m%Jac%x)
+
+   ! If states will be perturbed in the rotating frame, convert states
+   if (RotStatesLoc) call BD_ContStateToRotatingFrame(p, u, OtherState, x, m%x_perturb)
+   
+   ! Pack states to array
+   call BD_VarsPackContState(Vars, m%x_perturb, m%Jac%x)
+
 
    !----------------------------------------------------------------------------
 
@@ -6203,13 +6521,23 @@ SUBROUTINE BD_JacobianPContState(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrS
 
             ! Calculate positive perturbation
             call MV_Perturb(Vars%x(i), j, 1, m%Jac%x, m%Jac%x_perturb)
-            call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            if (RotStatesLoc) then
+               call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_rot)
+               call BD_ContStateToInertialFrame(p, u, OtherState, m%x_rot, m%x_perturb)
+            else
+               call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            end if
             call BD_CalcOutput(t, u, p, m%x_perturb, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2, NeedWriteOutput); if (Failed()) return
             call BD_VarsPackOutput(Vars, m%y_lin, m%Jac%y_pos)
 
             ! Calculate negative perturbation
             call MV_Perturb(Vars%x(i), j, -1, m%Jac%x, m%Jac%x_perturb)
-            call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            if (RotStatesLoc) then
+               call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_rot)
+               call BD_ContStateToInertialFrame(p, u, OtherState, m%x_rot, m%x_perturb)
+            else
+               call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            end if
             call BD_CalcOutput(t, u, p, m%x_perturb, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2, NeedWriteOutput); if (Failed()) return
             call BD_VarsPackOutput(Vars, m%y_lin, m%Jac%y_neg)
 
@@ -6240,14 +6568,26 @@ SUBROUTINE BD_JacobianPContState(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrS
 
             ! Calculate positive perturbation
             call MV_Perturb(Vars%x(i), j, 1, m%Jac%x, m%Jac%x_perturb)
-            call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
-            call BD_CalcContStateDeriv(t, u, p, m%x_perturb, xd, z, OtherState, m, m%dxdt_lin, ErrStat2, ErrMsg2); if (Failed()) return
+            if (RotStatesLoc) then
+               call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_rot)
+               call BD_ContStateToInertialFrame(p, u, OtherState, m%x_rot, m%x_perturb)
+            else
+               call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            end if
+            call BD_CalcContStateDeriv(t, u, p, m%x_perturb, xd, z, OtherState, m, m%dxdt_lin, &
+                                       ErrStat2, ErrMsg, RotStates); if (Failed()) return
             call BD_VarsPackContStateDeriv(Vars, m%dxdt_lin, m%Jac%x_pos)
 
             ! Calculate negative perturbation
             call MV_Perturb(Vars%x(i), j, -1, m%Jac%x, m%Jac%x_perturb)
-            call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
-            call BD_CalcContStateDeriv(t, u, p, m%x_perturb, xd, z, OtherState, m, m%dxdt_lin, ErrStat2, ErrMsg2); if (Failed()) return
+            if (RotStatesLoc) then
+               call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_rot)
+               call BD_ContStateToInertialFrame(p, u, OtherState, m%x_rot, m%x_perturb)
+            else
+               call BD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            end if
+            call BD_CalcContStateDeriv(t, u, p, m%x_perturb, xd, z, OtherState, m, m%dxdt_lin, &
+                                       ErrStat2, ErrMsg2, RotStates); if (Failed()) return
             call BD_VarsPackContStateDeriv(Vars, m%dxdt_lin, m%Jac%x_neg)
 
             ! Get partial derivative via central difference and store in full linearization array

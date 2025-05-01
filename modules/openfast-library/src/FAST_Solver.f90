@@ -838,7 +838,7 @@ subroutine FAST_SolverStep0(p, m, GlueModData, GlueModMaps, Turbine, ErrStat, Er
 
          ! Get continuous state operating points
          call FAST_GetOP(ModData, t_initial, INPUT_CURR, STATE_CURR, Turbine, ErrStat2, ErrMsg2, &
-                         x_op=ModData%Lin%x, x_glue=m%Mod%Lin%x)
+                         x_op=ModData%Lin%x, x_glue=m%Mod%Lin%x, RotStates=.false.)
          if (Failed()) return
 
          ! Transfer initial module state to GA state
@@ -1154,7 +1154,7 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
 
             ! Collect updated states
             call FAST_GetOP(ModData, t_global_next, INPUT_CURR, STATE_PRED, Turbine, ErrStat2, ErrMsg2, &
-                            x_op=ModData%Lin%x, x_glue=m%Mod%Lin%x)
+                            x_op=ModData%Lin%x, x_glue=m%Mod%Lin%x, RotStates=.false.)
             if (Failed()) return
 
             ! Transfer current states to linearization array
@@ -1174,7 +1174,7 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
 
             ! Transfer solver states to module
             call FAST_SetOP(ModData, INPUT_CURR, STATE_PRED, Turbine, ErrStat2, ErrMsg2, &
-                            x_op=ModData%Lin%x, x_glue=m%Mod%Lin%x)
+                            x_op=ModData%Lin%x, x_glue=m%Mod%Lin%x, RotStates=.false.)
             if (Failed()) return
 
             ! Transfer accelerations to BeamDyn
@@ -1312,7 +1312,7 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
          ! Calculate continuous state derivatives for tight coupling modules
          do i = 1, size(p%iModTC)
             call FAST_GetOP(m%Mod%ModData(i), t_global_next, INPUT_CURR, STATE_PRED, Turbine, ErrStat2, ErrMsg2, &
-                            dx_op=m%Mod%ModData(i)%Lin%dx, dx_glue=m%Mod%Lin%dx)
+                            dx_op=m%Mod%ModData(i)%Lin%dx, dx_glue=m%Mod%Lin%dx, RotStates=.false.)
             if (Failed()) return
          end do
 
@@ -1413,7 +1413,7 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
                ! Transfer states and inputs to modules
                call FAST_SetOP(ModData, INPUT_CURR, STATE_PRED, Turbine, ErrStat2, ErrMsg2, &
                                x_op=ModData%Lin%x, x_glue=m%Mod%Lin%x, &
-                               u_op=ModData%Lin%u, u_glue=m%Mod%Lin%u)
+                               u_op=ModData%Lin%u, u_glue=m%Mod%Lin%u, RotStates=.false.)
                if (Failed()) return
 
                ! Transfer accelerations to BeamDyn
@@ -1749,13 +1749,13 @@ subroutine BuildJacobianTC(p, m, GlueModMaps, ThisTime, iState, Turbine, ErrStat
          ! Calculate dYdx, dXdx for tight coupling modules
          call FAST_JacobianPContState(ModData, ThisTime, INPUT_CURR, iState, Turbine, ErrStat2, ErrMsg2, &
                                       dXdx=ModData%Lin%dXdx, dXdx_glue=m%Mod%Lin%dXdx, &
-                                      dYdx=ModData%Lin%dYdx, dYdx_glue=m%Mod%Lin%dYdx)
+                                      dYdx=ModData%Lin%dYdx, dYdx_glue=m%Mod%Lin%dYdx, RotStates=.false.)
          if (Failed()) return
 
          ! Calculate Jacobians wrt inputs
          call FAST_JacobianPInput(ModData, ThisTime, INPUT_CURR, iState, Turbine, ErrStat2, ErrMsg2, &
                                   dXdu=ModData%Lin%dXdu, dXdu_glue=m%Mod%Lin%dXdu, &
-                                  dYdu=ModData%Lin%dYdu, dYdu_glue=m%Mod%Lin%dYdu)
+                                  dYdu=ModData%Lin%dYdu, dYdu_glue=m%Mod%Lin%dYdu, RotStates=.false.)
          if (Failed()) return
       end associate
    end do
@@ -1764,7 +1764,7 @@ subroutine BuildJacobianTC(p, m, GlueModMaps, ThisTime, iState, Turbine, ErrStat
    do i = size(p%iModTC) + 1, size(m%Mod%ModData)
       associate (ModData => m%Mod%ModData(i))
          call FAST_JacobianPInput(ModData, ThisTime, INPUT_CURR, iState, Turbine, ErrStat2, ErrMsg2, &
-                                  dYdu=ModData%Lin%dYdu, dYdu_glue=m%Mod%Lin%dYdu)
+                                  dYdu=ModData%Lin%dYdu, dYdu_glue=m%Mod%Lin%dYdu, RotStates=.false.)
          if (Failed()) return
       end associate
    end do
@@ -1899,7 +1899,7 @@ subroutine BuildJacobianIO(p, m, GlueModMaps, ThisTime, iState, Turbine, ErrStat
    do i = 1, size(m%Mod%ModData)
       associate (ModData => m%Mod%ModData(i))
          call FAST_JacobianPInput(ModData, ThisTime, INPUT_CURR, iState, Turbine, ErrStat2, ErrMsg2, &
-                                  dYdu=ModData%Lin%dYdu, dYdu_glue=m%Mod%Lin%dYdu)
+                                  dYdu=ModData%Lin%dYdu, dYdu_glue=m%Mod%Lin%dYdu, RotStates=.false.)
          if (Failed()) return
       end associate
    end do
