@@ -1147,7 +1147,23 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
 
                ! Update the azimuth angle
                call ED_UpdateAzimuth(Turbine%ED%p(ModData%Ins), Turbine%ED%x(ModData%Ins, STATE_PRED), ModData%DT)
-               
+
+            case (Module_BD)
+
+               ! Transfer acceleration from TC state to BeamDyn
+               call SetBDAccel(ModData, m%StatePred, Turbine%BD%OtherSt(ModData%Ins, STATE_PRED))
+
+               ! Reset BeamDyn states so they are relative to the root node
+               call BD_UpdateGlobalRef(Turbine%BD%Input(INPUT_CURR, ModData%Ins), &
+                                       Turbine%BD%p(ModData%Ins), &
+                                       Turbine%BD%x(ModData%Ins, STATE_PRED), &
+                                       Turbine%BD%OtherSt(ModData%Ins, STATE_PRED), &
+                                       ErrStat2, ErrMsg2)
+               if (Failed()) return
+
+               ! Transfer acceleration from BeamDyn to state
+               call GetBDAccel(ModData, Turbine%BD%OtherSt(ModData%Ins, STATE_PRED), m%StatePred)
+
             case default
                cycle
             end select
