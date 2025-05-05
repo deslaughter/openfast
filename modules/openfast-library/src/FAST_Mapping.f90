@@ -868,12 +868,12 @@ subroutine InitMappings_BD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                          Active=NotCompAeroMaps)
       if (Failed()) return
 
-      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
-                         SrcDL=DatLoc(ED_y_HubPtMotion), &                       ! ED%y%HubPtMotion
-                         DstDL=DatLoc(BD_u_HubMotion), &                         ! BD%Input(1, DstMod%Ins)%HubMotion
-                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                         Active=NotCompAeroMaps)
-      if (Failed()) return
+      ! call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+      !                    SrcDL=DatLoc(ED_y_HubPtMotion), &                       ! ED%y%HubPtMotion
+      !                    DstDL=DatLoc(BD_u_HubMotion), &                         ! BD%Input(1, DstMod%Ins)%HubMotion
+      !                    ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+      !                    Active=NotCompAeroMaps)
+      ! if (Failed()) return
 
    case (Module_ExtLd)
 
@@ -2214,15 +2214,15 @@ subroutine MapMotionMesh(Turbine, Mappings, SrcMod, SrcDL, DstMod, DstDL, ErrSta
    if (.not. (SrcMesh%committed .and. DstMesh%committed)) return
 
    ! Check that all meshes in mapping have nonzero identifiers
-   ! if (SrcMesh%ID == 0) then
-   !    call SetErrStat(ErrID_Fatal, 'SrcMesh "'//trim(FAST_OutputFieldName(SrcMod, SrcDL))//'" not in module variables', &
-   !                    ErrStat, ErrMsg, RoutineName)
-   !    return
-   ! else if (DstMesh%ID == 0) then
-   !    call SetErrStat(ErrID_Fatal, 'DstMesh "'//trim(FAST_InputFieldName(DstMod, DstDL))//'" not in module variables', &
-   !                    ErrStat, ErrMsg, RoutineName)
-   !    return
-   ! end if
+   if (SrcMesh%ID == 0) then
+      call SetErrStat(ErrID_Fatal, 'SrcMesh "'//trim(FAST_OutputFieldName(SrcMod, SrcDL))//'" not in module variables', &
+                      ErrStat, ErrMsg, RoutineName)
+      return
+   else if (DstMesh%ID == 0) then
+      call SetErrStat(ErrID_Fatal, 'DstMesh "'//trim(FAST_InputFieldName(DstMod, DstDL))//'" not in module variables', &
+                      ErrStat, ErrMsg, RoutineName)
+      return
+   end if
 
    ! Create mapping description
    Mapping%Desc = trim(SrcMod%Abbr)//'_'//trim(Num2LStr(SrcMod%Ins))//" "// &

@@ -6092,11 +6092,12 @@ subroutine BD_ContStateToInertialFrame(p, u, OtherState, xr, xi)
    RootTransDisp = matmul(u%RootMotion%TranslationDisp(:,1), OtherState%GlbRot)
    RootTransVel = matmul(u%RootMotion%TranslationVel(:,1), OtherState%GlbRot)
    RootRotVel = matmul(u%RootMotion%RotationVel(:,1), OtherState%GlbRot)
-   RootOri0 = quat_inv(dcm_to_quat(u%RootMotion%RefOrientation(:,:,1)))
-   RootOri = quat_inv(dcm_to_quat(u%RootMotion%Orientation(:,:,1)))
+   RootOri0 = wm_to_quat(OtherState%Glb_crv)
+   RootOri = dcm_to_quat(transpose(u%RootMotion%Orientation(:,:,1)))
    RootRotDisp = quat_compose(RootOri, -RootOri0)
    RootPos0 = p%uuN0(1:3, 1, 1)
-   RootPos = p%uuN0(1:3, 1, 1) + RootTransDisp
+   RootPos = p%uuN0(1:3, 1, 1) + RootTransDisp + &
+             matmul(u%RootMotion%Position(:,1) - OtherState%GlbPos, OtherState%GlbRot)
    
    ! Loop through elements
    do i = 1, p%elem_total
@@ -6162,11 +6163,12 @@ subroutine BD_ContStateToRotatingFrame(p, u, OtherState, xi, xr)
    RootTransDisp = matmul(u%RootMotion%TranslationDisp(:,1), OtherState%GlbRot)
    RootTransVel = matmul(u%RootMotion%TranslationVel(:,1), OtherState%GlbRot)
    RootRotVel = matmul(u%RootMotion%RotationVel(:,1), OtherState%GlbRot)
-   RootOri0 = quat_inv(dcm_to_quat(u%RootMotion%RefOrientation(:,:,1)))
-   RootOri = quat_inv(dcm_to_quat(u%RootMotion%Orientation(:,:,1)))
+   RootOri0 = wm_to_quat(OtherState%Glb_crv)
+   RootOri = dcm_to_quat(transpose(u%RootMotion%Orientation(:,:,1)))
    RootRotDisp = quat_compose(RootOri, -RootOri0)
    RootPos0 = p%uuN0(1:3, 1, 1)
-   RootPos = p%uuN0(1:3, 1, 1) + RootTransDisp
+   RootPos = p%uuN0(1:3, 1, 1) + RootTransDisp + &
+             matmul(u%RootMotion%Position(:,1) - OtherState%GlbPos, OtherState%GlbRot)
    
    ! Loop through elements
    do i = 1, p%elem_total
@@ -6237,11 +6239,12 @@ subroutine BD_ContStateDerivToRotatingFrame(p, u, OtherState, x_i, dxdt_i, dxdt_
    RootRotVel = matmul(u%RootMotion%RotationVel(:,1), OtherState%GlbRot)
    RootTransAcc = matmul(u%RootMotion%TranslationAcc(:,1), OtherState%GlbRot)
    RootRotAcc = matmul(u%RootMotion%RotationAcc(:,1), OtherState%GlbRot)
-   RootOri0 = quat_inv(dcm_to_quat(u%RootMotion%RefOrientation(:,:,1)))
-   RootOri = quat_inv(dcm_to_quat(u%RootMotion%Orientation(:,:,1)))
+   RootOri0 = wm_to_quat(OtherState%Glb_crv)
+   RootOri = dcm_to_quat(transpose(u%RootMotion%Orientation(:,:,1)))
    RootRotDisp = quat_compose(RootOri, -RootOri0)
    RootPos0 = p%uuN0(1:3, 1, 1)
-   RootPos = p%uuN0(1:3, 1, 1) + RootTransDisp
+   RootPos = p%uuN0(1:3, 1, 1) + RootTransDisp + &
+             matmul(u%RootMotion%Position(:,1) - OtherState%GlbPos, OtherState%GlbRot)
    
    ! Loop through elements
    do i = 1, p%elem_total
