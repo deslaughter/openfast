@@ -6201,7 +6201,7 @@ subroutine BD_ContStateToRotatingFrame(p, u, OtherState, xi, xr)
          NodeTransVel = xi%dqdt(1:3,NodeIndex)
 
          ! Node translational velocity with root velocity and rotation removed (rotating frame)
-         xr%dqdt(1:3,NodeIndex) = NodeTransVel - RootTransVel - Cross_Product(RootRotVel, vRootNode)
+         xr%dqdt(1:3,NodeIndex) = NodeTransVel - (RootTransVel + Cross_Product(RootRotVel, vRootNode))
 
          ! Node rotational velocity (blade inerital frame)
          NodeRotVel = xi%dqdt(4:6,NodeIndex)
@@ -6265,16 +6265,16 @@ subroutine BD_ContStateDerivToRotatingFrame(p, u, OtherState, x_i, dxdt_i, dxdt_
          vRootNode = p%uuN0(1:3, j, i) + x_i%q(1:3, NodeIndex) - RootPos
 
          ! Node translational velocity with root velocity and rotation removed (rotating frame)
-         dxdt_r%q(1:3,NodeIndex) = dxdt_i%q(1:3,NodeIndex) - RootTransVel - Cross_Product(RootRotVel, vRootNode)
+         dxdt_r%q(1:3,NodeIndex) = dxdt_i%q(1:3,NodeIndex) - (RootTransVel + Cross_Product(RootRotVel, vRootNode))
 
          ! Node rotational velocity (rotating frame)
          dxdt_r%q(4:6,NodeIndex) = dxdt_i%q(4:6,NodeIndex) - RootRotVel
 
          ! Node translational acceleration (blade frame)
          dxdt_r%dqdt(1:3,NodeIndex) = dxdt_i%dqdt(1:3,NodeIndex) - &
-                                    Cross_Product(2.0_R8Ki*RootRotVel, dxdt_r%q(1:3,NodeIndex)) - &
-                                    Cross_Product(RootRotVel, RootTransVel - Cross_Product(RootRotVel, vRootNode)) - &
-                                    Cross_Product(RootRotAcc, vRootNode)
+                                      Cross_Product(RootRotVel, Cross_Product(RootRotVel, vRootNode)) - &
+                                      Cross_Product(RootRotAcc, vRootNode) - &
+                                      RootTransAcc
 
          ! Node rotational acceleration (blade frame)
          dxdt_r%dqdt(4:6,NodeIndex) = dxdt_i%dqdt(4:6,NodeIndex) - RootRotAcc
