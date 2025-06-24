@@ -171,7 +171,28 @@ SUBROUTINE MD_C_Init(                                             &
    CALL DispCopyrightLicense( version%Name )
    CALL DispCompileRuntimeInfo( version%Name )
 
-
+   ! Destroy global memory
+   if (allocated(u)) then
+      do i = 1, size(u)
+         call MD_DestroyInput(u(i), ErrStat_F, ErrMsg_F)
+      end do
+      deallocate(u)
+   end if
+   call MD_DestroyParam(p, ErrStat_F, ErrMsg_F)
+   do i = 0, 2
+      call MD_DestroyContState(x(i), ErrStat_F, ErrMsg_F)
+   end do
+   do i = 0, 2
+      call MD_DestroyDiscState(xd(i), ErrStat_F, ErrMsg_F)
+   end do
+   do i = 0, 2
+      call MD_DestroyConstrState(z(i), ErrStat_F, ErrMsg_F)
+   end do
+   do i = 0, 2
+      call MD_DestroyOtherState(other(i), ErrStat_F, ErrMsg_F)
+   end do
+   call MD_DestroyOutput(y, ErrStat_F, ErrMsg_F)
+   call MD_DestroyMisc(m, ErrStat_F, ErrMsg_F)
 
    ! Convert the MD input file to FileInfoType
    !----------------------------------------------------------------------------------------------------------------------------------------------
