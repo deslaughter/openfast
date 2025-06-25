@@ -1,4 +1,31 @@
-
+!**********************************************************************************************************************************
+! LICENSING
+! Copyright (C) 2015-2016  National Renewable Energy Laboratory
+!
+!    This file is part of InflowWind.
+!
+! Licensed under the Apache License, Version 2.0 (the "License");
+! you may not use this file except in compliance with the License.
+! You may obtain a copy of the License at
+!
+!     http://www.apache.org/licenses/LICENSE-2.0
+!
+! Unless required by applicable law or agreed to in writing, software
+! distributed under the License is distributed on an "AS IS" BASIS,
+! WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+! See the License for the specific language governing permissions and
+! limitations under the License.
+!**********************************************************************************************************************************
+!
+!  This code is designed to connect with LabView for a specific wave tank test case and likely will not work for other purposes.
+!
+!  For this test, a physical platform is deployed in a wave tank with cable acutators that are controlled through LabView.  This
+!  module is called to provide some loads that are not present in the physical tank setup.  These include the following:
+!     - rotor loading from a fixed RPM MHK rotor from AeroDyn.  This is calculated from either steady current provided by SeaState
+!     - Mooring loads from MoorDyn
+!
+!
+!**********************************************************************************************************************************
 MODULE WaveTankTesting
 
     USE ISO_C_BINDING
@@ -29,6 +56,7 @@ MODULE WaveTankTesting
 
     REAL(C_DOUBLE) :: DT
 
+!FIXME: replace all this with meshes
     REAL(C_FLOAT), DIMENSION(3,3) :: FloaterPositions = 0.0_C_FLOAT
     REAL(C_FLOAT), DIMENSION(2,6) :: FloaterVelocities = 0.0_C_FLOAT
     REAL(C_FLOAT), DIMENSION(1,6) :: FloaterAccelerations = 0.0_C_FLOAT
