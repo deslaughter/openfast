@@ -233,6 +233,7 @@ typedef   ^        ParameterType    ^           QPtw_ShpDer            {:}{:}   
 typedef   ^        ParameterType    ^           FEweight               {:}{:}        - - "weighting factors for integrating local sectional loads" -
 typedef   ^        ParameterType    logical     RotStates               -            - - "Orient states in rotating frame during linearization? (flag)" -
 typedef   ^        ParameterType    LOGICAL     CompAeroMaps            -   .FALSE.    - "flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false)"	-
+typedef   ^        ParameterType    R8Ki        AzimuthRot             {3}           - - "blade azimuth rotation angle"	-
 
 
 # ..... Inputs
@@ -247,7 +248,7 @@ typedef   ^        InputType  MeshType  HubMotion  - - - "motion (orientation) a
 # ...................................................................................................................
 # Define outputs that are contained on the mesh here:
 typedef   ^        OutputType  MeshType  ReactionForce -  - - "contains force and moments" -
-typedef   ^        OutputType  MeshType  BldMotion     -  - - "Motion (disp,rot,vel, acc) along beam axis" -
+typedef   ^        OutputType  MeshType  BldMotion     -  - - "Motion (translational/rotational: disp, vel, acc) in inertial frame" -
 # Define outputs that are not on this mesh here:
 typedef   ^        OutputType  ReKi      RootMxr       -  - - "x-component of the root reaction moment expressed in r (used for ServoDyn Bladed DLL Interface)" "Nm"
 typedef   ^        OutputType  ReKi      RootMyr       -  - - "y-component of the root reaction moment expressed in r (used for ServoDyn Bladed DLL Interface)" "Nm"
@@ -363,3 +364,4 @@ typedef   ^        MiscVarType    BD_ContinuousStateType    x_perturb   - - - ""
 typedef   ^        MiscVarType    BD_ContinuousStateType    dxdt_lin  - - - "" -
 typedef   ^        MiscVarType    BD_InputType  u_perturb    -            - - "" -
 typedef   ^        MiscVarType    BD_OutputType y_lin    -            - - "" -
+typedef   ^        MiscVarType    MeshType      BldMotionRot  -       - - "Motion (translational/rotational: disp, vel, acc) in hub rotating frame" -

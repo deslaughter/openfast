@@ -5768,6 +5768,7 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
          do K=1,NumBl
                ! BeamDyn outputs
             call MeshWrVTK(p_FAST%TurbinePos, BD%y(k)%BldMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_BldMotion'//trim(num2lstr(k)), y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
+            call MeshWrVTK(p_FAST%TurbinePos, BD%m(k)%BldMotionRot, trim(p_FAST%VTK_OutFileRoot)//'.BD_BldMotionRot'//trim(num2lstr(k)), y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
          end do
       end if
 
@@ -6000,6 +6001,8 @@ SUBROUTINE WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, 
    ELSE IF ( p_FAST%CompElast == Module_BD .and. ALLOCATED(BD%y)) THEN
       DO K=1,NumBl
          call MeshWrVTK(p_FAST%TurbinePos, BD%y(k)%BldMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_BldMotion'//trim(num2lstr(k)), &
+                        y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
+         call MeshWrVTK(p_FAST%TurbinePos, BD%m(k)%BldMotionRot, trim(p_FAST%VTK_OutFileRoot)//'.BD_BldMotionRot'//trim(num2lstr(k)), &
                         y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
       END DO
    ELSE IF ( p_FAST%CompElast == Module_ED ) THEN

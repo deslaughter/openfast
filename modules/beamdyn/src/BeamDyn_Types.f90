@@ -223,6 +223,7 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:,:), ALLOCATABLE  :: FEweight      !< weighting factors for integrating local sectional loads [-]
     LOGICAL  :: RotStates = .false.      !< Orient states in rotating frame during linearization? (flag) [-]
     LOGICAL  :: CompAeroMaps = .FALSE.      !< flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false) [-]
+    REAL(R8Ki) , DIMENSION(1:3)  :: AzimuthRot = 0.0_R8Ki      !< blade azimuth rotation angle [-]
   END TYPE BD_ParameterType
 ! =======================
 ! =========  BD_InputType  =======
@@ -236,7 +237,7 @@ IMPLICIT NONE
 ! =========  BD_OutputType  =======
   TYPE, PUBLIC :: BD_OutputType
     TYPE(MeshType)  :: ReactionForce      !< contains force and moments [-]
-    TYPE(MeshType)  :: BldMotion      !< Motion (disp,rot,vel, acc) along beam axis [-]
+    TYPE(MeshType)  :: BldMotion      !< Motion (translational/rotational: disp, vel, acc) in inertial frame [-]
     REAL(ReKi)  :: RootMxr = 0.0_ReKi      !< x-component of the root reaction moment expressed in r (used for ServoDyn Bladed DLL Interface) [Nm]
     REAL(ReKi)  :: RootMyr = 0.0_ReKi      !< y-component of the root reaction moment expressed in r (used for ServoDyn Bladed DLL Interface) [Nm]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WriteOutput      !< Data to be written to an output file: see WriteOutputHdr for names of each variable [see WriteOutputUnt]
@@ -323,6 +324,7 @@ IMPLICIT NONE
     TYPE(BD_ContinuousStateType)  :: dxdt_lin      !<  [-]
     TYPE(BD_InputType)  :: u_perturb      !<  [-]
     TYPE(BD_OutputType)  :: y_lin      !<  [-]
+    TYPE(MeshType)  :: BldMotionRot      !< Motion (translational/rotational: disp, vel, acc) in hub rotating frame [-]
   END TYPE BD_MiscVarType
 ! =======================
    integer(IntKi), public, parameter :: BD_x_q                           =   1 ! BD%q
@@ -1529,6 +1531,7 @@ subroutine BD_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    end if
    DstParamData%RotStates = SrcParamData%RotStates
    DstParamData%CompAeroMaps = SrcParamData%CompAeroMaps
+   DstParamData%AzimuthRot = SrcParamData%AzimuthRot
 end subroutine
 
 subroutine BD_DestroyParam(ParamData, ErrStat, ErrMsg)
@@ -1731,6 +1734,7 @@ subroutine BD_PackParam(RF, Indata)
    call RegPackAlloc(RF, InData%FEweight)
    call RegPack(RF, InData%RotStates)
    call RegPack(RF, InData%CompAeroMaps)
+   call RegPack(RF, InData%AzimuthRot)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1839,6 +1843,7 @@ subroutine BD_UnPackParam(RF, OutData)
    call RegUnpackAlloc(RF, OutData%FEweight); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RotStates); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompAeroMaps); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%AzimuthRot); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine BD_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
@@ -2967,6 +2972,9 @@ subroutine BD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
    call BD_CopyOutput(SrcMiscData%y_lin, DstMiscData%y_lin, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   call MeshCopy(SrcMiscData%BldMotionRot, DstMiscData%BldMotionRot, CtrlCode, ErrStat2, ErrMsg2 )
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
 end subroutine
 
 subroutine BD_DestroyMisc(MiscData, ErrStat, ErrMsg)
@@ -3094,6 +3102,8 @@ subroutine BD_DestroyMisc(MiscData, ErrStat, ErrMsg)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call BD_DestroyOutput(MiscData%y_lin, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call MeshDestroy( MiscData%BldMotionRot, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
 
 subroutine BD_PackMisc(RF, Indata)
@@ -3145,6 +3155,7 @@ subroutine BD_PackMisc(RF, Indata)
    call BD_PackContState(RF, InData%dxdt_lin) 
    call BD_PackInput(RF, InData%u_perturb) 
    call BD_PackOutput(RF, InData%y_lin) 
+   call MeshPack(RF, InData%BldMotionRot) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -3200,6 +3211,7 @@ subroutine BD_UnPackMisc(RF, OutData)
    call BD_UnpackContState(RF, OutData%dxdt_lin) ! dxdt_lin 
    call BD_UnpackInput(RF, OutData%u_perturb) ! u_perturb 
    call BD_UnpackOutput(RF, OutData%y_lin) ! y_lin 
+   call MeshUnpack(RF, OutData%BldMotionRot) ! BldMotionRot 
 end subroutine
 
 subroutine BD_Input_ExtrapInterp(u, t, u_out, t_out, ErrStat, ErrMsg)

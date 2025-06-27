@@ -963,8 +963,8 @@ subroutine FAST_GetOP(ModData, ThisTime, iInput, iState, T, ErrStat, ErrMsg, &
          end if
          if (RotStatesLoc) then
             call BD_ContStateToRotatingFrame(T%BD%p(ModData%Ins), T%BD%Input(iInput, ModData%Ins), &
-                                             T%BD%OtherSt(ModData%Ins, iState), T%BD%x(ModData%Ins, iState), &
-                                             T%BD%m(ModData%Ins)%x_perturb)
+                                             T%BD%m(ModData%Ins), T%BD%OtherSt(ModData%Ins, iState), &
+                                             T%BD%x(ModData%Ins, iState), T%BD%m(ModData%Ins)%x_perturb)
             call BD_VarsPackContState(ModData%Vars, T%BD%m(ModData%Ins)%x_perturb, x_op)
          else
             call BD_VarsPackContState(ModData%Vars, T%BD%x(ModData%Ins, iState), x_op)
@@ -1252,8 +1252,8 @@ subroutine FAST_SetOP(ModData, iInput, iState, T, ErrStat, ErrMsg, &
          if (RotStatesLoc) then
             call BD_VarsUnpackContState(ModData%Vars, x_op, T%BD%m(ModData%Ins)%x_perturb)
             call BD_ContStateToRotatingFrame(T%BD%p(ModData%Ins), T%BD%Input(iInput, ModData%Ins), &
-                                             T%BD%OtherSt(ModData%Ins, iState), T%BD%m(ModData%Ins)%x_perturb, &
-                                             T%BD%x(ModData%Ins, iState))
+                                             T%BD%m(ModData%Ins), T%BD%OtherSt(ModData%Ins, iState), &
+                                             T%BD%m(ModData%Ins)%x_perturb, T%BD%x(ModData%Ins, iState))
          else
             call BD_VarsUnpackContState(ModData%Vars, x_op, T%BD%x(ModData%Ins, iState))
          end if

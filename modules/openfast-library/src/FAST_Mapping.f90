@@ -862,18 +862,18 @@ subroutine InitMappings_BD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    case (Module_ED)
 
       call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
-                         SrcDL=DatLoc(ED_y_BladeRootMotion, DstMod%Ins), &   ! ED%y%BladeRootMotion(DstMod%Ins)
-                         DstDL=DatLoc(BD_u_RootMotion), &                    ! BD%u(DstMod%Ins)%RootMotion
+                         SrcDL=DatLoc(ED_y_BladeRootMotion, DstMod%Ins), &       ! ED%y%BladeRootMotion(DstMod%Ins)
+                         DstDL=DatLoc(BD_u_RootMotion), &                        ! BD%u(DstMod%Ins)%RootMotion
                          ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
                          Active=NotCompAeroMaps)
       if (Failed()) return
 
-      ! call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
-      !                    SrcDL=DatLoc(ED_y_HubPtMotion), &                       ! ED%y%HubPtMotion
-      !                    DstDL=DatLoc(BD_u_HubMotion), &                         ! BD%Input(1, DstMod%Ins)%HubMotion
-      !                    ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-      !                    Active=NotCompAeroMaps)
-      ! if (Failed()) return
+      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                         SrcDL=DatLoc(ED_y_HubPtMotion), &                       ! ED%y%HubPtMotion
+                         DstDL=DatLoc(BD_u_HubMotion), &                         ! BD%Input(1, DstMod%Ins)%HubMotion
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=NotCompAeroMaps)
+      if (Failed()) return
 
    case (Module_ExtLd)
 
