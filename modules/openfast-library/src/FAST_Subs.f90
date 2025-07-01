@@ -575,6 +575,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_SeaSt%defWtrDens    = p_FAST%WtrDens
       Init%InData_SeaSt%defWtrDpth    = p_FAST%WtrDpth
       Init%InData_SeaSt%defMSL2SWL    = p_FAST%MSL2SWL
+      Init%InData_SeaSt%MHK           = p_FAST%MHK
       Init%InData_SeaSt%UseInputFile  = .TRUE.
       Init%InData_SeaSt%Linearize     = p_FAST%Linearize
       Init%InData_SeaSt%hasIce        = p_FAST%CompIce /= Module_None
@@ -586,7 +587,14 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_SeaSt%PtfmLocationX = p_FAST%TurbinePos(1)
       Init%InData_SeaSt%PtfmLocationY = p_FAST%TurbinePos(2)
 
-      ! wave field visualization
+      
+      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompInflow == Module_IfW) THEN
+         Init%InData_SeaSt%hasCurrField = .TRUE.
+      ELSE
+         Init%InData_SeaSt%hasCurrField = .FALSE.
+      END IF
+
+         ! wave field visualization
       if (p_FAST%WrVTK == VTK_Animate .and. p_FAST%VTK_Type == VTK_Surf) Init%InData_SeaSt%SurfaceVis = .true.
 
       ! Call module initialization routine
@@ -607,6 +615,13 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
          p_FAST%VTK_surface%NWaveElevPts(2) = 0
       endif
 
+      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompInflow == Module_IfW) THEN ! MHK turbine with dynamic current
+         ! Simulating an MHK turbine; load dynamic current from IfW
+         SeaSt%p%WaveField%CurrField  => Init%OutData_IfW%FlowField
+         SeaSt%p%WaveField%hasCurrField = .TRUE.
+      ELSE ! Wind turbine
+         SeaSt%p%WaveField%hasCurrField = .FALSE.
+      END IF
    end if
 
    !----------------------------------------------------------------------------
@@ -654,6 +669,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_AD%InputFile          = p_FAST%AeroFile
       Init%InData_AD%RootName           = p_FAST%OutFileRoot
       Init%InData_AD%MHK                = p_FAST%MHK
+      Init%InData_AD%CompSeaSt          = p_FAST%CompSeaSt
       if ( p_FAST%MHK == MHK_None ) then
          Init%InData_AD%defFldDens      = p_FAST%AirDens
       else
@@ -697,6 +713,11 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       CALL AD_Init( Init%InData_AD, AD%Input(1), AD%p, AD%x(STATE_CURR), AD%xd(STATE_CURR), AD%z(STATE_CURR), &
                     AD%OtherSt(STATE_CURR), AD%y, AD%m, p_FAST%dt_module( MODULE_AD ), Init%OutData_AD, ErrStat2, ErrMsg2 )
       if (Failed()) return
+
+      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompSeaSt == Module_SeaSt) THEN ! MHK turbine
+         ! Set AD pointers to wavefield
+         AD%p%WaveField => Init%OutData_SeaSt%WaveField
+      END IF
 
       ! Loop through rotors and add module for each one
       do i = 1, size(Init%OutData_AD%rotors)
@@ -903,7 +924,11 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_SD%g             = p_FAST%Gravity
       Init%InData_SD%SDInputFile   = p_FAST%SubFile
       Init%InData_SD%RootName      = p_FAST%OutFileRoot
-      Init%InData_SD%TP_RefPoint   = ED%y(iED)%PlatformPtMesh%Position(:,1)  ! "Interface point" where loads will be transferred to
+      ! TODO: Below is only a temporary patch to keep things working as before. Need to be updated to support multirotor capability.
+      Init%InData_SD%nTP           = 1
+      Allocate(Init%InData_SD%TP_RefPoint(3,Init%InData_SD%nTP), stat=ErrStat2)
+         CALL SetErrStat(ErrStat2,'Allocating TP reference points',ErrStat,ErrMsg,RoutineName)
+      Init%InData_SD%TP_RefPoint(:,iED) = ED%y(iED)%PlatformPtMesh%Position(:,1)  ! "Interface points" where loads and motion will be transferred to and from
       Init%InData_SD%SubRotateZ    = 0.0                                ! Used by driver to rotate structure around z
 
       CALL SD_Init( Init%InData_SD, SD%Input(1), SD%p,  SD%x(STATE_CURR), SD%xd(STATE_CURR), SD%z(STATE_CURR),  &
@@ -1877,6 +1902,8 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
    IF (p%MHK /= MHK_None .and. p%MHK /= MHK_FixedBottom .and. p%MHK /= MHK_Floating) CALL SetErrStat( ErrID_Fatal, 'MHK switch is invalid. Set MHK to 0, 1, or 2 in the FAST input file.', ErrStat, ErrMsg, RoutineName )
 
    IF (p%MHK /= MHK_None .and. p%Linearize) CALL SetErrStat( ErrID_Warn, 'Linearization is not fully implemented for an MHK turbine (buoyancy not included in perturbations, and added mass not included anywhere).', ErrStat, ErrMsg, RoutineName )
+
+   IF (p%MHK /= MHK_None .and. p%CompSeaSt == Module_SeaSt .and. p%CompInflow /= Module_IfW) CALL SetErrStat( ErrID_Fatal, 'InflowWind must be activated for MHK turbines when SeaState is used.', ErrStat, ErrMsg, RoutineName )
 
    IF (p%Gravity < 0.0_ReKi) CALL SetErrStat( ErrID_Fatal, 'Gravity must not be negative.', ErrStat, ErrMsg, RoutineName )
 
@@ -5880,8 +5907,9 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
       !call MeshWrVTK(p_FAST%TurbinePos, SD%Input(1)%TPMesh, trim(p_FAST%VTK_OutFileRoot)//'.SD_TPMesh_motion', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
       call MeshWrVTK(p_FAST%TurbinePos, SD%Input(1)%LMesh, trim(p_FAST%VTK_OutFileRoot)//'.SD_LMesh_y2Mesh', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SD%y%y2Mesh )
       call MeshWrVTK(p_FAST%TurbinePos, SD%Input(1)%LMesh, trim(p_FAST%VTK_OutFileRoot)//'.SD_LMesh_y3Mesh', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SD%y%y3Mesh )
-
-      call MeshWrVTK(p_FAST%TurbinePos, SD%y%y1Mesh, trim(p_FAST%VTK_OutFileRoot)//'.SD_y1Mesh_TPMesh', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SD%Input(1)%TPMesh )
+      DO j = 1,size(SD%y%y1Mesh)
+         call MeshWrVTK(p_FAST%TurbinePos, SD%y%y1Mesh(j), trim(p_FAST%VTK_OutFileRoot)//'.SD_y1Mesh_TPMesh'//trim(num2lstr(j)), y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SD%Input(1)%TPMesh(j) )
+      END DO
       !call MeshWrVTK(p_FAST%TurbinePos, SD%y%y3Mesh, trim(p_FAST%VTK_OutFileRoot)//'.SD_y3Mesh_motion', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
    ELSE IF ( p_FAST%CompSub == Module_ExtPtfm .and. allocated(ExtPtfm%Input)) THEN
       call MeshWrVTK(p_FAST%TurbinePos, ExtPtfm%y%PtfmMesh, trim(p_FAST%VTK_OutFileRoot)//'.ExtPtfm', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, ExtPtfm%Input(1)%PtfmMesh )
@@ -6440,7 +6468,9 @@ SUBROUTINE WriteInputMeshesToFile(u_ED, u_AD, u_SD, u_HD, u_MAP, u_BD, FileName,
       CALL MeshWrBin( unOut, u_ED(J_local)%TowerPtLoads,            ErrStat, ErrMsg )
       CALL MeshWrBin( unOut, u_ED(J_local)%PlatformPtMesh,          ErrStat, ErrMsg )
    end do
-   CALL MeshWrBin( unOut, u_SD%TPMesh,                  ErrStat, ErrMsg )
+   do J_local = 1,size(u_SD%TPMesh)
+      CALL MeshWrBin( unOut, u_SD%TPMesh(J_local),         ErrStat, ErrMsg )
+   end do
    CALL MeshWrBin( unOut, u_SD%LMesh,                   ErrStat, ErrMsg )
    CALL MeshWrBin( unOut, u_HD%Morison%Mesh,            ErrStat, ErrMsg )
    CALL MeshWrBin( unOut, u_HD%WAMITMesh,               ErrStat, ErrMsg )
@@ -6530,7 +6560,9 @@ SUBROUTINE WriteMotionMeshesToFile(time, y_ED, u_SD, y_SD, u_HD, u_MAP, y_BD, u_
       CALL MeshWrBin( unOut, y_ED(J_local)%TowerLn2Mesh,            ErrStat, ErrMsg )
       CALL MeshWrBin( unOut, y_ED(J_local)%PlatformPtMesh,          ErrStat, ErrMsg )
    end do
-   CALL MeshWrBin( unOut, u_SD%TPMesh,                  ErrStat, ErrMsg )
+   do J_local = 1,size(u_SD%TPMesh)
+      CALL MeshWrBin( unOut, u_SD%TPMesh(J_local),         ErrStat, ErrMsg )
+   end do
    CALL MeshWrBin( unOut, y_SD%y2Mesh,                  ErrStat, ErrMsg )
    CALL MeshWrBin( unOut, y_SD%y3Mesh,                  ErrStat, ErrMsg )
    CALL MeshWrBin( unOut, u_HD%Morison%Mesh,            ErrStat, ErrMsg )

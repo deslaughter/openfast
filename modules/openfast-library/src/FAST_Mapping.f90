@@ -629,7 +629,7 @@ subroutine InitMappings_AD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    case (Module_BD)
 
       call MapMotionMesh(Turbine, Mappings, &
-                         SrcMod=SrcMod, SrcDL=DatLoc(BD_y_BldMotion), &                                    ! BD%y(SrcMod%Ins)%BldMotion
+                         SrcMod=SrcMod, SrcDL=DatLoc(BD_y_BldMotion), &                 ! BD%y(SrcMod%Ins)%BldMotion
                          DstMod=DstMod, DstDL=DatLoc(AD_u_BladeMotion, SrcMod%Ins), &   ! AD%u%rotors(DstMod%Ins)%BladeMotion(SrcMod%Ins)
                          ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
                          Active=NotCompAeroMaps .or. (SrcMod%Ins == 1))
@@ -641,7 +641,7 @@ subroutine InitMappings_AD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
       if (Turbine%p_FAST%CompElast == Module_ED) then
          do i = 1, size(Turbine%ED%y(SrcMod%Ins)%BladeLn2Mesh)
             call MapMotionMesh(Turbine, Mappings, &
-                               SrcMod=SrcMod, SrcDL=DatLoc(ED_y_BladeLn2Mesh, i), &                     ! ED%y%BladeLn2Mesh(i)
+                               SrcMod=SrcMod, SrcDL=DatLoc(ED_y_BladeLn2Mesh, i), &  ! ED%y%BladeLn2Mesh(i)
                                DstMod=DstMod, DstDL=DatLoc(AD_u_BladeMotion, i), &   ! AD%u%rotors(DstMod%Ins)%BladeMotion(i)
                                ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
                                Active=CompElastED .and. (NotCompAeroMaps .or. (i == 1)))
@@ -1143,8 +1143,8 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    case (Module_SD)
 
       call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
-                       SrcDL=DatLoc(SD_y_Y1Mesh), &                    ! SD%y%Y1mesh, &
-                       SrcDispDL=DatLoc(SD_u_TPMesh), &                ! SD%u%TPMesh
+                       SrcDL=DatLoc(SD_y_Y1Mesh,DstMod%Ins), &         ! SD%y%Y1mesh, &
+                       SrcDispDL=DatLoc(SD_u_TPMesh,DstMod%Ins), &     ! SD%u%TPMesh
                        DstDL=DatLoc(ED_u_PlatformPtMesh), &            ! ED%u%PlatformPtMesh
                        DstDispDL=DatLoc(ED_y_PlatformPtMesh), &        ! ED%y%PlatformPtMesh
                        ErrStat=ErrStat2, ErrMsg=ErrMsg2)
@@ -1807,8 +1807,8 @@ subroutine InitMappings_SD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    case (Module_ED)
 
       call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
-                         SrcDL=DatLoc(ED_y_PlatformPtMesh), &          ! ED%y%PlatformPtMesh
-                         DstDL=DatLoc(SD_u_TPMesh), &                  ! SD%u%TPMesh
+                         SrcDL=DatLoc(ED_y_PlatformPtMesh), &             ! ED%y%PlatformPtMesh
+                         DstDL=DatLoc(SD_u_TPMesh, SrcMod%Ins), &         ! SD%u%TPMesh
                          ErrStat=ErrStat2, ErrMsg=ErrMsg2); if(Failed()) return
 
    case (Module_FEAM)
@@ -1930,7 +1930,7 @@ subroutine InitMappings_SrvD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    integer(IntKi), intent(out)            :: ErrStat
    character(*), intent(out)              :: ErrMsg
 
-   character(*), parameter    :: RoutineName = 'InitMappings_BD'
+   character(*), parameter    :: RoutineName = 'InitMappings_SrvD'
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
    integer(IntKi)             :: i, j
@@ -1947,8 +1947,8 @@ subroutine InitMappings_SrvD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
       ! Blade Structural Controller
       do i = 1, Turbine%SrvD%p%NumBStC
          call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
-                            SrcDL=DatLoc(BD_y_BldMotion), &                         ! BD%y%BldMotion
-                            DstDL=DatLoc(SrvD_u_BStCMotionMesh, DstMod%Ins, i), &   ! SrvD%u%BStCMotionMesh(i, j)
+                            SrcDL=DatLoc(BD_y_BldMotion, SrcMod%Ins), &             ! BD%y(SrcMod%Ins)%BldMotion
+                            DstDL=DatLoc(SrvD_u_BStCMotionMesh, SrcMod%Ins, i), &   ! SrvD%u%BStCMotionMesh(SrcMod%Ins,i)
                             ErrStat=ErrStat2, ErrMsg=ErrMsg2); if(Failed()) return
       end do
 
