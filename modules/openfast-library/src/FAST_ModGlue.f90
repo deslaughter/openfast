@@ -671,7 +671,6 @@ subroutine ModGlue_CalcSteady(n_t_global, t_global, p, m, y, p_FAST, m_FAST, T, 
    end do
 
    ! Loop through modules and collect output
-
    do j = 1, size(m%ModGlue%ModData)
       associate (ModData => m%ModGlue%ModData(j))
 
@@ -680,7 +679,7 @@ subroutine ModGlue_CalcSteady(n_t_global, t_global, p, m, y, p_FAST, m_FAST, T, 
 
          ! Get outputs
          call FAST_GetOP(ModData, t_global, INPUT_CURR, STATE_CURR, T, ErrStat2, ErrMsg2, &
-                         y_op=m%ModGlue%Lin%y, y_glue=m%ModGlue%Lin%y)
+                         y_op=ModData%Lin%y, y_glue=m%ModGlue%Lin%y)
          if (Failed()) return
 
       end associate
