@@ -419,10 +419,10 @@ subroutine MV_AddModule(ModDataAry, ModID, ModAbbr, Instance, ModDT, SolverDT, V
    !----------------------------------------------------------------------------
 
    if (.not. allocated(ModDataAry)) then
-      allocate (ModDataAry(1), source=ModData)
+      allocate(ModDataAry(1), source=ModData)
    else
       call move_alloc(ModDataAry, ModDataAryTmp)
-      allocate (ModDataAry(size(ModDataAryTmp) + 1))
+      allocate(ModDataAry(size(ModDataAryTmp) + 1))
       ModDataAry(:size(ModDataAryTmp)) = ModDataAryTmp
       ModDataAry(size(ModDataAry)) = ModData
    end if
@@ -939,11 +939,11 @@ subroutine MV_AddVar(VarAry, Name, Field, DL, Num, iAry, jAry, kAry, Flags, Deri
    ! Append Var to VarArray
    if (allocated(VarAry)) then
       call move_alloc(VarAry, VarAryTmp)
-      allocate (VarAry(size(VarAryTmp) + 1))
+      allocate(VarAry(size(VarAryTmp) + 1))
       VarAry(:size(VarAryTmp)) = VarAryTmp
       VarAry(size(VarAry)) = Var
    else
-      allocate (VarAry(1), source=Var)
+      allocate(VarAry(1), source=Var)
    end if
 
 end subroutine

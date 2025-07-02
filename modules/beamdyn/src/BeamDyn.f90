@@ -182,7 +182,7 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
    call Init_ContinuousStates(p, u, x, OtherState, ErrStat2, ErrMsg2); if (Failed()) return
 
       ! initialize outputs (need to do this after initializing inputs and parameters (p%nnu0))
-   call Init_y(InitInp, p, OtherState, u, y, ErrStat2, ErrMsg2); if (Failed()) return
+   call Init_y(p, OtherState, u, y, ErrStat2, ErrMsg2); if (Failed()) return
 
       ! allocate and initialize misc vars (do this after initializing input and output meshes):
    call Init_MiscVars(InitInp, p, OtherState, u, y, MiscVar, ErrStat2, ErrMsg2); if (Failed()) return
@@ -1167,9 +1167,8 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
 end subroutine SetParameters
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> this routine initializes the outputs, y, that are used in the BeamDyn interface for coupling in the FAST framework.
-subroutine Init_y(InitInp, p, OtherState, u, y, ErrStat, ErrMsg)
+subroutine Init_y( p, OtherState, u, y, ErrStat, ErrMsg)
 
-   type(BD_InitInputType),       intent(in)     :: InitInp           !< Initialization input
    type(BD_ParameterType),       intent(inout)  :: p                 !< Parameters  -- intent(out) only because it changes p%NdIndx
    type(BD_OtherStateType),      intent(in   )  :: OtherState        !< Global rotations are stored in otherstate
    type(BD_InputType),           intent(inout)  :: u                 !< Inputs
@@ -1182,18 +1181,18 @@ subroutine Init_y(InitInp, p, OtherState, u, y, ErrStat, ErrMsg)
    real(ReKi)                                   :: Pos(3)            ! must be same type as mesh position fields
 
    
-   character(*), parameter                      :: RoutineName = 'Init_y'
+   integer(intKi)                               :: temp_id
+   integer(intKi)                               :: i,j               ! loop counters
+   integer(intKi)                               :: NNodes            ! number of nodes in mesh
    integer(intKi)                               :: ErrStat2          ! temporary Error status
    character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
-   integer(intKi)                               :: NNodes            ! number of nodes in mesh
-   integer(intKi)                               :: temp_id
-   integer(intKi)                               :: i, j, k           ! loop counters
+   character(*), parameter                      :: RoutineName = 'Init_y'
+
+
 
    ErrStat = ErrID_None
    ErrMsg  = ""
 
-   ! Number of FE nodes, with overlapping nodes at the element end points
-   NNodes = p%nodes_per_elem*p%elem_total
 
    !.................................
    ! y%ReactionForce (for coupling with ElastoDyn)
@@ -1218,6 +1217,7 @@ subroutine Init_y(InitInp, p, OtherState, u, y, ErrStat, ErrMsg)
    SELECT CASE (p%BldMotionNodeLoc)
    CASE (BD_MESH_FE) ! This is how the NREL-version of BeamDyn works (output nodes at the finite element nodes)
       
+      NNodes = p%nodes_per_elem*p%elem_total ! this is the same as the number of FE nodes, with overlapping nodes at the element end points
       CALL MeshCreate( BlankMesh        = y%BldMotion        &
                       ,IOS              = COMPONENT_OUTPUT   &
                       ,NNodes           = NNodes             &
@@ -1302,6 +1302,8 @@ subroutine Init_y(InitInp, p, OtherState, u, y, ErrStat, ErrMsg)
       
    END SELECT   
    y%BldMotion%RefNode = 1
+
+
 
    !.................................
    ! y%WriteOutput (for writing columns to output file)
