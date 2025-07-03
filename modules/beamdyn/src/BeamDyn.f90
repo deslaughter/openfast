@@ -6080,6 +6080,7 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
    call MV_AddMeshVar(InitOut%Vars%u, "HubMotion", MotionFields, &
                       DatLoc(BD_u_HubMotion), &
                       Mesh=u%HubMotion, &
+                      Flags=VF_NoLin, &
                       Perturbs=[0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransDisp
                                 0.2_R8Ki*D2R_D, &                     ! FieldOrientation
                                 0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransVel
