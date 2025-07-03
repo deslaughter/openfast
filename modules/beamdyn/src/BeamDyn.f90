@@ -1808,16 +1808,10 @@ subroutine Init_MiscVars(InitInp, p, OtherState, u, y, m, ErrStat, ErrMsg )
          k = k + 1
 
          ! Node position in inertial frame
-         NodePos = OtherState%GlbPos + matmul(OtherState%GlbRot, p%uuN0(1:3, j, i))
-
-         ! Node position in rotating frame
-         NodePos = quat_rotate_vec(InertialToRotating, NodePos - InitInp%HubPos)
-
-         ! Node orientation in inertial frame
-         CALL BD_CrvCompose(RotWM, OtherState%Glb_crv, p%uuN0(4:6,j,i), FLAG_R1R2)
+         NodePos = p%uuN0(1:3, j, i)
 
          ! Node orientation in rotating frame
-         RotMat = quat_to_dcm(quat_compose(wm_to_quat(-RotWM), -InertialToRotating))
+         RotMat = quat_to_dcm(wm_to_quat(-p%uuN0(4:6,j,i)))
 
          ! Position and orient node in mesh
          call MeshPositionNode(m%BldMotionRot, k, NodePos, ErrStat2, ErrMsg2, orient=RotMat)
@@ -6077,16 +6071,16 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
                       Perturbs=[MaxThrust/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes), &  ! FieldForce
                                 MaxTorque/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes)])   ! FieldMoment
 
-   call MV_AddMeshVar(InitOut%Vars%u, "HubMotion", MotionFields, &
-                      DatLoc(BD_u_HubMotion), &
-                      Mesh=u%HubMotion, &
-                      Flags=VF_NoLin, &
-                      Perturbs=[0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransDisp
-                                0.2_R8Ki*D2R_D, &                     ! FieldOrientation
-                                0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransVel
-                                0.2_R8Ki*D2R_D, &                     ! FieldAngularVel
-                                0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransAcc
-                                0.2_R8Ki*D2R_D])                      ! FieldAngularAcc
+   ! call MV_AddMeshVar(InitOut%Vars%u, "HubMotion", MotionFields, &
+   !                    DatLoc(BD_u_HubMotion), &
+   !                    Mesh=u%HubMotion, &
+   !                    Flags=VF_NoLin, &
+   !                    Perturbs=[0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransDisp
+   !                              0.2_R8Ki*D2R_D, &                     ! FieldOrientation
+   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransVel
+   !                              0.2_R8Ki*D2R_D, &                     ! FieldAngularVel
+   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransAcc
+   !                              0.2_R8Ki*D2R_D])                      ! FieldAngularAcc
 
    !----------------------------------------------------------------------------
    ! Output variables
@@ -6179,41 +6173,14 @@ subroutine BD_ContStateToInertialFrame(p, u, m, OtherState, x_r, x_i)
    type(BD_ContinuousStateType), intent(in)     :: x_r   ! States in rotating frame
    type(BD_ContinuousStateType), intent(inout)  :: x_i   ! States in inertial frame
 
-   real(R8Ki)        :: HubPosI(3), HubRotI(3) !, HubAxisX(3)
-   real(R8Ki)        :: GlbRot(3)                           ! Global rotation as quaternion
-   real(R8Ki)        :: InertialToRotating(3)               ! Inertial to rotating frame quaternion
-   real(R8Ki)        :: HubTransVelR(3), HubRotVelR(3)
-   real(R8Ki)        :: NodeRot0I(3), NodeRotR0(3)
-   real(R8Ki)        :: NodePosI(3), NodePosR(3)
-   real(R8Ki)        :: NodeRotI(3), NodeRotR(3), NodeRotB(3)
-   real(R8Ki)        :: NodeTransDispI(3), NodeTransDispR(3)
-   real(R8Ki)        :: NodeRotDispI(3), NodeRotDispR(3)
-   real(R8Ki)        :: NodeTransVelI(3), NodeTransVelR(3)
-   real(R8Ki)        :: NodeRotVelI(3), NodeRotVelR(3)
-   real(R8Ki)        :: rHubNodeI(3), rHubNodeR(3)
+   real(R8Ki)        :: RootTransVel(3), RootRotVel(3)
+   real(R8Ki)        :: NodeTransVel(3), NodeRotVel(3)
+   real(R8Ki)        :: r(3)
    integer(IntKi)    :: i, j, NodeIndex
 
-   ! Get global rotation as quaternion
-   GlbRot = wm_to_quat(-OtherState%Glb_crv)
-
-   ! Calculate the hub position (inertial frame)
-   HubPosI = u%HubMotion%Position(:,1) + u%HubMotion%TranslationDisp(:,1)
-
-   ! Get the hub orientation (inertial frame)
-   HubRotI = dcm_to_quat(u%HubMotion%Orientation(:,:,1))
-
-   ! Extract the hub x-axis
-   ! HubAxisX = u%HubMotion%Orientation(1,:,1)
-
-   ! Calculate rotation to remove shaft tilt and blade azimuth
-   InertialToRotating = quat_compose(HubRotI, p%AzimuthRot)
-
-   ! Hub translational velocity (rotating frame)
-   HubTransVelR = quat_rotate_vec(InertialToRotating, u%HubMotion%TranslationVel(:,1))
-
-   ! Calculate the angular velocity about the hub axis
-   ! HubRotVelR = [dot_product(u%HubMotion%RotationVel(:,1), HubAxisX), 0.0_R8Ki, 0.0_R8Ki]
-   HubRotVelR = quat_rotate_vec(InertialToRotating, u%HubMotion%RotationVel(:,1))
+   ! Get root velocity in blade frame
+   RootTransVel = matmul(u%RootMotion%TranslationVel(:,1), OtherState%GlbRot)
+   RootRotVel = matmul(u%RootMotion%RotationVel(:,1), OtherState%GlbRot)
 
    ! Loop through elements
    do i = 1, p%elem_total
@@ -6224,73 +6191,38 @@ subroutine BD_ContStateToInertialFrame(p, u, m, OtherState, x_r, x_i)
          ! Node index in state arrays
          NodeIndex = (i - 1) * (p%nodes_per_elem - 1) + j
 
+         ! Vector from root to node (blade frame)
+         r = p%uuN0(1:3, j, i) + x_r%q(1:3, NodeIndex)
+
          !----------------------------------------------------------------------
-         ! Node Translational Displacement
+         ! Node Position and Orientation
          !----------------------------------------------------------------------
 
          ! Node translational displacement (rotating frame)
-         NodeTransDispR = x_r%q(1:3,NodeIndex)
+         x_i%q(1:3,NodeIndex) = x_r%q(1:3, NodeIndex)
 
-         ! Vector from hub to node (rotating frame)
-         rHubNodeR = NodeTransDispR + m%BldMotionRot%Position(:,NodeIndex)
-
-         ! Vector from hub to node (inertial frame)
-         rHubNodeI = quat_rotate_vec(-InertialToRotating, rHubNodeR)
-
-         ! Node position (inertial frame)
-         NodePosI = rHubNodeI + HubPosI
-
-         ! Node translational displacement (inertial frame)
-         NodeTransDispI = matmul(transpose(OtherState%GlbRot), NodePosI - OtherState%GlbPos) - p%uuN0(1:3, j, i)
-         x_i%q(1:3, NodeIndex) = NodeTransDispI
-
-         !----------------------------------------------------------------------
-         ! Node Rotational Displacement
-         !----------------------------------------------------------------------
-
-         ! Get node initial orientation (rotating frame)
-         NodeRotR0 = dcm_to_quat(m%BldMotionRot%RefOrientation(:,:,NodeIndex))
-
-         ! Get node rotational displacement from initial orientation (rotating frame)
-         NodeRotDispR = -wm_to_quat(x_r%q(4:6,NodeIndex))
-
-         ! Get node orientation (rotating frame)
-         NodeRotR = quat_compose(NodeRotR0, NodeRotDispR)
-
-         ! Get node orientation (inertial frame) 
-         NodeRotI = quat_compose(NodeRotR, InertialToRotating)
-
-         ! Get node orientation (blade frame)
-         NodeRotB = quat_compose(NodeRotI, -GlbRot)
-
-         ! Get rotational displacement (blade frame)
-         NodeRotDispI = quat_compose(wm_to_quat(p%uuN0(4:6, j, i)), NodeRotB)
-         x_i%q(4:6, NodeIndex) = -quat_to_wm(NodeRotDispI) 
+         ! Rotational displacement (rotating frame)
+         x_i%q(4:6,NodeIndex) = x_r%q(4:6, NodeIndex)
 
          !----------------------------------------------------------------------
          ! Node Translational Velocity
          !----------------------------------------------------------------------
 
-         ! Node translational velocity (rotating frame)
-         NodeTransVelR = x_r%dqdt(1:3,NodeIndex)
-         
-         ! Node translational velocity (inertial frame)
-         NodeTransVelI = quat_rotate_vec(-InertialToRotating, NodeTransVelR + Cross_Product(HubRotVelR, rHubNodeR) + HubTransVelR)
+         ! Node translational velocity (blade frame)
+         NodeTransVel = x_r%dqdt(1:3,NodeIndex)
 
-         x_i%dqdt(1:3,NodeIndex) = matmul(transpose(OtherState%GlbRot), NodeTransVelI)
+         ! Node translational velocity (rotating frame)
+         x_i%dqdt(1:3,NodeIndex) = NodeTransVel + Cross_Product(RootRotVel, r) + RootTransVel
 
          !----------------------------------------------------------------------
          ! Node Rotational Velocity
          !----------------------------------------------------------------------
 
+         ! Node rotational velocity (blade frame)
+         NodeRotVel = x_r%dqdt(4:6,NodeIndex)
+
          ! Node rotational velocity (rotating frame)
-         NodeRotVelR = x_r%dqdt(4:6,NodeIndex)
-
-         ! Node rotational velocity (inertial frame)
-         NodeRotVelI = quat_rotate_vec(-InertialToRotating, NodeRotVelR + HubRotVelR)
-
-         ! Node rotational velocity (inertial frame)
-         x_i%dqdt(4:6,NodeIndex) = matmul(transpose(OtherState%GlbRot), NodeRotVelI)
+         x_i%dqdt(4:6,NodeIndex) = NodeRotVel + RootRotVel
 
       end do
    end do
@@ -6306,35 +6238,14 @@ subroutine BD_ContStateToRotatingFrame(p, u, m, OtherState, x_i, x_r)
    type(BD_ContinuousStateType), intent(in)     :: x_i    ! States in inertial frame
    type(BD_ContinuousStateType), intent(inout)  :: x_r    ! States in rotating frame
 
-   real(R8Ki)        :: HubPosI(3), HubRotI(3) !, HubAxisX(3)
-   real(R8Ki)        :: HubTransVelR(3), HubRotVelR(3)
-   real(R8Ki)        :: GlbRot(3)                           ! Global rotation as quaternion
-   real(R8Ki)        :: InertialToRotating(3)               ! Inertial to rotating frame quaternion
-   real(R8Ki)        :: NodeRotR0(3), NodePosI(3)
-   real(R8Ki)        :: NodeRotI(3), NodeRotR(3), NodeRotB(3)
-   real(R8Ki)        :: NodeTransDisp(3), NodeRotDispI(3), NodeRotDispR(3)
-   real(R8Ki)        :: NodeTransVelI(3), NodeRotVelI(3)
-   real(R8Ki)        :: NodeTransVelR(3), NodeRotVelR(3)
-   real(R8Ki)        :: rHubNodeI(3), rHubNodeR(3)
+   real(R8Ki)        :: RootTransVel(3), RootRotVel(3)
+   real(R8Ki)        :: NodeTransVel(3), NodeRotVel(3)
+   real(R8Ki)        :: r(3)
    integer(IntKi)    :: i, j, NodeIndex
 
-   ! Get global rotation as quaternion
-   GlbRot = wm_to_quat(-OtherState%Glb_crv)
-
-   ! Calculate the hub position (inertial frame)
-   HubPosI = u%HubMotion%Position(:,1) + u%HubMotion%TranslationDisp(:,1)
-
-   ! Get the hub orientation (inertial frame)
-   HubRotI = dcm_to_quat(u%HubMotion%Orientation(:,:,1))
-
-   ! Calculate rotation to remove shaft tilt and blade azimuth
-   InertialToRotating = quat_compose(HubRotI, p%AzimuthRot)
-
-   ! Hub translational velocity (rotating frame)
-   HubTransVelR = quat_rotate_vec(InertialToRotating, u%HubMotion%TranslationVel(:,1))
-
-   ! Hub rotational velocity (rotating frame)
-   HubRotVelR = quat_rotate_vec(InertialToRotating, u%HubMotion%RotationVel(:,1))
+   ! Get root velocity in blade frame
+   RootTransVel = matmul(u%RootMotion%TranslationVel(:,1), OtherState%GlbRot)
+   RootRotVel = matmul(u%RootMotion%RotationVel(:,1), OtherState%GlbRot)
 
    ! Loop through elements
    do i = 1, p%elem_total
@@ -6345,70 +6256,46 @@ subroutine BD_ContStateToRotatingFrame(p, u, m, OtherState, x_i, x_r)
          ! Node index in state arrays
          NodeIndex = (i - 1) * (p%nodes_per_elem - 1) + j
 
+         ! Vector from root to node (blade frame)
+         r = p%uuN0(1:3, j, i) + x_i%q(1:3, NodeIndex)
+
          !----------------------------------------------------------------------
-         ! Node Translational Displacement
+         ! Node Position and Orientation
          !----------------------------------------------------------------------
-
-         ! Node deformed position (inertial frame)
-         NodePosI = OtherState%GlbPos + matmul(OtherState%GlbRot, p%uuN0(1:3, j, i) + x_i%q(1:3, NodeIndex))
-
-         ! Vector from hub to node (inertial frame)
-         rHubNodeI = NodePosI - HubPosI
-
-         ! Vector from hub to node (rotating frame)
-         rHubNodeR = quat_rotate_vec(InertialToRotating, rHubNodeI)
 
          ! Node translational displacement (rotating frame)
-         NodeTransDisp = rHubNodeR - m%BldMotionRot%Position(:,NodeIndex)
-         x_r%q(1:3,NodeIndex) = NodeTransDisp
-         m%BldMotionRot%TranslationDisp(:,NodeIndex) = NodeTransDisp
+         x_r%q(1:3,NodeIndex) = x_i%q(1:3, NodeIndex)
 
-         !----------------------------------------------------------------------
-         ! Node Rotational Displacement
-         !----------------------------------------------------------------------
-
-         ! Get node initial orientation (rotating frame)
-         NodeRotR0 = dcm_to_quat(m%BldMotionRot%RefOrientation(:,:,NodeIndex))
-         
-         ! Get node rotational displacement (blade frame)
-         NodeRotDispI = -wm_to_quat(x_i%q(4:6, NodeIndex))
-
-         ! Get node orientation (blade frame)
-         NodeRotB = quat_compose(-wm_to_quat(p%uuN0(4:6, j, i)), NodeRotDispI)
-
-         ! Get node orientation (inertial frame)
-         NodeRotI = quat_compose(NodeRotB, GlbRot)
-
-         ! Get node orientation (rotating frame)
-         NodeRotR = quat_compose(NodeRotI, -InertialToRotating)
-
-         ! Calculate node rotational displacement from initial orientation (rotating frame)
-         NodeRotDispR = quat_compose(-NodeRotR0, NodeRotR)
-         x_r%q(4:6,NodeIndex) = -quat_to_wm(NodeRotDispR)
-         m%BldMotionRot%Orientation(:,:,NodeIndex) = quat_to_dcm(NodeRotR)
+         ! Rotational displacement (rotating frame)
+         x_r%q(4:6,NodeIndex) = x_i%q(4:6, NodeIndex)
 
          !----------------------------------------------------------------------
          ! Node Translational Velocity
          !----------------------------------------------------------------------
 
-         ! Node translational velocity (inertial frame)
-         NodeTransVelI = matmul(OtherState%GlbRot, x_i%dqdt(1:3,NodeIndex))
+         ! Node translational velocity (blade frame)
+         NodeTransVel = x_i%dqdt(1:3,NodeIndex)
 
          ! Node translational velocity (rotating frame)
-         NodeTransVelR = quat_rotate_vec(InertialToRotating, NodeTransVelI) 
-         x_r%dqdt(1:3,NodeIndex) = NodeTransVelR - Cross_Product(HubRotVelR, rHubNodeR) - HubTransVelR
-         m%BldMotionRot%TranslationVel(:,NodeIndex) = x_r%dqdt(1:3,NodeIndex)
+         x_r%dqdt(1:3,NodeIndex) = NodeTransVel - Cross_Product(RootRotVel, r) - RootTransVel
 
          !----------------------------------------------------------------------
-         ! Node Rotational Displacement
+         ! Node Rotational Velocity
          !----------------------------------------------------------------------
 
-         ! Node rotational velocity (inertial frame)
-         NodeRotVelI = matmul(OtherState%GlbRot, x_i%dqdt(4:6,NodeIndex))
+         ! Node rotational velocity (blade frame)
+         NodeRotVel = x_i%dqdt(4:6,NodeIndex)
 
          ! Node rotational velocity (rotating frame)
-         NodeRotVelR = quat_rotate_vec(InertialToRotating, NodeRotVelI) 
-         x_r%dqdt(4:6,NodeIndex) = NodeRotVelR - HubRotVelR
+         x_r%dqdt(4:6,NodeIndex) = NodeRotVel - RootRotVel
+
+         !----------------------------------------------------------------------
+         ! Update mesh
+         !----------------------------------------------------------------------
+
+         m%BldMotionRot%TranslationDisp(:,NodeIndex) = x_r%q(1:3, NodeIndex)
+         m%BldMotionRot%Orientation(:,:,NodeIndex) = quat_to_dcm(quat_compose(wm_to_quat(-p%uuN0(4:6, j, i)), wm_to_quat(-x_r%q(4:6, NodeIndex))))
+         m%BldMotionRot%TranslationVel(:,NodeIndex) = x_r%dqdt(1:3,NodeIndex)
          m%BldMotionRot%RotationVel(:,NodeIndex) = x_r%dqdt(4:6,NodeIndex)
 
       end do
@@ -6425,45 +6312,21 @@ subroutine BD_ContStateDerivToRotatingFrame(p, u, m, OtherState, x_i, dxdt_i, dx
    type(BD_ContinuousStateType), intent(in)     :: dxdt_i    ! State dervatives in inertial frame
    type(BD_ContinuousStateType), intent(inout)  :: dxdt_r    ! State dervatives in rotating frame
 
-   real(R8Ki)        :: HubPosI(3), HubRotI(3)
-   real(R8Ki)        :: GlbRot(3)                           ! Global rotation as quaternion
-   real(R8Ki)        :: InertialToRotating(3)               ! Inertial to rotating frame quaternion
-   real(R8Ki)        :: HubTransVelR(3), HubTransAccR(3)
-   real(R8Ki)        :: HubRotVelR(3), HubRotAccR(3)
-   real(R8Ki)        :: NodeRotR0(3), NodePosI(3)
-   real(R8Ki)        :: NodeRotI(3), NodeRotR(3), NodeRotB(3)
-   real(R8Ki)        :: NodeTransDisp(3), NodeRotDispI(3), NodeRotDispR(3)
-   real(R8Ki)        :: NodeTransVelI(3), NodeRotVelI(3)
-   real(R8Ki)        :: NodeTransVelR(3), NodeRotVelR(3)
-   real(R8Ki)        :: NodeTransAccI(3), NodeRotAccI(3)
-   real(R8Ki)        :: NodeTransAccR(3), NodeRotAccR(3)
-   real(R8Ki)        :: rHubNodeI(3), rHubNodeR(3)
+   real(R8Ki)        :: RootTransVel(3), RootRotVel(3)
+   real(R8Ki)        :: RootTransAcc(3), RootRotAcc(3)
+   real(R8Ki)        :: NodeTransVel(3), NodeRotVel(3)
+   real(R8Ki)        :: NodeTransAcc(3), NodeRotAcc(3)
    real(R8Ki)        :: CentripetalAcc(3), TransverseAcc(3), CoriolisAcc(3)
+   real(R8Ki)        :: r(3)
    integer(IntKi)    :: i, j, NodeIndex
 
-   ! Get global rotation as quaternion
-   GlbRot = wm_to_quat(-OtherState%Glb_crv)
+   ! Get root velocity in blade frame
+   RootTransVel = matmul(u%RootMotion%TranslationVel(:,1), OtherState%GlbRot)
+   RootRotVel = matmul(u%RootMotion%RotationVel(:,1), OtherState%GlbRot)
 
-   ! Calculate the hub position (inertial frame)
-   HubPosI = u%HubMotion%Position(:,1) + u%HubMotion%TranslationDisp(:,1)
-
-   ! Get the hub orientation (inertial frame)
-   HubRotI = dcm_to_quat(u%HubMotion%Orientation(:,:,1))
-
-   ! Calculate rotation to remove shaft tilt and blade azimuth
-   InertialToRotating = quat_compose(HubRotI, p%AzimuthRot)
-
-   ! Hub translational velocity (rotating frame)
-   HubTransVelR = quat_rotate_vec(InertialToRotating, u%HubMotion%TranslationVel(:,1))
-
-   ! Hub rotational velocity (rotating frame)
-   HubRotVelR = quat_rotate_vec(InertialToRotating, u%HubMotion%RotationVel(:,1))
-
-   ! Hub translational acceleration (rotating frame)
-   HubTransAccR = quat_rotate_vec(InertialToRotating, u%HubMotion%TranslationAcc(:,1))
-
-   ! Calculate the angular acceleration about the hub axis (rotating frame)
-   HubRotAccR = quat_rotate_vec(InertialToRotating, u%HubMotion%RotationAcc(:,1))
+   ! Get root acceleration in blade frame
+   RootTransAcc = matmul(u%RootMotion%TranslationAcc(:,1), OtherState%GlbRot)
+   RootRotAcc = matmul(u%RootMotion%RotationAcc(:,1), OtherState%GlbRot)
 
    ! Loop through elements
    do i = 1, p%elem_total
@@ -6474,42 +6337,59 @@ subroutine BD_ContStateDerivToRotatingFrame(p, u, m, OtherState, x_i, dxdt_i, dx
          ! Node index in state arrays
          NodeIndex = (i - 1) * (p%nodes_per_elem - 1) + j
 
-         ! Extract node inertial velocites and accelerations
-         NodeTransVelI = matmul(OtherState%GlbRot, dxdt_i%q(1:3,NodeIndex))
-         NodeRotVelI = matmul(OtherState%GlbRot, dxdt_i%q(4:6,NodeIndex))
-         NodeTransAccI = matmul(OtherState%GlbRot, dxdt_i%dqdt(1:3,NodeIndex))
-         NodeRotAccI = matmul(OtherState%GlbRot, dxdt_i%dqdt(4:6,NodeIndex))
-
-         ! Node deformed position (inertial frame)
-         NodePosI = OtherState%GlbPos + matmul(OtherState%GlbRot, p%uuN0(1:3, j, i) + x_i%q(1:3, NodeIndex))
-
          ! Vector from hub to node (inertial frame)
-         rHubNodeI = NodePosI - HubPosI
+         r = p%uuN0(1:3, j, i) + x_i%q(1:3, NodeIndex)
 
-         ! Vector from hub to node (rotating frame)
-         rHubNodeR = quat_rotate_vec(InertialToRotating, rHubNodeI)
+         !----------------------------------------------------------------------
+         ! Node Translational Velocity
+         !----------------------------------------------------------------------
 
-         ! Node translational velocity with hub rotation removed (rotating frame)
-         NodeTransVelR = quat_rotate_vec(InertialToRotating, NodeTransVelI)
-         dxdt_r%q(1:3,NodeIndex) = NodeTransVelR - Cross_Product(HubRotVelR, rHubNodeR) - HubTransVelR
-         m%BldMotionRot%TranslationVel(:,NodeIndex) = dxdt_r%q(1:3,NodeIndex)
+         ! Node translational velocity (blade frame)
+         NodeTransVel = dxdt_i%q(1:3,NodeIndex)
+
+         ! Node translational velocity (rotating frame)
+         dxdt_r%q(1:3,NodeIndex) = NodeTransVel - Cross_Product(RootRotVel, r) - RootTransVel
+
+         !----------------------------------------------------------------------
+         ! Node Rotational Velocity
+         !----------------------------------------------------------------------
+
+         ! Node rotational velocity (blade frame)
+         NodeRotVel = dxdt_i%q(4:6,NodeIndex)
 
          ! Node rotational velocity (rotating frame)
-         NodeRotVelR = quat_rotate_vec(InertialToRotating, NodeRotVelI)
-         dxdt_r%q(4:6,NodeIndex) = NodeRotVelR - HubRotVelR
-         m%BldMotionRot%RotationVel(:,NodeIndex) = dxdt_r%q(4:6,NodeIndex)
+         dxdt_r%q(4:6,NodeIndex) = NodeRotVel - RootRotVel
+
+         !----------------------------------------------------------------------
+         ! Node Translational Acceleration
+         !----------------------------------------------------------------------
+
+         ! Node translational acceleration (blade frame)
+         NodeTransAcc = dxdt_i%dqdt(1:3,NodeIndex)
 
          ! Node translational acceleration (rotating frame)
-         CentripetalAcc = Cross_Product(HubRotVelR, Cross_Product(HubRotVelR, rHubNodeR))
-         TransverseAcc = Cross_Product(HubRotAccR, rHubNodeR)
-         CoriolisAcc = Cross_Product(2.0_R8Ki*HubRotVelR, dxdt_r%q(1:3,NodeIndex))
-         NodeTransAccR = quat_rotate_vec(InertialToRotating, NodeTransAccI)
-         dxdt_r%dqdt(1:3,NodeIndex) = NodeTransAccR - TransverseAcc - CentripetalAcc - CoriolisAcc - HubTransAccR
-         m%BldMotionRot%TranslationAcc(:,NodeIndex) = dxdt_r%dqdt(1:3,NodeIndex)
+         CentripetalAcc = Cross_Product(RootRotVel, Cross_Product(RootRotVel, r))
+         TransverseAcc = Cross_Product(RootRotAcc, r)
+         CoriolisAcc = Cross_Product(2.0_R8Ki*RootRotVel, dxdt_r%q(1:3,NodeIndex))
+         dxdt_r%dqdt(1:3,NodeIndex) = NodeTransAcc - TransverseAcc - CentripetalAcc - CoriolisAcc - RootTransAcc
+
+         !----------------------------------------------------------------------
+         ! Node Rotational Acceleration
+         !----------------------------------------------------------------------
+
+         ! Node rotational acceleration (blade frame)
+         NodeRotAcc = dxdt_i%dqdt(4:6,NodeIndex)
 
          ! Node rotational acceleration (rotating frame)
-         NodeRotAccR = quat_rotate_vec(InertialToRotating, NodeRotAccI)
-         dxdt_r%dqdt(4:6,NodeIndex) = NodeRotAccR - HubRotAccR
+         dxdt_r%dqdt(4:6,NodeIndex) = NodeRotAcc - RootRotAcc
+
+         !----------------------------------------------------------------------
+         ! Update mesh
+         !----------------------------------------------------------------------
+
+         m%BldMotionRot%TranslationVel(:,NodeIndex) = dxdt_r%q(1:3,NodeIndex)
+         m%BldMotionRot%RotationVel(:,NodeIndex) = dxdt_r%q(4:6,NodeIndex)
+         m%BldMotionRot%TranslationAcc(:,NodeIndex) = dxdt_r%dqdt(1:3,NodeIndex)
          m%BldMotionRot%RotationAcc(:,NodeIndex) = dxdt_r%dqdt(4:6,NodeIndex)
 
       end do
