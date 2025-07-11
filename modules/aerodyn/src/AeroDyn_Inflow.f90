@@ -394,10 +394,10 @@ subroutine ADI_InitInflowWind(Root, i_IW, u_AD, o_AD, IW, dt, InitOutData, errSt
       InitInData%BoxExceedAllow = .true.
       InitInData%OutputAccel = i_IW%OutputAccel
 
-      !bjj: what about these initialization inputs?
+      !FIXME: bjj: what about these initialization inputs?
       !   InitInData%HubPosition
       !   InitInData%RadAvg 
-
+      
       CALL InflowWind_Init( InitInData, IW%u, IW%p, &
                      IW%x, IW%xd, IW%z, IW%OtherSt, &
                      IW%y, IW%m, dt,  InitOutData, errStat2, errMsg2 )
