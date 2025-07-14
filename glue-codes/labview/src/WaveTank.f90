@@ -1,4 +1,31 @@
-
+!**********************************************************************************************************************************
+! LICENSING
+! Copyright (C) 2025  National Renewable Energy Laboratory
+!
+!    This file is a module specific to an experimental wave tank at NREL.
+!
+! Licensed under the Apache License, Version 2.0 (the "License");
+! you may not use this file except in compliance with the License.
+! You may obtain a copy of the License at
+!
+!     http://www.apache.org/licenses/LICENSE-2.0
+!
+! Unless required by applicable law or agreed to in writing, software
+! distributed under the License is distributed on an "AS IS" BASIS,
+! WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+! See the License for the specific language governing permissions and
+! limitations under the License.
+!**********************************************************************************************************************************
+!
+!  This code is designed to connect with LabView for a specific wave tank test case and likely will not work for other purposes.
+!
+!  For this test, a physical platform is deployed in a wave tank with cable acutators that are controlled through LabView.  This
+!  module is called to provide some loads that are not present in the physical tank setup.  These include the following:
+!     - rotor loading from a fixed RPM MHK rotor from AeroDyn.  This is calculated from either steady current provided by SeaState
+!     - Mooring loads from MoorDyn
+!
+!
+!**********************************************************************************************************************************
 MODULE WaveTankTesting
 
     USE ISO_C_BINDING
@@ -29,6 +56,7 @@ MODULE WaveTankTesting
 
     REAL(C_DOUBLE) :: DT
 
+!FIXME: replace all this with meshes
     REAL(C_FLOAT), DIMENSION(3,3) :: FloaterPositions = 0.0_C_FLOAT
     REAL(C_FLOAT), DIMENSION(2,6) :: FloaterVelocities = 0.0_C_FLOAT
     REAL(C_FLOAT), DIMENSION(1,6) :: FloaterAccelerations = 0.0_C_FLOAT
@@ -46,26 +74,26 @@ MODULE WaveTankTesting
     REAL(C_FLOAT), ALLOCATABLE :: BladeMeshAccelerations(:,:)
 
     TYPE WaveTank_InitInput
-        REAL(C_DOUBLE)  :: DT
+        REAL(C_DOUBLE)      :: DT
 
         ! SeaState variables
-        TYPE(C_PTR)     :: SS_OutRootName_C
-        REAL(C_FLOAT)   :: SS_Gravity_C
-        REAL(C_FLOAT)   :: SS_WtrDens_C
-        REAL(C_FLOAT)   :: SS_WtrDpth_C
-        REAL(C_FLOAT)   :: SS_MSL2SWL_C
-        INTEGER(C_INT)  :: SS_NSteps_C
-        REAL(C_FLOAT)   :: SS_TimeInterval_C
-        INTEGER(C_INT)  :: SS_WaveElevSeriesFlag_C
-        INTEGER(C_INT)  :: SS_WrWvKinMod_C
+        character(C_CHAR)   :: SS_OutRootName_C(IntfStrLen)
+        REAL(C_FLOAT)       :: SS_Gravity_C
+        REAL(C_FLOAT)       :: SS_WtrDens_C
+        REAL(C_FLOAT)       :: SS_WtrDpth_C
+        REAL(C_FLOAT)       :: SS_MSL2SWL_C
+        INTEGER(C_INT)      :: SS_NSteps_C
+        REAL(C_FLOAT)       :: SS_TimeInterval_C
+        INTEGER(C_INT)      :: SS_WaveElevSeriesFlag_C
+        INTEGER(C_INT)      :: SS_WrWvKinMod_C
 
         ! MD variables
-        ! REAL(C_DOUBLE)  :: MD_DT_C                                !< Using global DT
-        REAL(C_FLOAT)   :: MD_G_C
-        REAL(C_FLOAT)   :: MD_RHO_C
-        REAL(C_FLOAT)   :: MD_DEPTH_C
-        REAL(C_FLOAT)   :: MD_PtfmInit_C(6)
-        INTEGER(C_INT)  :: MD_InterpOrder_C
+        ! REAL(C_DOUBLE)    :: MD_DT_C                                !< Using global DT
+        REAL(C_FLOAT)       :: MD_G_C
+        REAL(C_FLOAT)       :: MD_RHO_C
+        REAL(C_FLOAT)       :: MD_DEPTH_C
+        REAL(C_FLOAT)       :: MD_PtfmInit_C(6)
+        INTEGER(C_INT)      :: MD_InterpOrder_C
 
         ! ADI variables
         ! Preinit
@@ -128,11 +156,8 @@ SUBROUTINE ReadInput(InputFilePath, InitInp, ErrStat, ErrMsg)
     CHARACTER(*),               INTENT(  OUT)   :: ErrMsg
 
     ! Local variables  
-    INTEGER :: UnIn = -1
-    ! CHARACTER(1024)                                  :: Line                 ! String to temporarially hold value of read line   
+    INTEGER :: UnIn = -1  
     CHARACTER(1024), target                     :: TmpPath
-    CHARACTER(1024), pointer                    :: TmpPointer
-    ! CHARACTER(1024)                                  :: TmpFmt               ! Temporary storage for format statement
     CHARACTER(1024)                             :: FileName
 
     integer(IntKi)                              :: ErrStat2             ! local status of error message
@@ -153,8 +178,7 @@ SUBROUTINE ReadInput(InputFilePath, InitInp, ErrStat, ErrMsg)
     IF (ErrStat >= AbortErrLev) RETURN
 
     CALL ReadVar( UnIn, FileName, TmpPath, 'SS_OutRootName_C', 'SS_OutRootName_C', ErrStat2, ErrMsg2); CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'WaveTankTesting.ReadInput')
-    TmpPointer => TmpPath
-    InitInp%SS_OutRootName_C = C_LOC(TmpPointer)
+    InitInp%SS_OutRootName_C = transfer(TmpPath, InitInp%SS_OutRootName_C)
     CALL ReadVar( UnIn, FileName, InitInp%SS_Gravity_C, 'SS_Gravity_C', 'SS_Gravity_C', ErrStat2, ErrMsg2); CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'WaveTankTesting.ReadInput')
     CALL ReadVar( UnIn, FileName, InitInp%SS_WtrDens_C, 'SS_WtrDens_C', 'SS_WtrDens_C', ErrStat2, ErrMsg2); CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'WaveTankTesting.ReadInput')
     CALL ReadVar( UnIn, FileName, InitInp%SS_WtrDpth_C, 'SS_WtrDpth_C', 'SS_WtrDpth_C', ErrStat2, ErrMsg2); CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'WaveTankTesting.ReadInput')
@@ -244,21 +268,22 @@ SUBROUTINE WaveTank_Init(   &
 !GCC$ ATTRIBUTES DLLEXPORT :: WaveTank_Init
 #endif
 
-    TYPE(C_PTR),        INTENT(IN   ) :: WT_InputFile_C
-    TYPE(C_PTR),        INTENT(IN   ) :: MD_InputFile_C
-    TYPE(C_PTR),        INTENT(IN   ) :: SS_InputFile_C
-    TYPE(C_PTR),        INTENT(IN   ) :: AD_InputFile_C
-    TYPE(C_PTR),        INTENT(IN   ) :: IfW_InputFile_C
-    INTEGER(C_INT),     INTENT(  OUT) :: ErrStat_C
-    CHARACTER(KIND=C_CHAR), INTENT(  OUT) :: ErrMsg_C(ErrMsgLen_C)
+    character(c_char),          INTENT(IN   ) :: WT_InputFile_C(IntfStrLen)
+    character(c_char), target,  INTENT(IN   ) :: MD_InputFile_C(IntfStrLen)
+    character(c_char), target,  INTENT(IN   ) :: SS_InputFile_C(IntfStrLen)
+    character(c_char), target,  INTENT(IN   ) :: AD_InputFile_C(IntfStrLen)
+    character(c_char), target,  INTENT(IN   ) :: IfW_InputFile_C(IntfStrLen)
+    INTEGER(C_INT),             INTENT(  OUT) :: ErrStat_C
+    CHARACTER(KIND=C_CHAR),     INTENT(  OUT) :: ErrMsg_C(ErrMsgLen_C)
 
     ! Local variables
     INTEGER(C_INT)                          :: ErrStat_C2
     CHARACTER(KIND=C_CHAR, LEN=ErrMsgLen_C) :: ErrMsg_C2
     INTEGER(IntKi)                          :: ErrStat_F2
     CHARACTER(ErrMsgLen)                    :: ErrMsg_F2
-    TYPE(WaveTank_InitInput)                :: WT_InitInp
-    CHARACTER(1024), POINTER                :: WT_InputFilePath
+    TYPE(WaveTank_InitInput), target        :: WT_InitInp
+    CHARACTER(1024)                         :: WT_InputFilePath
+    integer(IntKi)                          :: i
 
     ! The length of these arrays much match what is set in the corresponding C binding modules
     CHARACTER(KIND=C_CHAR) :: SS_OutputChannelNames_C(ChanLen*MaxOutPts+1)
@@ -272,7 +297,9 @@ SUBROUTINE WaveTank_Init(   &
     ErrStat_C = ErrID_None
     ErrMsg_C  = " "//C_NULL_CHAR
 
-    CALL C_F_POINTER(WT_InputFile_C, WT_InputFilePath)
+    WT_InputFilePath = transfer(WT_InputFile_C, WT_InputFilePath)
+    i = index(WT_InputFilePath, char(0))
+    WT_InputFilePath = WT_InputFilePath(1:i)
     CALL ReadInput(WT_InputFilePath, WT_InitInp, ErrStat_F2, ErrMsg_F2)
     CALL SetErrStat_F2C(ErrStat_F2, ErrMsg_F2, ErrStat_C, ErrMsg_C) !, 'WaveTank_Init')
     IF (ErrStat_C >= AbortErrLev) RETURN
@@ -323,8 +350,8 @@ SUBROUTINE WaveTank_Init(   &
     BladeMeshAccelerations = 0.0_C_FLOAT
 
     CALL SeaSt_C_Init(                          &    
-        SS_InputFile_C,                         &
-        WT_InitInp%SS_OutRootName_C,            &
+        c_loc(SS_InputFile_C(1)),               &
+        c_loc(WT_InitInp%SS_OutRootName_C(1)),  &
         WT_InitInp%SS_Gravity_C,                &
         WT_InitInp%SS_WtrDens_C,                &
         WT_InitInp%SS_WtrDpth_C,                &
@@ -333,6 +360,7 @@ SUBROUTINE WaveTank_Init(   &
         WT_InitInp%SS_TimeInterval_C,           &
         WT_InitInp%SS_WaveElevSeriesFlag_C,     &
         WT_InitInp%SS_WrWvKinMod_C,             &
+        WT_InitInp%DebugLevel,                  &
         SS_NumChannels_C,                       &
         SS_OutputChannelNames_C,                &
         SS_OutputChannelUnits_C,                &
@@ -346,7 +374,7 @@ SUBROUTINE WaveTank_Init(   &
 
     CALL MD_C_Init(                             &
         0,                                      &   !< InputFilePassed: 0 for file, 1 for string
-        MD_InputFile_C,                         &
+        c_loc(MD_InputFile_C(1)),               &
         IntfStrLen,                             &   !< InputFileStringLength_C
         DT,                                     &
         WT_InitInp%MD_G_C,                      &
@@ -404,10 +432,10 @@ SUBROUTINE WaveTank_Init(   &
 
     CALL ADI_C_Init(                            &
         0,                                      &   !< ADinputFilePassed; 0 for file, 1 for string
-        AD_InputFile_C,                         &   !< ADinputFileString_C; Input file as a single string with lines delineated by C_NULL_CHAR
+        c_loc(AD_InputFile_C(1)),               &   !< ADinputFileString_C; Input file as a single string with lines delineated by C_NULL_CHAR
         IntfStrLen,                             &   !< ADinputFileStringLength_C; length of the input file string
         0,                                      &   !< IfWinputFilePassed; 0 for file, 1 for string
-        IfW_InputFile_C,                        &   !< IfWinputFileString_C; Input file as a single string with lines delineated by C_NULL_CHAR
+        c_loc(IfW_InputFile_C(1)),              &   !< IfWinputFileString_C; Input file as a single string with lines delineated by C_NULL_CHAR
         IntfStrLen,                             &   !< IfWinputFileStringLength_C; length of the input file string
         WT_InitInp%ADI_OutRootName_C,           &   !< Root name to use for echo files and other
         WT_InitInp%ADI_OutVTKDir_C,             &   !< Directory to put all vtk output
@@ -515,7 +543,16 @@ SUBROUTINE WaveTank_CalcOutput( &
     ! Load the new positions
     FloaterPositions(3,:) = (/ positions_x, positions_y, positions_z /)
     DeltaS = FloaterPositions(3,:) - FloaterPositions(2,:)
+    ! TODO: rigid body rotation is missing on moment arm
     NacellePositions(3,:) = NacellePositions(2,:) + DeltaS
+
+    ! TODO:
+    ! - Create mesh for platform point (WaveTank_Init)
+    ! - Create mesh for hub position (WaveTank_Init)
+    !   - Need rotational velocity for hub
+    ! - Mesh map hub to blade roots
+    ! - Mesh map blade roots to blade nodes (blade pitch?)
+    ! - Create entire structural model (copy from AeroDyn driver)
 
     ! Stride
     ! Lower bound: (I-1)*3+1 is the first of the three position components for the current blade
@@ -562,6 +599,7 @@ SUBROUTINE WaveTank_CalcOutput( &
     ! NOTE: MD_C_UpdateStates and MD_C_CalcOutput do not use the positions, velocities, and accelerations.
     !       They're passed here just for consistency, but we should not let that interface drive
     !       the design of this module.
+    ! TODO: get angles from mesh
     CALL MD_C_UpdateStates(                 &
         time,                               &
         REAL(time + DT, C_DOUBLE),          &
@@ -573,6 +611,7 @@ SUBROUTINE WaveTank_CalcOutput( &
     CALL SetErrStat_C(ErrStat_C2, ErrMsg_C2, ErrStat_C, ErrMsg_C, 'MD_C_UpdateStates')
     IF (ErrStat_C >= AbortErrLev) RETURN
 
+    ! TODO: get angles from mesh
     CALL MD_C_CalcOutput(                   &
         time,                               &
         (/ FloaterPositions(3,:), 0.0_C_FLOAT, 0.0_C_FLOAT, 0.0_C_FLOAT /), &
@@ -674,15 +713,18 @@ SUBROUTINE WaveTank_End(ErrStat_C, ErrMsg_C) bind (C, NAME="WaveTank_End")
     INTEGER(C_INT)                          :: ErrStat_C2
     CHARACTER(KIND=C_CHAR, LEN=ErrMsgLen_C) :: ErrMsg_C2
 
-    CALL MD_C_END(ErrStat_C, ErrMsg_C)
+    ErrStat_C = ErrID_None
+    ErrMsg_C  = " "//C_NULL_CHAR
+
+    CALL MD_C_END(ErrStat_C2, ErrMsg_C2)
     CALL SetErrStat_C(ErrStat_C2, ErrMsg_C2, ErrStat_C, ErrMsg_C, 'MD_C_END')
     IF (ErrStat_C >= AbortErrLev) RETURN
 
-    CALL SeaSt_C_END(ErrStat_C, ErrMsg_C)
+    CALL SeaSt_C_END(ErrStat_C2, ErrMsg_C2)
     CALL SetErrStat_C(ErrStat_C2, ErrMsg_C2, ErrStat_C, ErrMsg_C, 'SeaSt_C_END')
     IF (ErrStat_C >= AbortErrLev) RETURN
 
-    CALL ADI_C_END(ErrStat_C, ErrMsg_C)
+    CALL ADI_C_END(ErrStat_C2, ErrMsg_C2)
     CALL SetErrStat_C(ErrStat_C2, ErrMsg_C2, ErrStat_C, ErrMsg_C, 'ADI_C_END')
     IF (ErrStat_C >= AbortErrLev) RETURN
 

@@ -59,7 +59,11 @@ MODULE SeaState_C_Binding
 CONTAINS
 
 
-SUBROUTINE SeaSt_C_Init(InputFile_C, OutRootName_C, Gravity_C, WtrDens_C, WtrDpth_C, MSL2SWL_C, NSteps_C, TimeInterval_C, WaveElevSeriesFlag_C, WrWvKinMod_C, NumChannels_C, OutputChannelNames_C, OutputChannelUnits_C, ErrStat_C, ErrMsg_C) BIND (C, NAME='SeaSt_C_Init')
+SUBROUTINE SeaSt_C_Init(&
+    InputFile_C, OutRootName_C, Gravity_C, WtrDens_C, WtrDpth_C, MSL2SWL_C, &
+    NSteps_C, TimeInterval_C, WaveElevSeriesFlag_C, WrWvKinMod_C, DebugLevel_C, &
+    NumChannels_C, OutputChannelNames_C, OutputChannelUnits_C, ErrStat_C, ErrMsg_C) &
+    BIND (C, NAME='SeaSt_C_Init')
 IMPLICIT NONE
 #ifndef IMPLICIT_DLLEXPORT
 !DEC$ ATTRIBUTES DLLEXPORT :: SeaSt_C_Init
@@ -75,6 +79,7 @@ IMPLICIT NONE
     REAL(C_FLOAT),              INTENT(IN   ) :: TimeInterval_C
     INTEGER(C_INT),             INTENT(IN   ) :: WaveElevSeriesFlag_C
     INTEGER(C_INT),             INTENT(IN   ) :: WrWvKinMod_C
+    INTEGER(C_INT),             INTENT(IN   ) :: DebugLevel_C
     INTEGER(C_INT),             INTENT(  OUT) :: NumChannels_C
     CHARACTER(KIND=C_CHAR),     INTENT(  OUT) :: OutputChannelNames_C(ChanLen*MaxOutPts+1)
     CHARACTER(KIND=C_CHAR),     INTENT(  OUT) :: OutputChannelUnits_C(ChanLen*MaxOutPts+1)
@@ -109,12 +114,17 @@ IMPLICIT NONE
     ErrStat_F =  ErrID_None
     ErrMsg_F  =  ""
 
-    CALL NWTC_Init( ProgNameIn=version%Name )
-    CALL DispCopyrightLicense( version%Name )
-    CALL DispCompileRuntimeInfo( version%Name )
+    CALL NWTC_Init(ProgNameIn=version%Name)
+    CALL DispCopyrightLicense(version%Name)
+    CALL DispCompileRuntimeInfo(version%Name)
 
     ! interface debugging
-    ! DebugLevel = int(DebugLevel_in,IntKi)
+    DebugLevel = int(DebugLevel_C, IntKi)
+
+    ! Destroy memory in case they've been previously initialized, ignore errors
+    call SeaSt_DestroyParam(p, ErrStat_F, ErrMsg_F)
+    call SeaSt_DestroyInput(u, ErrStat_F, ErrMsg_F)
+    call SeaSt_DestroyMisc(m, ErrStat_F, ErrMsg_F)
 
     ! Input files
     CALL C_F_POINTER(InputFile_C, InputFileString)  ! Get a pointer to the input file string
