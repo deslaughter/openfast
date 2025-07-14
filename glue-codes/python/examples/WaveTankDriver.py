@@ -216,7 +216,7 @@ if __name__=="__main__":
     wavetanklib = WaveTankLib(
         library_path,
         {
-            "WaveTank": "/Users/rmudafor/Development/openfast/glue-codes/python/wavetankconfig.in",
+            "WaveTank": "/Users/rmudafor/Development/openfast/glue-codes/python/examples/wavetankconfig.in",
             "MoorDyn": "/Users/rmudafor/Development/openfast/reg_tests/r-test/glue-codes/openfast/MHK_RM1_Floating/MHK_RM1_Floating_MoorDyn.dat",
             "SeaState": "/Users/rmudafor/Development/openfast/reg_tests/r-test/glue-codes/openfast/MHK_RM1_Floating/SeaState.dat",
             "AeroDyn": "/Users/rmudafor/Development/openfast/reg_tests/r-test/glue-codes/openfast/MHK_RM1_Floating/MHK_RM1_Floating_AeroDyn.dat",
