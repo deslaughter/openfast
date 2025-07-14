@@ -26,14 +26,17 @@ class OpenFASTInterfaceType(CDLL):
         4: "Fatal Error"
     }
 
+    # NWTC Library sets the length of file names passed through the interfaces
+    IntfStrLen = 1025
+
     #   NOTE:   the error message length in Fortran is controlled by the
     #           ErrMsgLen variable in the NWTC_Base.f90 file.  If that ever
     #           changes, it may be necessary to update the corresponding size
     #           here.
     ERROR_MSG_C_LEN = 8197
 
-    #   NOTE:   the length of the name used for any output file written by the
-    #           HD Fortran code is 1025.
+    #   NOTE:   the length of the name used for any input or output file written by the
+    #           OpenFAST code is 1025.
     default_str_c_len = 1025
 
     abort_error_level = c_int(4)

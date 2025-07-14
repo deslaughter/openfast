@@ -38,8 +38,10 @@ class WaveTankLib(OpenFASTInterfaceType):
         """
         super().__init__(library_path)
 
+        # Create C-compatible string buffers for input file names
         self.input_file_names = {
-            k: str(Path(v).absolute()).encode('utf-8') for k,v in input_file_names.items()
+            k: create_string_buffer(str(Path(v).absolute()).encode('utf-8'), self.IntfStrLen)
+            for k,v in input_file_names.items()
         }
 
         self._initialize_routines()
@@ -63,11 +65,11 @@ class WaveTankLib(OpenFASTInterfaceType):
 
     def _initialize_routines(self):
         self.WaveTank_Init.argtypes = [
-            POINTER(c_char_p),      #  intent(in   ) :: WT_InputFile_c(IntfStrLen)
-            POINTER(c_char_p),      #  intent(in   ) :: MD_InputFile_c(IntfStrLen)
-            POINTER(c_char_p),      #  intent(in   ) :: SS_InputFile_c(IntfStrLen)
-            POINTER(c_char_p),      #  intent(in   ) :: AD_InputFile_c(IntfStrLen)
-            POINTER(c_char_p),      #  intent(in   ) :: IfW_InputFile_c(IntfStrLen)
+            POINTER(c_char),        #  intent(in   ) :: WT_InputFile_c(IntfStrLen)
+            POINTER(c_char),        #  intent(in   ) :: MD_InputFile_c(IntfStrLen)
+            POINTER(c_char),        #  intent(in   ) :: SS_InputFile_c(IntfStrLen)
+            POINTER(c_char),        #  intent(in   ) :: AD_InputFile_c(IntfStrLen)
+            POINTER(c_char),        #  intent(in   ) :: IfW_InputFile_c(IntfStrLen)
             POINTER(c_int),         #  intent(  out) :: ErrStat_C
             POINTER(c_char),        #  intent(  out) :: ErrMsg_C(ErrMsgLen_C)
         ]
@@ -119,11 +121,11 @@ class WaveTankLib(OpenFASTInterfaceType):
         #     init_positions_c[i] = c_float(p)
 
         self.WaveTank_Init(
-            c_char_p(self.input_file_names["WaveTank"]),
-            c_char_p(self.input_file_names["MoorDyn"]),
-            c_char_p(self.input_file_names["SeaState"]),
-            c_char_p(self.input_file_names["AeroDyn"]),
-            c_char_p(self.input_file_names["InflowWind"]),
+            self.input_file_names["WaveTank"],
+            self.input_file_names["MoorDyn"],
+            self.input_file_names["SeaState"],
+            self.input_file_names["AeroDyn"],
+            self.input_file_names["InflowWind"],
             byref(_error_status),
             _error_message,
         )
