@@ -1,8 +1,8 @@
 !**********************************************************************************************************************************
 ! LICENSING
-! Copyright (C) 2015-2016  National Renewable Energy Laboratory
+! Copyright (C) 2025  National Renewable Energy Laboratory
 !
-!    This file is part of InflowWind.
+!    This file is a module specific to an experimental wave tank at NREL.
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
