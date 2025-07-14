@@ -432,10 +432,10 @@ SUBROUTINE WaveTank_Init(   &
 
     CALL ADI_C_Init(                            &
         0,                                      &   !< ADinputFilePassed; 0 for file, 1 for string
-        c_loc(AD_InputFile_C(1)),                         &   !< ADinputFileString_C; Input file as a single string with lines delineated by C_NULL_CHAR
+        c_loc(AD_InputFile_C(1)),               &   !< ADinputFileString_C; Input file as a single string with lines delineated by C_NULL_CHAR
         IntfStrLen,                             &   !< ADinputFileStringLength_C; length of the input file string
         0,                                      &   !< IfWinputFilePassed; 0 for file, 1 for string
-        c_loc(IfW_InputFile_C(1)),                        &   !< IfWinputFileString_C; Input file as a single string with lines delineated by C_NULL_CHAR
+        c_loc(IfW_InputFile_C(1)),              &   !< IfWinputFileString_C; Input file as a single string with lines delineated by C_NULL_CHAR
         IntfStrLen,                             &   !< IfWinputFileStringLength_C; length of the input file string
         WT_InitInp%ADI_OutRootName_C,           &   !< Root name to use for echo files and other
         WT_InitInp%ADI_OutVTKDir_C,             &   !< Directory to put all vtk output
@@ -457,9 +457,6 @@ SUBROUTINE WaveTank_Init(   &
     )
     CALL SetErrStat_C(ErrStat_C2, ErrMsg_C2, ErrStat_C, ErrMsg_C, 'ADI_C_Init')
     IF (ErrStat_C >= AbortErrLev) RETURN
-
-    call WaveTank_End(ErrStat_C2, ErrMsg_C2)
-    CALL SetErrStat_C(ErrStat_C2, ErrMsg_C2, ErrStat_C, ErrMsg_C, 'WaveTank_End')
 
 END SUBROUTINE WaveTank_Init
 
