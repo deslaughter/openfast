@@ -101,6 +101,7 @@ typedef  ^              ^                      ReKi                RefHeight    
 
 #----------------------------------------------------------------------------------------------------------------------------------
 typedef  ^              PointsFieldType        ReKi                Vel                 ::    -         -     "Point velocities populated by external driver [uvw,point]"                  -
+typedef  ^              ^                      ReKi                Acc                 ::    -         -     "Point accelerations populated by external driver [uvw,point]"               -
 
 #----------------------------------------------------------------------------------------------------------------------------------
 typedef  ^              UserFieldType          ReKi                RefHeight           -     -         -     "reference height; used to center the wind"                   meters

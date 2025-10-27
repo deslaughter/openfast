@@ -50,9 +50,10 @@ integer(IntKi), parameter :: ScaleMethod_None = 0, &           !< no scaling
 
 contains
 
-subroutine IfW_Points_Init(InitInp, PF, ErrStat, ErrMsg)
+subroutine IfW_Points_Init(InitInp, PF, OutputAccel, ErrStat, ErrMsg)
    type(Points_InitInputType), intent(in) :: InitInp
    type(PointsFieldType), intent(out)     :: PF
+   logical, intent(in)                    :: OutputAccel
    integer(IntKi), intent(out)            :: ErrStat
    character(*), intent(out)              :: ErrMsg
 
@@ -63,11 +64,19 @@ subroutine IfW_Points_Init(InitInp, PF, ErrStat, ErrMsg)
    ErrStat = ErrID_None
    ErrMsg = ""
 
-   ! UVW components at points
+   ! UVW velocity components at points
    call AllocAry(PF%Vel, 3, InitInp%NumWindPoints, &
                  'Point Velocity Array', TmpErrStat, TmpErrMsg)
    call SetErrStat(ErrStat, ErrMsg, TmpErrStat, TmpErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+
+   ! UVW acceleration components at points
+   if (OutputAccel) then
+      call AllocAry(PF%Acc, 3, InitInp%NumWindPoints, &
+                  'Point Acceleration Array', TmpErrStat, TmpErrMsg)
+      call SetErrStat(ErrStat, ErrMsg, TmpErrStat, TmpErrMsg, RoutineName)
+      if (ErrStat >= AbortErrLev) return
+   end if
 
 end subroutine
 

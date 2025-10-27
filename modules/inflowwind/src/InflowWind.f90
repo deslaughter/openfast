@@ -352,7 +352,7 @@ SUBROUTINE InflowWind_Init( InitInp, InputGuess, p, ContStates, DiscStates, Cons
 
       p%FlowField%FieldType = Point_FieldType
       Points_InitInput%NumWindPoints = InitInp%NumWindPoints
-      call IfW_Points_Init(Points_InitInput, p%FlowField%Points, TmpErrStat, TmpErrMsg); if (Failed()) return
+      call IfW_Points_Init(Points_InitInput, p%FlowField%Points, InitInp%OutputAccel, TmpErrStat, TmpErrMsg); if (Failed()) return
 
       ! Set reference position for wind rotation
       p%FlowField%RefPosition = 0.0_ReKi
@@ -407,6 +407,10 @@ SUBROUTINE InflowWind_Init( InitInp, InputGuess, p, ContStates, DiscStates, Cons
       if (p%FlowField%Grid3D%BoxExceedAllow) then
          call IfW_Grid3DField_CalcVelAvgProfile(p%FlowField%Grid3D, p%FlowField%AccFieldValid, TmpErrStat, TmpErrMsg); if (Failed()) return
       end if
+
+   case (Point_FieldType)
+
+      if (InitInp%OutputAccel) p%FlowField%AccFieldValid = .true.
 
    case default
 

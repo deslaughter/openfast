@@ -139,6 +139,7 @@ IMPLICIT NONE
 ! =========  PointsFieldType  =======
   TYPE, PUBLIC :: PointsFieldType
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Vel      !< Point velocities populated by external driver [uvw,point] [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Acc      !< Point accelerations populated by external driver [uvw,point] [-]
   END TYPE PointsFieldType
 ! =======================
 ! =========  UserFieldType  =======
@@ -913,6 +914,18 @@ subroutine IfW_FlowField_CopyPointsFieldType(SrcPointsFieldTypeData, DstPointsFi
       end if
       DstPointsFieldTypeData%Vel = SrcPointsFieldTypeData%Vel
    end if
+   if (allocated(SrcPointsFieldTypeData%Acc)) then
+      LB(1:2) = lbound(SrcPointsFieldTypeData%Acc)
+      UB(1:2) = ubound(SrcPointsFieldTypeData%Acc)
+      if (.not. allocated(DstPointsFieldTypeData%Acc)) then
+         allocate(DstPointsFieldTypeData%Acc(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstPointsFieldTypeData%Acc.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstPointsFieldTypeData%Acc = SrcPointsFieldTypeData%Acc
+   end if
 end subroutine
 
 subroutine IfW_FlowField_DestroyPointsFieldType(PointsFieldTypeData, ErrStat, ErrMsg)
@@ -925,6 +938,9 @@ subroutine IfW_FlowField_DestroyPointsFieldType(PointsFieldTypeData, ErrStat, Er
    if (allocated(PointsFieldTypeData%Vel)) then
       deallocate(PointsFieldTypeData%Vel)
    end if
+   if (allocated(PointsFieldTypeData%Acc)) then
+      deallocate(PointsFieldTypeData%Acc)
+   end if
 end subroutine
 
 subroutine IfW_FlowField_PackPointsFieldType(RF, Indata)
@@ -933,6 +949,7 @@ subroutine IfW_FlowField_PackPointsFieldType(RF, Indata)
    character(*), parameter         :: RoutineName = 'IfW_FlowField_PackPointsFieldType'
    if (RF%ErrStat >= AbortErrLev) return
    call RegPackAlloc(RF, InData%Vel)
+   call RegPackAlloc(RF, InData%Acc)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -945,6 +962,7 @@ subroutine IfW_FlowField_UnPackPointsFieldType(RF, OutData)
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpackAlloc(RF, OutData%Vel); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Acc); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine IfW_FlowField_CopyUserFieldType(SrcUserFieldTypeData, DstUserFieldTypeData, CtrlCode, ErrStat, ErrMsg)

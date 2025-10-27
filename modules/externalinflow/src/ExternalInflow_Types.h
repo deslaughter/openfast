@@ -28,6 +28,7 @@ typedef struct ExtInfw_InitInputType {
 	float TowerHeight;
 	float TowerBaseHeight;
 	int NodeClusterType;
+	bool EnableInflowAccel;
 } ExtInfw_InitInputType_t;
 
 typedef struct ExtInfw_InitOutputType {
@@ -55,6 +56,7 @@ typedef struct ExtInfw_ParameterType {
 	float TowerHeight;
 	float TowerBaseHeight;
 	int NodeClusterType;
+	bool EnableInflowAccel;
 } ExtInfw_ParameterType_t;
 
 typedef struct ExtInfw_InputType {
@@ -83,6 +85,9 @@ typedef struct ExtInfw_OutputType {
 	float *u;                   int u_Len;
 	float *v;                   int v_Len;
 	float *w;                   int w_Len;
+	float *au;                  int au_Len;
+	float *av;                  int av_Len;
+	float *aw;                  int aw_Len;
 	float *WriteOutput;         int WriteOutput_Len;
 } ExtInfw_OutputType_t;
 

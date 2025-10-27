@@ -871,6 +871,9 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
          RETURN
       END IF
 
+      ! If MHK is enabled, set flag to enable inflow acceleration
+      Init%InData_ExtInfw%EnableInflowAccel = p_FAST%MHK /= MHK_None
+
       !Set node clustering type
       Init%InData_ExtInfw%NodeClusterType = ExternInitData%NodeClusterType
          ! set up the data structures for integration with ExternalInflow

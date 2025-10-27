@@ -303,8 +303,10 @@ subroutine IfW_FlowField_GetVelAcc(FF, IStart, Time, PositionXYZ, VelocityUVW, A
       ! If start and end indices are valid, copy velocities, otherwise zero
       if (IStart >= 1 .and. IEnd < size(FF%Points%Vel)) then
          VelocityUVW = FF%Points%Vel(:, IStart:IEnd)
+         if (OutputAccel) AccelUVW = FF%Points%Acc(:, IStart:IEnd)
       else
          VelocityUVW = 0.0_ReKi
+         if (OutputAccel) AccelUVW = 0.0_ReKi
       end if
 
    case (User_FieldType)

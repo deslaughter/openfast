@@ -47,6 +47,7 @@ IMPLICIT NONE
     REAL(KIND=C_FLOAT) :: TowerHeight 
     REAL(KIND=C_FLOAT) :: TowerBaseHeight 
     INTEGER(KIND=C_INT) :: NodeClusterType 
+    LOGICAL(KIND=C_BOOL) :: EnableInflowAccel 
   END TYPE ExtInfw_InitInputType_C
   TYPE, PUBLIC :: ExtInfw_InitInputType
     TYPE( ExtInfw_InitInputType_C ) :: C_obj
@@ -58,6 +59,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: TowerHeight = 0.0_ReKi      !< Tower Height [meters]
     REAL(ReKi)  :: TowerBaseHeight = 0.0_ReKi      !< Tower Base Height [meters]
     INTEGER(IntKi)  :: NodeClusterType = 0_IntKi      !< Node clustering (0 - Uniform, 1 - Non-uniform clustered towards tip) [-]
+    LOGICAL  :: EnableInflowAccel = .false.      !< Flag to enable inflow acceleration [-]
   END TYPE ExtInfw_InitInputType
 ! =======================
 ! =========  ExtInfw_InitOutputType_C  =======
@@ -107,6 +109,7 @@ IMPLICIT NONE
     REAL(KIND=C_FLOAT) :: TowerHeight 
     REAL(KIND=C_FLOAT) :: TowerBaseHeight 
     INTEGER(KIND=C_INT) :: NodeClusterType 
+    LOGICAL(KIND=C_BOOL) :: EnableInflowAccel 
   END TYPE ExtInfw_ParameterType_C
   TYPE, PUBLIC :: ExtInfw_ParameterType
     TYPE( ExtInfw_ParameterType_C ) :: C_obj
@@ -123,6 +126,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: TowerHeight = 0.0_ReKi      !< Tower height [m]
     REAL(ReKi)  :: TowerBaseHeight = 0.0_ReKi      !< Tower base height [m]
     INTEGER(IntKi)  :: NodeClusterType = 0_IntKi      !< Node clustering (0 - Uniform, 1 - Non-uniform clustered towards tip) [-]
+    LOGICAL  :: EnableInflowAccel = .false.      !< Flag to enable inflow acceleration [-]
   END TYPE ExtInfw_ParameterType
 ! =======================
 ! =========  ExtInfw_InputType_C  =======
@@ -193,6 +197,12 @@ IMPLICIT NONE
     INTEGER(C_int) :: v_Len = 0 
     TYPE(C_ptr) :: w = C_NULL_PTR 
     INTEGER(C_int) :: w_Len = 0 
+    TYPE(C_ptr) :: au = C_NULL_PTR 
+    INTEGER(C_int) :: au_Len = 0 
+    TYPE(C_ptr) :: av = C_NULL_PTR 
+    INTEGER(C_int) :: av_Len = 0 
+    TYPE(C_ptr) :: aw = C_NULL_PTR 
+    INTEGER(C_int) :: aw_Len = 0 
     TYPE(C_ptr) :: WriteOutput = C_NULL_PTR 
     INTEGER(C_int) :: WriteOutput_Len = 0 
   END TYPE ExtInfw_OutputType_C
@@ -201,6 +211,9 @@ IMPLICIT NONE
     REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: u => NULL()      !< U-component wind speed (in the X-direction) at interface nodes [m/s]
     REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: v => NULL()      !< V-component wind speed (in the Y-direction) at interface nodes [m/s]
     REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: w => NULL()      !< W-component wind speed (in the Z-direction) at interface nodes [m/s]
+    REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: au => NULL()      !< U-component wind acceleration (in the X-direction) at interface nodes [m/s/s]
+    REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: av => NULL()      !< V-component wind acceleration (in the Y-direction) at interface nodes [m/s/s]
+    REAL(KIND=C_FLOAT) , DIMENSION(:), POINTER  :: aw => NULL()      !< W-component wind acceleration (in the Z-direction) at interface nodes [m/s/s]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WriteOutput      !< Data to be written to an output file: see WriteOutputHdr for names of each variable [see WriteOutputUnt]
   END TYPE ExtInfw_OutputType
 ! =======================
@@ -259,6 +272,8 @@ subroutine ExtInfw_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, E
    DstInitInputData%C_obj%TowerBaseHeight = SrcInitInputData%C_obj%TowerBaseHeight
    DstInitInputData%NodeClusterType = SrcInitInputData%NodeClusterType
    DstInitInputData%C_obj%NodeClusterType = SrcInitInputData%C_obj%NodeClusterType
+   DstInitInputData%EnableInflowAccel = SrcInitInputData%EnableInflowAccel
+   DstInitInputData%C_obj%EnableInflowAccel = SrcInitInputData%C_obj%EnableInflowAccel
 end subroutine
 
 subroutine ExtInfw_DestroyInitInput(InitInputData, ErrStat, ErrMsg)
@@ -301,6 +316,7 @@ subroutine ExtInfw_PackInitInput(RF, Indata)
    call RegPack(RF, InData%TowerHeight)
    call RegPack(RF, InData%TowerBaseHeight)
    call RegPack(RF, InData%NodeClusterType)
+   call RegPack(RF, InData%EnableInflowAccel)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -336,6 +352,8 @@ subroutine ExtInfw_UnPackInitInput(RF, OutData)
    OutData%C_obj%TowerBaseHeight = OutData%TowerBaseHeight
    call RegUnpack(RF, OutData%NodeClusterType); if (RegCheckErr(RF, RoutineName)) return
    OutData%C_obj%NodeClusterType = OutData%NodeClusterType
+   call RegUnpack(RF, OutData%EnableInflowAccel); if (RegCheckErr(RF, RoutineName)) return
+   OutData%C_obj%EnableInflowAccel = OutData%EnableInflowAccel
 end subroutine
 
 SUBROUTINE ExtInfw_C2Fary_CopyInitInput(InitInputData, ErrStat, ErrMsg, SkipPointers)
@@ -377,6 +395,7 @@ SUBROUTINE ExtInfw_C2Fary_CopyInitInput(InitInputData, ErrStat, ErrMsg, SkipPoin
    InitInputData%TowerHeight = InitInputData%C_obj%TowerHeight
    InitInputData%TowerBaseHeight = InitInputData%C_obj%TowerBaseHeight
    InitInputData%NodeClusterType = InitInputData%C_obj%NodeClusterType
+   InitInputData%EnableInflowAccel = InitInputData%C_obj%EnableInflowAccel
 END SUBROUTINE
 
 SUBROUTINE ExtInfw_F2C_CopyInitInput( InitInputData, ErrStat, ErrMsg, SkipPointers  )
@@ -424,6 +443,7 @@ SUBROUTINE ExtInfw_F2C_CopyInitInput( InitInputData, ErrStat, ErrMsg, SkipPointe
    InitInputData%C_obj%TowerHeight = InitInputData%TowerHeight
    InitInputData%C_obj%TowerBaseHeight = InitInputData%TowerBaseHeight
    InitInputData%C_obj%NodeClusterType = InitInputData%NodeClusterType
+   InitInputData%C_obj%EnableInflowAccel = InitInputData%EnableInflowAccel
 END SUBROUTINE
 
 subroutine ExtInfw_CopyInitOutput(SrcInitOutputData, DstInitOutputData, CtrlCode, ErrStat, ErrMsg)
@@ -964,6 +984,8 @@ subroutine ExtInfw_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrM
    DstParamData%C_obj%TowerBaseHeight = SrcParamData%C_obj%TowerBaseHeight
    DstParamData%NodeClusterType = SrcParamData%NodeClusterType
    DstParamData%C_obj%NodeClusterType = SrcParamData%C_obj%NodeClusterType
+   DstParamData%EnableInflowAccel = SrcParamData%EnableInflowAccel
+   DstParamData%C_obj%EnableInflowAccel = SrcParamData%C_obj%EnableInflowAccel
 end subroutine
 
 subroutine ExtInfw_DestroyParam(ParamData, ErrStat, ErrMsg)
@@ -1011,6 +1033,7 @@ subroutine ExtInfw_PackParam(RF, Indata)
    call RegPack(RF, InData%TowerHeight)
    call RegPack(RF, InData%TowerBaseHeight)
    call RegPack(RF, InData%NodeClusterType)
+   call RegPack(RF, InData%EnableInflowAccel)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1056,6 +1079,8 @@ subroutine ExtInfw_UnPackParam(RF, OutData)
    OutData%C_obj%TowerBaseHeight = OutData%TowerBaseHeight
    call RegUnpack(RF, OutData%NodeClusterType); if (RegCheckErr(RF, RoutineName)) return
    OutData%C_obj%NodeClusterType = OutData%NodeClusterType
+   call RegUnpack(RF, OutData%EnableInflowAccel); if (RegCheckErr(RF, RoutineName)) return
+   OutData%C_obj%EnableInflowAccel = OutData%EnableInflowAccel
 end subroutine
 
 SUBROUTINE ExtInfw_C2Fary_CopyParam(ParamData, ErrStat, ErrMsg, SkipPointers)
@@ -1102,6 +1127,7 @@ SUBROUTINE ExtInfw_C2Fary_CopyParam(ParamData, ErrStat, ErrMsg, SkipPointers)
    ParamData%TowerHeight = ParamData%C_obj%TowerHeight
    ParamData%TowerBaseHeight = ParamData%C_obj%TowerBaseHeight
    ParamData%NodeClusterType = ParamData%C_obj%NodeClusterType
+   ParamData%EnableInflowAccel = ParamData%C_obj%EnableInflowAccel
 END SUBROUTINE
 
 SUBROUTINE ExtInfw_F2C_CopyParam( ParamData, ErrStat, ErrMsg, SkipPointers  )
@@ -1154,6 +1180,7 @@ SUBROUTINE ExtInfw_F2C_CopyParam( ParamData, ErrStat, ErrMsg, SkipPointers  )
    ParamData%C_obj%TowerHeight = ParamData%TowerHeight
    ParamData%C_obj%TowerBaseHeight = ParamData%TowerBaseHeight
    ParamData%C_obj%NodeClusterType = ParamData%NodeClusterType
+   ParamData%C_obj%EnableInflowAccel = ParamData%EnableInflowAccel
 END SUBROUTINE
 
 subroutine ExtInfw_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
@@ -2110,6 +2137,51 @@ subroutine ExtInfw_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, E
       end if
       DstOutputData%w = SrcOutputData%w
    end if
+   if (associated(SrcOutputData%au)) then
+      LB(1:1) = lbound(SrcOutputData%au)
+      UB(1:1) = ubound(SrcOutputData%au)
+      if (.not. associated(DstOutputData%au)) then
+         allocate(DstOutputData%au(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%au.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+         DstOutputData%C_obj%au_Len = size(DstOutputData%au)
+         if (DstOutputData%C_obj%au_Len > 0) &
+            DstOutputData%C_obj%au = c_loc(DstOutputData%au(LB(1)))
+      end if
+      DstOutputData%au = SrcOutputData%au
+   end if
+   if (associated(SrcOutputData%av)) then
+      LB(1:1) = lbound(SrcOutputData%av)
+      UB(1:1) = ubound(SrcOutputData%av)
+      if (.not. associated(DstOutputData%av)) then
+         allocate(DstOutputData%av(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%av.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+         DstOutputData%C_obj%av_Len = size(DstOutputData%av)
+         if (DstOutputData%C_obj%av_Len > 0) &
+            DstOutputData%C_obj%av = c_loc(DstOutputData%av(LB(1)))
+      end if
+      DstOutputData%av = SrcOutputData%av
+   end if
+   if (associated(SrcOutputData%aw)) then
+      LB(1:1) = lbound(SrcOutputData%aw)
+      UB(1:1) = ubound(SrcOutputData%aw)
+      if (.not. associated(DstOutputData%aw)) then
+         allocate(DstOutputData%aw(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%aw.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+         DstOutputData%C_obj%aw_Len = size(DstOutputData%aw)
+         if (DstOutputData%C_obj%aw_Len > 0) &
+            DstOutputData%C_obj%aw = c_loc(DstOutputData%aw(LB(1)))
+      end if
+      DstOutputData%aw = SrcOutputData%aw
+   end if
    if (allocated(SrcOutputData%WriteOutput)) then
       LB(1:1) = lbound(SrcOutputData%WriteOutput)
       UB(1:1) = ubound(SrcOutputData%WriteOutput)
@@ -2149,6 +2221,24 @@ subroutine ExtInfw_DestroyOutput(OutputData, ErrStat, ErrMsg)
       OutputData%C_obj%w = c_null_ptr
       OutputData%C_obj%w_Len = 0
    end if
+   if (associated(OutputData%au)) then
+      deallocate(OutputData%au)
+      OutputData%au => null()
+      OutputData%C_obj%au = c_null_ptr
+      OutputData%C_obj%au_Len = 0
+   end if
+   if (associated(OutputData%av)) then
+      deallocate(OutputData%av)
+      OutputData%av => null()
+      OutputData%C_obj%av = c_null_ptr
+      OutputData%C_obj%av_Len = 0
+   end if
+   if (associated(OutputData%aw)) then
+      deallocate(OutputData%aw)
+      OutputData%aw => null()
+      OutputData%C_obj%aw = c_null_ptr
+      OutputData%C_obj%aw_Len = 0
+   end if
    if (allocated(OutputData%WriteOutput)) then
       deallocate(OutputData%WriteOutput)
    end if
@@ -2168,6 +2258,9 @@ subroutine ExtInfw_PackOutput(RF, Indata)
    call RegPackPtr(RF, InData%u)
    call RegPackPtr(RF, InData%v)
    call RegPackPtr(RF, InData%w)
+   call RegPackPtr(RF, InData%au)
+   call RegPackPtr(RF, InData%av)
+   call RegPackPtr(RF, InData%aw)
    call RegPackAlloc(RF, InData%WriteOutput)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -2196,6 +2289,21 @@ subroutine ExtInfw_UnPackOutput(RF, OutData)
    if (associated(OutData%w)) then
       OutData%C_obj%w_Len = size(OutData%w)
       if (OutData%C_obj%w_Len > 0) OutData%C_obj%w = c_loc(OutData%w(LB(1)))
+   end if
+   call RegUnpackPtr(RF, OutData%au, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+   if (associated(OutData%au)) then
+      OutData%C_obj%au_Len = size(OutData%au)
+      if (OutData%C_obj%au_Len > 0) OutData%C_obj%au = c_loc(OutData%au(LB(1)))
+   end if
+   call RegUnpackPtr(RF, OutData%av, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+   if (associated(OutData%av)) then
+      OutData%C_obj%av_Len = size(OutData%av)
+      if (OutData%C_obj%av_Len > 0) OutData%C_obj%av = c_loc(OutData%av(LB(1)))
+   end if
+   call RegUnpackPtr(RF, OutData%aw, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+   if (associated(OutData%aw)) then
+      OutData%C_obj%aw_Len = size(OutData%aw)
+      if (OutData%C_obj%aw_Len > 0) OutData%C_obj%aw = c_loc(OutData%aw(LB(1)))
    end if
    call RegUnpackAlloc(RF, OutData%WriteOutput); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -2240,6 +2348,33 @@ SUBROUTINE ExtInfw_C2Fary_CopyOutput(OutputData, ErrStat, ErrMsg, SkipPointers)
          NULLIFY( OutputData%w )
       ELSE
          CALL C_F_POINTER(OutputData%C_obj%w, OutputData%w, [OutputData%C_obj%w_Len])
+      END IF
+   END IF
+   
+   ! -- au Output Data fields
+   IF ( .NOT. SkipPointers_local ) THEN
+      IF ( .NOT. C_ASSOCIATED( OutputData%C_obj%au ) ) THEN
+         NULLIFY( OutputData%au )
+      ELSE
+         CALL C_F_POINTER(OutputData%C_obj%au, OutputData%au, [OutputData%C_obj%au_Len])
+      END IF
+   END IF
+   
+   ! -- av Output Data fields
+   IF ( .NOT. SkipPointers_local ) THEN
+      IF ( .NOT. C_ASSOCIATED( OutputData%C_obj%av ) ) THEN
+         NULLIFY( OutputData%av )
+      ELSE
+         CALL C_F_POINTER(OutputData%C_obj%av, OutputData%av, [OutputData%C_obj%av_Len])
+      END IF
+   END IF
+   
+   ! -- aw Output Data fields
+   IF ( .NOT. SkipPointers_local ) THEN
+      IF ( .NOT. C_ASSOCIATED( OutputData%C_obj%aw ) ) THEN
+         NULLIFY( OutputData%aw )
+      ELSE
+         CALL C_F_POINTER(OutputData%C_obj%aw, OutputData%aw, [OutputData%C_obj%aw_Len])
       END IF
    END IF
 END SUBROUTINE
@@ -2293,6 +2428,42 @@ SUBROUTINE ExtInfw_F2C_CopyOutput( OutputData, ErrStat, ErrMsg, SkipPointers  )
          OutputData%C_obj%w_Len = SIZE(OutputData%w)
          IF (OutputData%C_obj%w_Len > 0) &
             OutputData%C_obj%w = C_LOC(OutputData%w(lbound(OutputData%w,1)))
+      END IF
+   END IF
+   
+   ! -- au Output Data fields
+   IF (.NOT. SkipPointers_local ) THEN
+      IF (.NOT. ASSOCIATED(OutputData%au)) THEN 
+         OutputData%C_obj%au_Len = 0
+         OutputData%C_obj%au = C_NULL_PTR
+      ELSE
+         OutputData%C_obj%au_Len = SIZE(OutputData%au)
+         IF (OutputData%C_obj%au_Len > 0) &
+            OutputData%C_obj%au = C_LOC(OutputData%au(lbound(OutputData%au,1)))
+      END IF
+   END IF
+   
+   ! -- av Output Data fields
+   IF (.NOT. SkipPointers_local ) THEN
+      IF (.NOT. ASSOCIATED(OutputData%av)) THEN 
+         OutputData%C_obj%av_Len = 0
+         OutputData%C_obj%av = C_NULL_PTR
+      ELSE
+         OutputData%C_obj%av_Len = SIZE(OutputData%av)
+         IF (OutputData%C_obj%av_Len > 0) &
+            OutputData%C_obj%av = C_LOC(OutputData%av(lbound(OutputData%av,1)))
+      END IF
+   END IF
+   
+   ! -- aw Output Data fields
+   IF (.NOT. SkipPointers_local ) THEN
+      IF (.NOT. ASSOCIATED(OutputData%aw)) THEN 
+         OutputData%C_obj%aw_Len = 0
+         OutputData%C_obj%aw = C_NULL_PTR
+      ELSE
+         OutputData%C_obj%aw_Len = SIZE(OutputData%aw)
+         IF (OutputData%C_obj%aw_Len > 0) &
+            OutputData%C_obj%aw = C_LOC(OutputData%aw(lbound(OutputData%aw,1)))
       END IF
    END IF
 END SUBROUTINE
@@ -2661,6 +2832,15 @@ SUBROUTINE ExtInfw_Output_ExtrapInterp1(y1, y2, tin, y_out, tin_out, ErrStat, Er
    IF (ASSOCIATED(y_out%w) .AND. ASSOCIATED(y1%w)) THEN
       y_out%w = a1*y1%w + a2*y2%w
    END IF ! check if allocated
+   IF (ASSOCIATED(y_out%au) .AND. ASSOCIATED(y1%au)) THEN
+      y_out%au = a1*y1%au + a2*y2%au
+   END IF ! check if allocated
+   IF (ASSOCIATED(y_out%av) .AND. ASSOCIATED(y1%av)) THEN
+      y_out%av = a1*y1%av + a2*y2%av
+   END IF ! check if allocated
+   IF (ASSOCIATED(y_out%aw) .AND. ASSOCIATED(y1%aw)) THEN
+      y_out%aw = a1*y1%aw + a2*y2%aw
+   END IF ! check if allocated
    IF (ALLOCATED(y_out%WriteOutput) .AND. ALLOCATED(y1%WriteOutput)) THEN
       y_out%WriteOutput = a1*y1%WriteOutput + a2*y2%WriteOutput
    END IF ! check if allocated
@@ -2729,6 +2909,15 @@ SUBROUTINE ExtInfw_Output_ExtrapInterp2(y1, y2, y3, tin, y_out, tin_out, ErrStat
    END IF ! check if allocated
    IF (ASSOCIATED(y_out%w) .AND. ASSOCIATED(y1%w)) THEN
       y_out%w = a1*y1%w + a2*y2%w + a3*y3%w
+   END IF ! check if allocated
+   IF (ASSOCIATED(y_out%au) .AND. ASSOCIATED(y1%au)) THEN
+      y_out%au = a1*y1%au + a2*y2%au + a3*y3%au
+   END IF ! check if allocated
+   IF (ASSOCIATED(y_out%av) .AND. ASSOCIATED(y1%av)) THEN
+      y_out%av = a1*y1%av + a2*y2%av + a3*y3%av
+   END IF ! check if allocated
+   IF (ASSOCIATED(y_out%aw) .AND. ASSOCIATED(y1%aw)) THEN
+      y_out%aw = a1*y1%aw + a2*y2%aw + a3*y3%aw
    END IF ! check if allocated
    IF (ALLOCATED(y_out%WriteOutput) .AND. ALLOCATED(y1%WriteOutput)) THEN
       y_out%WriteOutput = a1*y1%WriteOutput + a2*y2%WriteOutput + a3*y3%WriteOutput

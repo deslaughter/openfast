@@ -20,6 +20,7 @@ typedef   ^   ^                                    ReKi    BladeLength          
 typedef   ^   ^                                    ReKi    TowerHeight           - - -  "Tower Height"   meters
 typedef   ^   ^                                    ReKi    TowerBaseHeight       - - -  "Tower Base Height"   meters
 typedef   ^   ^                                    IntKi   NodeClusterType       - - -  "Node clustering (0 - Uniform, 1 - Non-uniform clustered towards tip)"   -
+typedef   ^   ^                                    Logical EnableInflowAccel     - - -  "Flag to enable inflow acceleration"   -
 
 
 
@@ -52,6 +53,7 @@ typedef   ExternalInflow/ExtInfw   ParameterType   ReKi    BladeLength        - 
 typedef   ExternalInflow/ExtInfw   ParameterType   ReKi    TowerHeight        - - -  "Tower height"   "m"
 typedef   ExternalInflow/ExtInfw   ParameterType   ReKi    TowerBaseHeight    - - -  "Tower base height"   "m"
 typedef   ExternalInflow/ExtInfw   ParameterType   IntKi   NodeClusterType    - - -  "Node clustering (0 - Uniform, 1 - Non-uniform clustered towards tip)"   -
+typedef   ExternalInflow/ExtInfw   ParameterType   Logical EnableInflowAccel  - - -  "Flag to enable inflow acceleration"   -
 
 # ..... ExternalInflow_InputType data .......................................................................................................
 typedef   ^   InputType   ReKi   pxVel             {:} - -  "x position of velocity interface (Aerodyn) nodes"   "m"
@@ -76,4 +78,7 @@ typedef   ^   InputType   ReKi   forceNodesChord   {:} - -  "chord distribution 
 typedef   ^   OutputType   ReKi   u                {:} - -  "U-component wind speed (in the X-direction) at interface nodes"   m/s
 typedef   ^   OutputType   ReKi   v                {:} - -  "V-component wind speed (in the Y-direction) at interface nodes"   m/s
 typedef   ^   OutputType   ReKi   w                {:} - -  "W-component wind speed (in the Z-direction) at interface nodes"   m/s
+typedef   ^   OutputType   ReKi   au               {:} - -  "U-component wind acceleration (in the X-direction) at interface nodes"   m/s/s
+typedef   ^   OutputType   ReKi   av               {:} - -  "V-component wind acceleration (in the Y-direction) at interface nodes"   m/s/s
+typedef   ^   OutputType   ReKi   aw               {:} - -  "W-component wind acceleration (in the Z-direction) at interface nodes"   m/s/s
 typedef   ^   OutputType   ReKi   WriteOutput      {:} - -  "Data to be written to an output file: see WriteOutputHdr for names of each variable"   "see WriteOutputUnt"

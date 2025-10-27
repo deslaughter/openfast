@@ -234,7 +234,7 @@ SUBROUTINE Init_ExtInfw( InitInp, p_FAST, AirDens, u_AD, initOut_AD, y_AD, ExtIn
    ExtInfw%u%fz = 0.0_ReKi
 
       !............................................................................................
-      ! Define system output initializations (set up mesh) here:
+      ! Define system output velocity initializations (set up mesh) here:
       !............................................................................................
    CALL AllocPAry( ExtInfw%y%u, ExtInfw%p%nNodesVel, 'u', ErrStat2, ErrMsg2 ); if (Failed()) return;
    CALL AllocPAry( ExtInfw%y%v, ExtInfw%p%nNodesVel, 'v', ErrStat2, ErrMsg2 ); if (Failed()) return;
@@ -244,6 +244,26 @@ SUBROUTINE Init_ExtInfw( InitInp, p_FAST, AirDens, u_AD, initOut_AD, y_AD, ExtIn
    ExtInfw%y%c_obj%u_Len = ExtInfw%p%nNodesVel; ExtInfw%y%c_obj%u = C_LOC( ExtInfw%y%u(1) )
    ExtInfw%y%c_obj%v_Len = ExtInfw%p%nNodesVel; ExtInfw%y%c_obj%v = C_LOC( ExtInfw%y%v(1) )
    ExtInfw%y%c_obj%w_Len = ExtInfw%p%nNodesVel; ExtInfw%y%c_obj%w = C_LOC( ExtInfw%y%w(1) )
+
+      !............................................................................................
+      ! Define system output acceleration initializations (set up mesh) here:
+      !............................................................................................
+
+   if (InitInp%EnableInflowAccel) then
+      CALL AllocPAry( ExtInfw%y%au, ExtInfw%p%nNodesVel, 'au', ErrStat2, ErrMsg2 ); if (Failed()) return;
+      CALL AllocPAry( ExtInfw%y%av, ExtInfw%p%nNodesVel, 'av', ErrStat2, ErrMsg2 ); if (Failed()) return;
+      CALL AllocPAry( ExtInfw%y%aw, ExtInfw%p%nNodesVel, 'aw', ErrStat2, ErrMsg2 ); if (Failed()) return;
+
+         ! Initialize these to zero in case the interface doesn't set them
+      ExtInfw%y%au = 0.0_c_float
+      ExtInfw%y%av = 0.0_c_float
+      ExtInfw%y%aw = 0.0_c_float
+
+         ! make sure the C versions are synced with these arrays
+      ExtInfw%y%c_obj%au_Len = ExtInfw%p%nNodesVel; ExtInfw%y%c_obj%au = C_LOC( ExtInfw%y%au(1) )
+      ExtInfw%y%c_obj%av_Len = ExtInfw%p%nNodesVel; ExtInfw%y%c_obj%av = C_LOC( ExtInfw%y%av(1) )
+      ExtInfw%y%c_obj%aw_Len = ExtInfw%p%nNodesVel; ExtInfw%y%c_obj%aw = C_LOC( ExtInfw%y%aw(1) )
+   end if
 
       !............................................................................................
       ! Initialize InflowWind FlowField
@@ -258,7 +278,7 @@ SUBROUTINE Init_ExtInfw( InitInp, p_FAST, AirDens, u_AD, initOut_AD, y_AD, ExtIn
    ! Initialize flowfield points type
    ExtInfw%m%FlowField%FieldType = Point_FieldType
    Points_InitInput%NumWindPoints = ExtInfw%p%nNodesVel
-   call IfW_Points_Init(Points_InitInput, ExtInfw%m%FlowField%Points, ErrStat2, ErrMsg2); if (Failed()) return
+   call IfW_Points_Init(Points_InitInput, ExtInfw%m%FlowField%Points, InitInp%EnableInflowAccel, ErrStat2, ErrMsg2); if (Failed()) return
 
    ! Set pointer to flow field in InitOut
    InitOut%FlowField => ExtInfw%m%FlowField
@@ -302,9 +322,17 @@ SUBROUTINE ExtInfw_UpdateFlowField(p_FAST, ExtInfw, ErrStat, ErrMsg)
    ErrStat = ErrID_None
    ErrMsg  = ""
 
+   ! Inflow velocity components
    ExtInfw%m%FlowField%Points%Vel(1,1:size(ExtInfw%y%u)) = ExtInfw%y%u
    ExtInfw%m%FlowField%Points%Vel(2,1:size(ExtInfw%y%v)) = ExtInfw%y%v
    ExtInfw%m%FlowField%Points%Vel(3,1:size(ExtInfw%y%w)) = ExtInfw%y%w
+
+   ! Inflow acceleration components
+   if (ExtInfw%p%EnableInflowAccel) then
+      ExtInfw%m%FlowField%Points%Acc(1,1:size(ExtInfw%y%u)) = ExtInfw%y%au
+      ExtInfw%m%FlowField%Points%Acc(2,1:size(ExtInfw%y%v)) = ExtInfw%y%av
+      ExtInfw%m%FlowField%Points%Acc(3,1:size(ExtInfw%y%w)) = ExtInfw%y%aw
+   end if
 END SUBROUTINE ExtInfw_UpdateFlowField
 
 !----------------------------------------------------------------------------------------------------------------------------------
