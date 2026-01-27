@@ -370,7 +370,7 @@ subroutine ADI_InitInflowWind(Root, i_IW, u_AD, o_AD, IW, dt, InitOutData, errSt
       call IfW_SteadyWind_Init(Steady_InitInput, 0, IW%p%FlowField%Uniform, &
                                FileDat, errStat2, errMsg2)
       if(Failed()) return
-      if (i_IW%MHK == MHK_FixedBottom .or. i_IW%MHK == MHK_FLoating) then
+      if (i_IW%MHK == MHK_FixedBottom .or. i_IW%MHK == MHK_Floating) then
          call IfW_UniformField_CalcAccel(IW%p%FlowField%Uniform, errStat2, errMsg2)
          if(Failed()) return
          IW%p%FlowField%AccFieldValid = .true.
@@ -381,6 +381,7 @@ subroutine ADI_InitInflowWind(Root, i_IW, u_AD, o_AD, IW, dt, InitOutData, errSt
       InitInData%Linearize        = i_IW%Linearize
       InitInData%FilePassingMethod= i_IW%FilePassingMethod
       InitInData%NumWindPoints = 1
+      InitInData%OutputAccel = i_IW%MHK == MHK_FixedBottom .or. i_IW%MHK == MHK_Floating
       if (i_IW%FilePassingMethod == 1_IntKi) then     ! passing input file as an FileInfoType structure
          call NWTC_Library_Copyfileinfotype( i_IW%PassedFileInfo, InitInData%PassedFileInfo, MESH_NEWCOPY, errStat2, errMsg2 ); if (Failed()) return
       elseif (i_IW%FilePassingMethod == 2_IntKi) then ! passing input file as an IfW_InputFile structure
