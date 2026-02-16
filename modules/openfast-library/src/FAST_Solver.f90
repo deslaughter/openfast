@@ -1272,9 +1272,11 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
             call FAST_InputSolve(p%iModOpt2(i), GlueModData, GlueModMaps, INPUT_CURR, Turbine, ErrStat2, ErrMsg2)
             if (Failed()) return
 
-            ! Update states
-            call FAST_UpdateStates(ModData, t_initial, n_t_global, Turbine, ErrStat2, ErrMsg2)
-            if (Failed()) return
+            ! Update states of modules not in the tight coupling category
+            if (iand(ModData%Category, MC_Tight) == 0) then
+               call FAST_UpdateStates(ModData, t_initial, n_t_global, Turbine, ErrStat2, ErrMsg2)
+               if (Failed()) return
+            end if
 
             ! Calculate outputs
             call FAST_CalcOutput(ModData, GlueModMaps, t_global_next, INPUT_CURR, STATE_PRED, Turbine, ErrStat2, ErrMsg2)
@@ -1287,12 +1289,18 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
       !-------------------------------------------------------------------------
 
       do i = 1, size(p%iModOpt1)
+         associate (ModData => GlueModData(p%iModOpt1(i)))
 
-         call FAST_InputSolve(p%iModOpt1(i), GlueModData, GlueModMaps, INPUT_CURR, Turbine, ErrStat2, ErrMsg2)
-         if (Failed()) return
+            call FAST_InputSolve(p%iModOpt1(i), GlueModData, GlueModMaps, INPUT_CURR, Turbine, ErrStat2, ErrMsg2)
+            if (Failed()) return
 
-         call FAST_UpdateStates(GlueModData(p%iModOpt1(i)), t_initial, n_t_global, Turbine, ErrStat2, ErrMsg2)
-         if (Failed()) return
+            ! Skip modules where states were updated in Option 2
+            if (iand(ModData%Category, MC_Option2) /= 0) cycle
+
+            call FAST_UpdateStates(GlueModData(p%iModOpt1(i)), t_initial, n_t_global, Turbine, ErrStat2, ErrMsg2)
+            if (Failed()) return
+
+         end associate
       end do
 
       !-------------------------------------------------------------------------
