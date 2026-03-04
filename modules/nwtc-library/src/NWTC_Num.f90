@@ -5810,7 +5810,7 @@ end function Rad2M180to180Deg
 !! This routine is the inverse of GetSmllRotAngs (nwtc_num::getsmllrotangs). \n
 !! Use SmllRotTrans (nwtc_num::smllrottrans) instead of directly calling a specific routine in the generic interface. 
    SUBROUTINE SmllRotTransD( RotationType, Theta1, Theta2, Theta3, TransMat, ErrTxt, ErrStat, ErrMsg )
-
+! Update to new formulation in 4.2
       ! Passed Variables:
 
    REAL(R8Ki), INTENT(IN )             :: Theta1                                          !< \f$\theta_1\f$: the small rotation about \f$X_1\f$, (rad).
