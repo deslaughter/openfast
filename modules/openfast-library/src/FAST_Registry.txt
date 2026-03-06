@@ -123,6 +123,7 @@ typedef	^	FAST_ParameterType	logical	MirrorRotor	:	-	-	"Array of flags indicatin
 typedef	^	FAST_ParameterType	IntKi	NumBD	-	-	-	"number of BeamDyn instances"	-
 typedef	^	FAST_ParameterType	IntKi	BDRotMap	:	-	-	"array mapping BeamDyn instance to rotor number"	-
 typedef	^	FAST_ParameterType	IntKi	BDBldMap	:	-	-	"array mapping BeamDyn instance to blade number"	-
+typedef	^	FAST_ParameterType	IntKi	BDTwrMap	:	-	-	"array mapping BeamDyn instance to tower number"	-
 typedef	^	FAST_ParameterType	LOGICAL	BD_OutputSibling	-	-	-	"flag to determine if BD input is sibling of output mesh"	-
 # Data for TC Solver:
 typedef	^	FAST_ParameterType	IntKi	ModCoupling	-	-	-	"Module coupling type {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates}"	-
@@ -137,6 +138,7 @@ typedef	^	FAST_ParameterType	IntKi	SolveOption	-	-	-	"Switch to determine which 
 # Feature switches and flags:
 typedef	^	FAST_ParameterType	IntKi	NRotors	-	-	-	"Number of rotors in turbine"	-
 typedef	^	FAST_ParameterType	IntKi	CompElast	-	-	-	"Compute blade loads (switch) {Module_ED; Module_BD; Module_SED}"	-
+typedef	^	FAST_ParameterType	IntKi	CompTower	-	-	-	"Compute beamDyn tower (switch) {Module_None; Module_BeamDyn}"	-
 typedef	^	FAST_ParameterType	IntKi	CompInflow	-	-	-	"Compute inflow wind conditions (switch) {Module_None; Module_IfW; Module_ExtInfw}"	-
 typedef	^	FAST_ParameterType	IntKi	CompAero	-	-	-	"Compute aerodynamic loads (switch) {Module_None; Module_ADsk; Module_AD}"	-
 typedef	^	FAST_ParameterType	IntKi	CompServo	-	-	-	"Compute control and electrical-drive dynamics (switch) {Module_None; Module_SrvD}"	-
@@ -165,6 +167,7 @@ typedef ^   FAST_ParameterType  ReKi    MSL2SWL     -   -   -   "Offset between 
 # Input file names:
 typedef	^	FAST_ParameterType	CHARACTER(1024)	EDFile	:	-	-	"ElastoDyn/Simplified-ElastoDyn input file paths (NRotors)"	-
 typedef	^	FAST_ParameterType	CHARACTER(1024)	BDBldFile	::	-	-	"BeamDyn input file paths for each blade (MaxBladesBD,NRotors)"	-
+typedef	^	FAST_ParameterType	CHARACTER(1024)	BDTowerFile	:	-	-	"BeamDyn tower input file paths for each tower (MaxTowersBD,NRotors)"	-
 typedef	^	FAST_ParameterType	CHARACTER(1024)	ServoFile	:	-	-	"Turbine control and electrical-drive input file paths (NRotors)"	-
 typedef	^	FAST_ParameterType	CHARACTER(1024)	InflowFile	-	-	-	"Inflow wind input file path"	-
 typedef	^	FAST_ParameterType	CHARACTER(1024)	AeroFile	-	-	-	"Aerodynamic input file path"	-

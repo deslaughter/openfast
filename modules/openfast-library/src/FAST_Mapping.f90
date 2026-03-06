@@ -626,7 +626,7 @@ subroutine InitMappings_AD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
    integer(IntKi)             :: i, iBld
-   logical                    :: NotCompAeroMaps, CompElastED
+   logical                    :: NotCompAeroMaps, CompElastED, BDTower, CompTowerBD
 
    ErrStat = ErrID_None
    ErrMsg = ''
@@ -637,18 +637,32 @@ subroutine InitMappings_AD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    ! Flag is true if CompElast == Module_ED
    CompElastED = Turbine%p_FAST%CompElast == Module_ED
 
+   ! Flag is true if CompTower == Module_BD
+   CompTowerBD = Turbine%p_FAST%CompTower == Module_BD
+
    ! Select based on source module identifier
    select case (SrcMod%ID)
 
    case (Module_BD)
+
+      ! Is this a BD tower instance
+      BDTower = Turbine%p_FAST%BDTwrMap(SrcMod%Ins) > 0
 
       iBld = Turbine%p_FAST%BDBldMap(SrcMod%Ins)
       call MapMotionMesh(Turbine, Mappings, &
                          SrcMod=SrcMod, SrcDL=DatLoc(BD_y_BldMotion), &          ! BD%y(SrcMod%Ins)%BldMotion
                          DstMod=DstMod, DstDL=DatLoc(AD_u_BladeMotion, iBld), &  ! AD%u%rotors(DstMod%Ins)%BladeMotion(iBld)
                          ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                         Active=NotCompAeroMaps)
+                         Active=NotCompAeroMaps .and. (.not. BDTower ))
       if (Failed()) return
+
+      ! Tower motion
+      ! call MapMotionMesh(Turbine, Mappings, &
+      !                    SrcMod=SrcMod, SrcDL=DatLoc(BD_y_BldMotion), &          ! ED%y%TowerLn2Mesh
+      !                    DstMod=DstMod, DstDL=DatLoc(AD_u_TowerMotion), &        ! AD%u%rotors(DstMod%Ins)%TowerMotion
+      !                    ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+      !                    Active=NotCompAeroMaps .and. BDTower)
+      ! if (Failed()) return
 
    case (Module_ED)
 
@@ -679,7 +693,7 @@ subroutine InitMappings_AD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                          SrcMod=SrcMod, SrcDL=DatLoc(ED_y_TowerLn2Mesh), &                 ! ED%y%TowerLn2Mesh
                          DstMod=DstMod, DstDL=DatLoc(AD_u_TowerMotion), &                  ! AD%u%rotors(DstMod%Ins)%TowerMotion
                          ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                         Active=NotCompAeroMaps)
+                         Active=NotCompAeroMaps .and. (.not. CompTowerBD))
       if (Failed()) return
 
       ! Hub motion
@@ -851,7 +865,7 @@ subroutine InitMappings_BD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
    integer(IntKi)             :: i, iBld
-   logical                    :: NotCompAeroMaps, CompAeroAD
+   logical                    :: NotCompAeroMaps, CompAeroAD, BDTower
 
    ErrStat = ErrID_None
    ErrMsg = ''
@@ -865,19 +879,33 @@ subroutine InitMappings_BD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    ! Get the blade number for this BeamDyn instance
    iBld = Turbine%p_FAST%BDBldMap(DstMod%Ins)
 
+   ! Is this a BD tower instance
+   BDTower = Turbine%p_FAST%BDTwrMap(DstMod%Ins) > 0
+
    ! Select based on source module identifier
    select case (SrcMod%ID)
 
    case (Module_AD)
 
+      ! Blade Loads
       call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
                        SrcDL=DatLoc(AD_y_BladeLoad, iBld), &                ! AD%y%rotors(SrcMod%Ins)%BladeLoad(iBld)
                        SrcDispDL=DatLoc(AD_u_BladeMotion, iBld), &          ! AD%u%rotors(SrcMod%Ins)%BladeMotion(iBld)
                        DstDL=DatLoc(BD_u_DistrLoad), &                      ! BD%u(DstMod%Ins)%DistrLoad
                        DstDispDL=DatLoc(BD_y_BldMotion), &                  ! BD%y(DstMod%Ins)%BldMotion
                        ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                       Active=CompAeroAD .and. (NotCompAeroMaps .or. (DstMod%Ins == 1)))
+                       Active=CompAeroAD .and. (.not. BDTower))
       if (Failed()) return
+
+      ! Tower Loads
+      ! call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+      !                  SrcDL=DatLoc(AD_y_TowerLoad), &         ! AD%y%rotors(SrcMod%Ins)%TowerLoad
+      !                  SrcDispDL=DatLoc(AD_u_TowerMotion), &   ! AD%u%rotors(SrcMod%Ins)%TowerMotion
+      !                  DstDL=DatLoc(BD_u_DistrLoad), &         ! BD%u%DistrLoad
+      !                  DstDispDL=DatLoc(BD_y_BldMotion), &     ! BD%y%BldMotion
+      !                  ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+      !                  Active=CompAeroAD .and. BDTower .and. NotCompAeroMaps)
+      ! if (Failed()) return
 
    case (Module_ED)
 
@@ -885,7 +913,14 @@ subroutine InitMappings_BD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                          SrcDL=DatLoc(ED_y_BladeRootMotion, iBld), &             ! ED%y%BladeRootMotion(iBld)
                          DstDL=DatLoc(BD_u_RootMotion), &                        ! BD%u(DstMod%Ins)%RootMotion
                          ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                         Active=NotCompAeroMaps)
+                         Active=NotCompAeroMaps .and. Turbine%p_FAST%BDRotMap(DstMod%Ins) == DstMod%iRotor)
+      if (Failed()) return
+
+      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                         SrcDL=DatLoc(ED_y_PlatformPtMesh), &                    ! ED%y%PlatformPtMesh
+                         DstDL=DatLoc(BD_u_RootMotion), &                        ! BD%u(DstMod%Ins)%RootMotion
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=NotCompAeroMaps .and. BDTower)
       if (Failed()) return
 
       ! call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
@@ -917,6 +952,48 @@ subroutine InitMappings_BD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
          if (Failed()) return
       end do
 
+   case (Module_HD)
+
+      call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                       SrcDL=DatLoc(HydroDyn_y_Morison_Mesh), &                    ! MD%y%Y1Mesh(iRotor)
+                       SrcDispDL=DatLoc(HydroDyn_u_Morison_Mesh), &           ! MD%u%TPMesh(iRotor)
+                       DstDL=DatLoc(BD_u_TipLoad), &                            ! BD%Input(1, DstMod%Ins)%TipLoad
+                       DstDispDL=DatLoc(BD_y_TipMotion), &                      ! BD%y(DstMod%Ins)%TipMotion
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                       Active=BDTower)
+      if (Failed()) return
+
+      call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                       SrcDL=DatLoc(HydroDyn_y_WAMITMesh), &                   
+                       SrcDispDL=DatLoc(HydroDyn_u_WAMITMesh), &               
+                       DstDL=DatLoc(BD_u_TipLoad), &                            ! BD%Input(1, DstMod%Ins)%TipLoad
+                       DstDispDL=DatLoc(BD_y_TipMotion), &                      ! BD%y(DstMod%Ins)%TipMotion
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                       Active=BDTower)
+      if (Failed()) return
+
+   case (Module_MD)
+
+      call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                       SrcDL=DatLoc(MD_y_CoupledLoads, 1), &                    ! MD%y%Y1Mesh(iRotor)
+                       SrcDispDL=DatLoc(MD_u_CoupledKinematics, 1), &           ! MD%u%TPMesh(iRotor)
+                       DstDL=DatLoc(BD_u_TipLoad), &                            ! BD%Input(1, DstMod%Ins)%TipLoad
+                       DstDispDL=DatLoc(BD_y_TipMotion), &                      ! BD%y(DstMod%Ins)%TipMotion
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                       Active=BDTower)
+      if (Failed()) return
+
+   case (Module_SD)
+
+      call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                       SrcDL=DatLoc(SD_y_Y1Mesh, DstMod%iRotor), &              ! SD%y%Y1Mesh(iRotor)
+                       SrcDispDL=DatLoc(SD_u_TPMesh, DstMod%iRotor), &          ! SD%u%TPMesh(iRotor)
+                       DstDL=DatLoc(BD_u_TipLoad), &                            ! BD%Input(1, DstMod%Ins)%TipLoad
+                       DstDispDL=DatLoc(BD_y_TipMotion), &                      ! BD%y(DstMod%Ins)%TipMotion
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                       Active=BDTower)
+      if (Failed()) return
+
    end select
 
 contains
@@ -937,7 +1014,7 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
    integer(IntKi)             :: i, j, iBld
-   logical                    :: NotCompAeroMaps, CompAeroAD, CompElastED, CompSubSD
+   logical                    :: NotCompAeroMaps, CompAeroAD, CompElastED, CompSubSD, BDTower, CompTowerBD
 
    ErrStat = ErrID_None
    ErrMsg = ''
@@ -953,6 +1030,9 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
 
    ! Flag is true of CompSub == Module_SD
    CompSubSD = Turbine%p_FAST%CompSub == Module_SD
+
+   ! Flag is true of CompTower == Module_BD
+   CompTowerBD = Turbine%p_FAST%CompTower == Module_BD
 
    ! Select based on source module identifier
    select case (SrcMod%ID)
@@ -1009,7 +1089,7 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                        DstDL=DatLoc(ED_u_TowerPtLoads), &      ! ED%u%TowerPtLoads
                        DstDispDL=DatLoc(ED_y_TowerLn2Mesh), &  ! ED%y%TowerLn2Mesh
                        ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                       Active=CompAeroAD .and. NotCompAeroMaps)
+                       Active=CompAeroAD .and. (.not. CompTowerBD) .and. NotCompAeroMaps)
       if (Failed()) return
 
    case (Module_ADsk)
@@ -1026,6 +1106,9 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
       if (Failed()) return
 
    case (Module_BD)
+
+      ! Is this a BD tower instance
+      BDTower = Turbine%p_FAST%BDTwrMap(SrcMod%Ins) > 0
 
       ! ! Hub Loads
       ! call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
@@ -1047,7 +1130,17 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                        DstDL=DatLoc(ED_u_BladeRootLoads, iBld), &          ! ED%u%BladeRootLoads
                        DstDispDL=DatLoc(ED_y_BladeRootMotion, iBld), &     ! ED%y%BladeRootMotion
                        ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                       Active=NotCompAeroMaps)
+                       Active=NotCompAeroMaps .and. (.not. BDTower))
+      if (Failed()) return
+
+      ! Tower Loads
+      call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                       SrcDL=DatLoc(BD_y_ReactionForce), &                 ! BD%y(SrcMod%Ins)%ReactionForce
+                       SrcDispDL=DatLoc(BD_u_RootMotion), &                ! BD%u(SrcMod%Ins)%RootMotion
+                       DstDL=DatLoc(ED_u_PlatformPtMesh), &                ! ED%u%PlatformPtMesh
+                       DstDispDL=DatLoc(ED_y_PlatformPtMesh), &            ! ED%y%PlatformPtMesh
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                       Active=NotCompAeroMaps .and. BDTower)
       if (Failed()) return
 
    case (Module_ExtLd)
@@ -1102,8 +1195,8 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                        SrcDispDL=DatLoc(HydroDyn_u_Morison_Mesh), &    ! HD%u%Morison%Mesh
                        DstDL=DatLoc(ED_u_PlatformPtMesh), &            ! ED%u%PlatformPtMesh
                        DstDispDL=DatLoc(ED_y_PlatformPtMesh), &        ! ED%y%PlatformPtMesh
-                       Active=Turbine%p_FAST%CompSub == Module_None, &
-                       ErrStat=ErrStat2, ErrMsg=ErrMsg2)
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                       Active=Turbine%p_FAST%CompSub == Module_None .and. (.not. CompTowerBD))
       if (Failed()) return
 
       ! Platform loads (SubDyn not active)
@@ -1112,8 +1205,8 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                        SrcDispDL=DatLoc(HydroDyn_u_WAMITMesh), &       ! HD%u%WAMITMesh
                        DstDL=DatLoc(ED_u_PlatformPtMesh), &            ! ED%u%PlatformPtMesh
                        DstDispDL=DatLoc(ED_y_PlatformPtMesh), &        ! ED%y%PlatformPtMesh
-                       Active=Turbine%p_FAST%CompSub == Module_None, &
-                       ErrStat=ErrStat2, ErrMsg=ErrMsg2)
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                       Active=Turbine%p_FAST%CompSub == Module_None .and. (.not. CompTowerBD))
       if (Failed()) return
 
    case (Module_IceD)
@@ -1160,8 +1253,8 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                        SrcDispDL=DatLoc(MD_u_CoupledKinematics, 1), &  ! MD%u%CoupledKinematics(1)
                        DstDL=DatLoc(ED_u_PlatformPtMesh), &            ! ED%u%PlatformPtMesh
                        DstDispDL=DatLoc(ED_y_PlatformPtMesh), &        ! ED%y%PlatformPtMesh
-                       Active=Turbine%p_FAST%CompSub /= Module_SD, &
-                       ErrStat=ErrStat2, ErrMsg=ErrMsg2)
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                       Active=Turbine%p_FAST%CompSub /= Module_SD .and. (.not. CompTowerBD))
       if (Failed()) return
 
    case (Module_Orca)
@@ -1553,31 +1646,57 @@ subroutine InitMappings_HD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
    integer(IntKi)             :: i
+   logical                    :: BDTower
 
    ErrStat = ErrID_None
    ErrMsg = ''
 
    select case (SrcMod%ID)
 
+   case (Module_BD)
+
+      ! Is this a BD tower instance
+      BDTower = Turbine%p_FAST%BDTwrMap(SrcMod%Ins) > 0
+
+      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                         SrcDL=DatLoc(BD_y_TipMotion), &               ! BD%y%TipMotion
+                         DstDL=DatLoc(HydroDyn_u_PRPMesh), &           ! HD%u%PRPMesh
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=Turbine%p_FAST%NRotors == 1 .and. BDTower); if(Failed()) return
+
+      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                         SrcDL=DatLoc(BD_y_TipMotion), &            ! BD%y%TipMotion
+                         DstDL=DatLoc(HydroDyn_u_Morison_Mesh), &   ! HD%u%Morison%Mesh
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=Turbine%p_FAST%CompSub /= Module_SD .and. BDTower); if(Failed()) return
+
+      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                         SrcDL=DatLoc(BD_y_TipMotion), &            ! BD%y%TipMotion
+                         DstDL=DatLoc(HydroDyn_u_WAMITMesh), &      ! HD%u%WAMITMesh
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=Turbine%p_FAST%CompSub /= Module_SD .and. BDTower); if(Failed()) return
    case (Module_ED)
 
       call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
                          SrcDL=DatLoc(ED_y_PlatformPtMesh), &          ! ED%y%PlatformPtMesh
-                         DstDL=DatLoc(HydroDyn_u_PRPMesh), &           ! HD%u%PRPMesh
-                         Active=Turbine%p_FAST%NRotors == 1, &
-                         ErrStat=ErrStat2, ErrMsg=ErrMsg2); if(Failed()) return
+                         DstDL=DatLoc(HydroDyn_u_PRPMesh), &           ! HD%u%PRPMesh &
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=Turbine%p_FAST%NRotors == 1 .and. &
+                         Turbine%p_FAST%CompTower /= Module_BD); if(Failed()) return
 
       call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
                          SrcDL=DatLoc(ED_y_PlatformPtMesh), &       ! ED%y%PlatformPtMesh
                          DstDL=DatLoc(HydroDyn_u_Morison_Mesh), &   ! HD%u%Morison%Mesh
                          ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                         Active=Turbine%p_FAST%CompSub /= Module_SD); if(Failed()) return
+                         Active=Turbine%p_FAST%CompSub /= Module_SD .and. &
+                         Turbine%p_FAST%CompTower /= Module_BD); if(Failed()) return
 
       call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
                          SrcDL=DatLoc(ED_y_PlatformPtMesh), &       ! ED%y%PlatformPtMesh
                          DstDL=DatLoc(HydroDyn_u_WAMITMesh), &      ! HD%u%WAMITMesh
                          ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
-                         Active=Turbine%p_FAST%CompSub /= Module_SD); if(Failed()) return
+                         Active=Turbine%p_FAST%CompSub /= Module_SD .and. &
+                         Turbine%p_FAST%CompTower /= Module_BD); if(Failed()) return
 
    case (Module_SeaSt)
 
@@ -1770,19 +1889,32 @@ subroutine InitMappings_MD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    character(*), parameter    :: RoutineName = 'InitMappings_MD'
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
+   logical                    :: BDTower
 
    ErrStat = ErrID_None
    ErrMsg = ''
 
    select case (SrcMod%ID)
 
+   case (Module_BD)
+
+      ! Is this a BD tower instance
+      BDTower = Turbine%p_FAST%BDTwrMap(SrcMod%Ins) > 0
+
+      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                         SrcDL=DatLoc(BD_y_TipMotion), &                 ! BD%y%TipMotion
+                         DstDL=DatLoc(MD_u_CoupledKinematics, 1), &      ! MD%u%CoupledKinematics(1)
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=BDTower); if(Failed()) return
+
    case (Module_ED)
 
       call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
                          SrcDL=DatLoc(ED_y_PlatformPtMesh), &          ! ED%y%PlatformPtMesh
                          DstDL=DatLoc(MD_u_CoupledKinematics, 1), &    ! MD%u%CoupledKinematics(1)
-                         Active=Turbine%p_FAST%CompSub /= Module_SD, &
-                         ErrStat=ErrStat2, ErrMsg=ErrMsg2); if(Failed()) return
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=Turbine%p_FAST%CompSub /= Module_SD .and. &
+                                Turbine%p_FAST%CompTower == Module_None); if(Failed()) return
 
    case (Module_SD)
 
@@ -1846,12 +1978,23 @@ subroutine InitMappings_SD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
    integer(IntKi)             :: i, j
+   logical                    :: BDTower
 
    ErrStat = ErrID_None
    ErrMsg = ''
 
    select case (SrcMod%ID)
 
+   case (Module_BD)
+
+      ! Is this a BD tower instance
+      BDTower = Turbine%p_FAST%BDTwrMap(SrcMod%Ins) > 0
+
+      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                         SrcDL=DatLoc(BD_y_TipMotion), &                 ! BD%y%TipMotion
+                         DstDL=DatLoc(SD_u_TPMesh, SrcMod%Ins), &         ! SD%u%TPMesh
+                         ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                         Active=BDTower); if(Failed()) return
    case (Module_ED)
 
       call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
@@ -2031,7 +2174,8 @@ subroutine InitMappings_SrvD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
 
    case (Module_BD)
 
-      call MapCustom(Mappings, Custom_BD_to_SrvD, SrcMod, DstMod)
+      call MapCustom(Mappings, Custom_BD_to_SrvD, SrcMod, DstMod, &
+                     Active=Turbine%p_FAST%BDBldMap(SrcMod%Ins) > 0)
 
       ! Blade Structural Controller
       iBld = Turbine%p_FAST%BDBldMap(SrcMod%Ins)
@@ -2039,7 +2183,9 @@ subroutine InitMappings_SrvD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
          call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
                             SrcDL=DatLoc(BD_y_BldMotion), &                      ! BD%y(SrcMod%Ins)%BldMotion
                             DstDL=DatLoc(SrvD_u_BStCMotionMesh, iBld, i), &      ! SrvD%u%BStCMotionMesh(iBld,i)
-                            ErrStat=ErrStat2, ErrMsg=ErrMsg2); if(Failed()) return
+                            ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+                            Active=Turbine%p_FAST%BDBldMap(SrcMod%Ins) > 0)
+         if(Failed()) return
       end do
 
    case (Module_ED)

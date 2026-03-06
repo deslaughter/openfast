@@ -736,6 +736,7 @@ SUBROUTINE Set_BldMotion_Mesh(p, u, x, OtherState, m, y)
    INTEGER(IntKi)                               :: idx_node
    INTEGER(IntKi)                               :: temp_id
    INTEGER(IntKi)                               :: temp_id2
+   INTEGER(IntKi)                               :: NNodes
    CHARACTER(*), PARAMETER                      :: RoutineName = 'Set_BldMotion_Mesh'
 
 
@@ -800,6 +801,14 @@ SUBROUTINE Set_BldMotion_Mesh(p, u, x, OtherState, m, y)
        END SELECT
 
    END IF
+
+   NNodes = p%elem_total*p%nodes_per_elem
+   y%TipMotion%TranslationDisp(:,1) = y%BldMotion%TranslationDisp(:,NNodes)
+   y%TipMotion%Orientation(:,:,1) = y%BldMotion%Orientation(:,:,NNodes)
+   y%TipMotion%TranslationVel(:,1) = y%BldMotion%TranslationVel(:,NNodes)
+   y%TipMotion%TranslationAcc(:,1) = y%BldMotion%TranslationAcc(:,NNodes)
+   y%TipMotion%RotationVel(:,1) = y%BldMotion%RotationVel(:,NNodes)
+   y%TipMotion%RotationAcc(:,1) = y%BldMotion%RotationAcc(:,NNodes)
    
 END SUBROUTINE Set_BldMotion_Mesh
 !> This routine calculates values for the y%BldMotion mesh.

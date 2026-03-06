@@ -29,7 +29,8 @@ typedef   ^         InitInputType ReKi            GlbPos    {3}    - - "Initial 
 typedef   ^         InitInputType R8Ki            GlbRot    {3}{3} - - "Initial direction cosine matrix of the local blade coordinate system -- in BD coords"
 typedef   ^         InitInputType R8Ki            RootDisp  {3}    - - "Initial root displacement"
 typedef   ^         InitInputType R8Ki            RootOri   {3}{3} - - "Initial root orientation"
-typedef   ^         InitInputType ReKi            RootVel   {6}    - - "Initial root velocities and angular veolcities"
+typedef   ^         InitInputType ReKi            RootVel   {6}    - - "Initial root velocities and angular velocities"
+typedef   ^         InitInputType R8Ki            TipMass   {6}{6}    - - "Platform Mass and inertia (6x6 matrix)" -
 typedef   ^         InitInputType Logical         Linearize - .FALSE. - "Flag that tells this module if the glue code wants to linearize." -
 typedef   ^         InitInputType Logical         DynamicSolve - .TRUE. - "Use dynamic solve option.  Set to False for static solving (handled by glue code or driver code)." -
 typedef   ^         InitInputType LOGICAL         CompAeroMaps -   .FALSE. - "flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false)"	-
@@ -176,6 +177,7 @@ typedef   ^        ParameterType  ^             Jacobian         {:}{:}    - -  
 typedef   ^        ParameterType  ^             uu0              {:}{:}{:} - -  "Initial Disp/Rot value at quadrature point (at T=0)" -
 typedef   ^        ParameterType  ^             rrN0             {:}{:}{:} - -  "Initial relative rotation array, relative to root (at T=0) (index 1=rot DOF; index 2=FE nodes; index 3=element)" -
 typedef   ^        ParameterType  ^             E10              {:}{:}{:} - -  "Initial E10 at quadrature point" -
+typedef   ^        ParameterType  ^             TipMass          {6}{6}    - 0  "Platform Mass and inertia (6x6 matrix)" -
 #end of BDKi-type variables
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 typedef   ^        ParameterType IntKi          nodes_per_elem   -         - -  "Finite element (GLL) nodes per element" -
@@ -235,6 +237,7 @@ typedef   ^        ParameterType    R8Ki        ModalDampingMat       {:}{:}  - 
 typedef   ^        InputType  MeshType  RootMotion - - - "contains motion" -
 typedef   ^        InputType  MeshType  PointLoad  - - - "Applied point forces along beam axis" -
 typedef   ^        InputType  MeshType  DistrLoad  - - - "Applied distributed forces along beam axis" -
+typedef   ^        InputType  MeshType  TipLoad    - - - "Applied tip forces" -
 
 
 # ..... Outputs
@@ -242,6 +245,7 @@ typedef   ^        InputType  MeshType  DistrLoad  - - - "Applied distributed fo
 # Define outputs that are contained on the mesh here:
 typedef   ^        OutputType  MeshType  ReactionForce -  - - "contains force and moments" -
 typedef   ^        OutputType  MeshType  BldMotion     -  - - "Motion (disp,rot,vel, acc) along beam axis" -
+typedef   ^        OutputType  MeshType  TipMotion     -  - - "Motion (disp,rot,vel, acc) at tip" -
 # Define outputs that are not on this mesh here:
 typedef   ^        OutputType  ReKi      RootMxr       -  - - "x-component of the root reaction moment expressed in r (used for ServoDyn Bladed DLL Interface)" "Nm"
 typedef   ^        OutputType  ReKi      RootMyr       -  - - "y-component of the root reaction moment expressed in r (used for ServoDyn Bladed DLL Interface)" "Nm"

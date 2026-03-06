@@ -140,6 +140,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: NumBD = 0_IntKi      !< number of BeamDyn instances [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: BDRotMap      !< array mapping BeamDyn instance to rotor number [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: BDBldMap      !< array mapping BeamDyn instance to blade number [-]
+    INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: BDTwrMap      !< array mapping BeamDyn instance to tower number [-]
     LOGICAL  :: BD_OutputSibling = .false.      !< flag to determine if BD input is sibling of output mesh [-]
     INTEGER(IntKi)  :: ModCoupling = 0_IntKi      !< Module coupling type {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates} [-]
     REAL(DbKi)  :: RhoInf = 0.0_R8Ki      !< Numerical damping parameter for tight coupling generalized-alpha integrator (-) [0.0 to 1.0] [-]
@@ -151,6 +152,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: SolveOption = 0_IntKi      !< Switch to determine which solve option we are going to use (see Solve_FullOpt1, etc) [-]
     INTEGER(IntKi)  :: NRotors = 0_IntKi      !< Number of rotors in turbine [-]
     INTEGER(IntKi)  :: CompElast = 0_IntKi      !< Compute blade loads (switch) {Module_ED; Module_BD; Module_SED} [-]
+    INTEGER(IntKi)  :: CompTower = 0_IntKi      !< Compute beamDyn tower (switch) {Module_None; Module_BeamDyn} [-]
     INTEGER(IntKi)  :: CompInflow = 0_IntKi      !< Compute inflow wind conditions (switch) {Module_None; Module_IfW; Module_ExtInfw} [-]
     INTEGER(IntKi)  :: CompAero = 0_IntKi      !< Compute aerodynamic loads (switch) {Module_None; Module_ADsk; Module_AD} [-]
     INTEGER(IntKi)  :: CompServo = 0_IntKi      !< Compute control and electrical-drive dynamics (switch) {Module_None; Module_SrvD} [-]
@@ -177,6 +179,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: MSL2SWL = 0.0_ReKi      !< Offset between still-water level and mean sea level [m]
     CHARACTER(1024) , DIMENSION(:), ALLOCATABLE  :: EDFile      !< ElastoDyn/Simplified-ElastoDyn input file paths (NRotors) [-]
     CHARACTER(1024) , DIMENSION(:,:), ALLOCATABLE  :: BDBldFile      !< BeamDyn input file paths for each blade (MaxBladesBD,NRotors) [-]
+    CHARACTER(1024) , DIMENSION(:), ALLOCATABLE  :: BDTowerFile      !< BeamDyn tower input file paths for each tower (MaxTowersBD,NRotors) [-]
     CHARACTER(1024) , DIMENSION(:), ALLOCATABLE  :: ServoFile      !< Turbine control and electrical-drive input file paths (NRotors) [-]
     CHARACTER(1024)  :: InflowFile      !< Inflow wind input file path [-]
     CHARACTER(1024)  :: AeroFile      !< Aerodynamic input file path [-]
@@ -1157,6 +1160,18 @@ subroutine FAST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstParamData%BDBldMap = SrcParamData%BDBldMap
    end if
+   if (allocated(SrcParamData%BDTwrMap)) then
+      LB(1:1) = lbound(SrcParamData%BDTwrMap)
+      UB(1:1) = ubound(SrcParamData%BDTwrMap)
+      if (.not. allocated(DstParamData%BDTwrMap)) then
+         allocate(DstParamData%BDTwrMap(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%BDTwrMap.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstParamData%BDTwrMap = SrcParamData%BDTwrMap
+   end if
    DstParamData%BD_OutputSibling = SrcParamData%BD_OutputSibling
    DstParamData%ModCoupling = SrcParamData%ModCoupling
    DstParamData%RhoInf = SrcParamData%RhoInf
@@ -1168,6 +1183,7 @@ subroutine FAST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%SolveOption = SrcParamData%SolveOption
    DstParamData%NRotors = SrcParamData%NRotors
    DstParamData%CompElast = SrcParamData%CompElast
+   DstParamData%CompTower = SrcParamData%CompTower
    DstParamData%CompInflow = SrcParamData%CompInflow
    DstParamData%CompAero = SrcParamData%CompAero
    DstParamData%CompServo = SrcParamData%CompServo
@@ -1215,6 +1231,18 @@ subroutine FAST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
          end if
       end if
       DstParamData%BDBldFile = SrcParamData%BDBldFile
+   end if
+   if (allocated(SrcParamData%BDTowerFile)) then
+      LB(1:1) = lbound(SrcParamData%BDTowerFile)
+      UB(1:1) = ubound(SrcParamData%BDTowerFile)
+      if (.not. allocated(DstParamData%BDTowerFile)) then
+         allocate(DstParamData%BDTowerFile(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%BDTowerFile.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstParamData%BDTowerFile = SrcParamData%BDTowerFile
    end if
    if (allocated(SrcParamData%ServoFile)) then
       LB(1:1) = lbound(SrcParamData%ServoFile)
@@ -1347,11 +1375,17 @@ subroutine FAST_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%BDBldMap)) then
       deallocate(ParamData%BDBldMap)
    end if
+   if (allocated(ParamData%BDTwrMap)) then
+      deallocate(ParamData%BDTwrMap)
+   end if
    if (allocated(ParamData%EDFile)) then
       deallocate(ParamData%EDFile)
    end if
    if (allocated(ParamData%BDBldFile)) then
       deallocate(ParamData%BDBldFile)
+   end if
+   if (allocated(ParamData%BDTowerFile)) then
+      deallocate(ParamData%BDTowerFile)
    end if
    if (allocated(ParamData%ServoFile)) then
       deallocate(ParamData%ServoFile)
@@ -1386,6 +1420,7 @@ subroutine FAST_PackParam(RF, Indata)
    call RegPack(RF, InData%NumBD)
    call RegPackAlloc(RF, InData%BDRotMap)
    call RegPackAlloc(RF, InData%BDBldMap)
+   call RegPackAlloc(RF, InData%BDTwrMap)
    call RegPack(RF, InData%BD_OutputSibling)
    call RegPack(RF, InData%ModCoupling)
    call RegPack(RF, InData%RhoInf)
@@ -1397,6 +1432,7 @@ subroutine FAST_PackParam(RF, Indata)
    call RegPack(RF, InData%SolveOption)
    call RegPack(RF, InData%NRotors)
    call RegPack(RF, InData%CompElast)
+   call RegPack(RF, InData%CompTower)
    call RegPack(RF, InData%CompInflow)
    call RegPack(RF, InData%CompAero)
    call RegPack(RF, InData%CompServo)
@@ -1423,6 +1459,7 @@ subroutine FAST_PackParam(RF, Indata)
    call RegPack(RF, InData%MSL2SWL)
    call RegPackAlloc(RF, InData%EDFile)
    call RegPackAlloc(RF, InData%BDBldFile)
+   call RegPackAlloc(RF, InData%BDTowerFile)
    call RegPackAlloc(RF, InData%ServoFile)
    call RegPack(RF, InData%InflowFile)
    call RegPack(RF, InData%AeroFile)
@@ -1508,6 +1545,7 @@ subroutine FAST_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%NumBD); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BDRotMap); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BDBldMap); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BDTwrMap); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%BD_OutputSibling); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%ModCoupling); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RhoInf); if (RegCheckErr(RF, RoutineName)) return
@@ -1519,6 +1557,7 @@ subroutine FAST_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%SolveOption); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NRotors); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompElast); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%CompTower); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompInflow); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompAero); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompServo); if (RegCheckErr(RF, RoutineName)) return
@@ -1545,6 +1584,7 @@ subroutine FAST_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%MSL2SWL); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%EDFile); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BDBldFile); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BDTowerFile); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%ServoFile); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%InflowFile); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%AeroFile); if (RegCheckErr(RF, RoutineName)) return

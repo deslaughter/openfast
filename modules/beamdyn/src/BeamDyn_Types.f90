@@ -48,7 +48,8 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(1:3,1:3)  :: GlbRot = 0.0_R8Ki      !< Initial direction cosine matrix of the local blade coordinate system -- in BD coords [-]
     REAL(R8Ki) , DIMENSION(1:3)  :: RootDisp = 0.0_R8Ki      !< Initial root displacement [-]
     REAL(R8Ki) , DIMENSION(1:3,1:3)  :: RootOri = 0.0_R8Ki      !< Initial root orientation [-]
-    REAL(ReKi) , DIMENSION(1:6)  :: RootVel = 0.0_ReKi      !< Initial root velocities and angular veolcities [-]
+    REAL(ReKi) , DIMENSION(1:6)  :: RootVel = 0.0_ReKi      !< Initial root velocities and angular velocities [-]
+    REAL(R8Ki) , DIMENSION(1:6,1:6)  :: TipMass = 0.0_R8Ki      !< Platform Mass and inertia (6x6 matrix) [-]
     LOGICAL  :: Linearize = .FALSE.      !< Flag that tells this module if the glue code wants to linearize. [-]
     LOGICAL  :: DynamicSolve = .TRUE.      !< Use dynamic solve option.  Set to False for static solving (handled by glue code or driver code). [-]
     LOGICAL  :: CompAeroMaps = .FALSE.      !< flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false) [-]
@@ -170,6 +171,7 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: uu0      !< Initial Disp/Rot value at quadrature point (at T=0) [-]
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: rrN0      !< Initial relative rotation array, relative to root (at T=0) (index 1=rot DOF; index 2=FE nodes; index 3=element) [-]
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: E10      !< Initial E10 at quadrature point [-]
+    REAL(R8Ki) , DIMENSION(1:6,1:6)  :: TipMass = 0.0_R8Ki      !< Platform Mass and inertia (6x6 matrix) [-]
     INTEGER(IntKi)  :: nodes_per_elem = 0_IntKi      !< Finite element (GLL) nodes per element [-]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: node_elem_idx      !< Index to first and last nodes of element in p%node_total sized arrays [-]
     INTEGER(IntKi)  :: refine = 0_IntKi      !< FE mesh refinement factor for trapezoidal quadrature [-]
@@ -223,12 +225,14 @@ IMPLICIT NONE
     TYPE(MeshType)  :: RootMotion      !< contains motion [-]
     TYPE(MeshType)  :: PointLoad      !< Applied point forces along beam axis [-]
     TYPE(MeshType)  :: DistrLoad      !< Applied distributed forces along beam axis [-]
+    TYPE(MeshType)  :: TipLoad      !< Applied tip forces [-]
   END TYPE BD_InputType
 ! =======================
 ! =========  BD_OutputType  =======
   TYPE, PUBLIC :: BD_OutputType
     TYPE(MeshType)  :: ReactionForce      !< contains force and moments [-]
     TYPE(MeshType)  :: BldMotion      !< Motion (disp,rot,vel, acc) along beam axis [-]
+    TYPE(MeshType)  :: TipMotion      !< Motion (disp,rot,vel, acc) at tip [-]
     REAL(ReKi)  :: RootMxr = 0.0_ReKi      !< x-component of the root reaction moment expressed in r (used for ServoDyn Bladed DLL Interface) [Nm]
     REAL(ReKi)  :: RootMyr = 0.0_ReKi      !< y-component of the root reaction moment expressed in r (used for ServoDyn Bladed DLL Interface) [Nm]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WriteOutput      !< Data to be written to an output file: see WriteOutputHdr for names of each variable [see WriteOutputUnt]
@@ -326,11 +330,13 @@ IMPLICIT NONE
    integer(IntKi), public, parameter :: BD_u_RootMotion                  =   3 ! BD%RootMotion
    integer(IntKi), public, parameter :: BD_u_PointLoad                   =   4 ! BD%PointLoad
    integer(IntKi), public, parameter :: BD_u_DistrLoad                   =   5 ! BD%DistrLoad
-   integer(IntKi), public, parameter :: BD_y_ReactionForce               =   6 ! BD%ReactionForce
-   integer(IntKi), public, parameter :: BD_y_BldMotion                   =   7 ! BD%BldMotion
-   integer(IntKi), public, parameter :: BD_y_RootMxr                     =   8 ! BD%RootMxr
-   integer(IntKi), public, parameter :: BD_y_RootMyr                     =   9 ! BD%RootMyr
-   integer(IntKi), public, parameter :: BD_y_WriteOutput                 =  10 ! BD%WriteOutput
+   integer(IntKi), public, parameter :: BD_u_TipLoad                     =   6 ! BD%TipLoad
+   integer(IntKi), public, parameter :: BD_y_ReactionForce               =   7 ! BD%ReactionForce
+   integer(IntKi), public, parameter :: BD_y_BldMotion                   =   8 ! BD%BldMotion
+   integer(IntKi), public, parameter :: BD_y_TipMotion                   =   9 ! BD%TipMotion
+   integer(IntKi), public, parameter :: BD_y_RootMxr                     =  10 ! BD%RootMxr
+   integer(IntKi), public, parameter :: BD_y_RootMyr                     =  11 ! BD%RootMyr
+   integer(IntKi), public, parameter :: BD_y_WriteOutput                 =  12 ! BD%WriteOutput
 
 contains
 
@@ -351,6 +357,7 @@ subroutine BD_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrSta
    DstInitInputData%RootDisp = SrcInitInputData%RootDisp
    DstInitInputData%RootOri = SrcInitInputData%RootOri
    DstInitInputData%RootVel = SrcInitInputData%RootVel
+   DstInitInputData%TipMass = SrcInitInputData%TipMass
    DstInitInputData%Linearize = SrcInitInputData%Linearize
    DstInitInputData%DynamicSolve = SrcInitInputData%DynamicSolve
    DstInitInputData%CompAeroMaps = SrcInitInputData%CompAeroMaps
@@ -378,6 +385,7 @@ subroutine BD_PackInitInput(RF, Indata)
    call RegPack(RF, InData%RootDisp)
    call RegPack(RF, InData%RootOri)
    call RegPack(RF, InData%RootVel)
+   call RegPack(RF, InData%TipMass)
    call RegPack(RF, InData%Linearize)
    call RegPack(RF, InData%DynamicSolve)
    call RegPack(RF, InData%CompAeroMaps)
@@ -397,6 +405,7 @@ subroutine BD_UnPackInitInput(RF, OutData)
    call RegUnpack(RF, OutData%RootDisp); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RootOri); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RootVel); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%TipMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Linearize); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DynamicSolve); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompAeroMaps); if (RegCheckErr(RF, RoutineName)) return
@@ -1333,6 +1342,7 @@ subroutine BD_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstParamData%E10 = SrcParamData%E10
    end if
+   DstParamData%TipMass = SrcParamData%TipMass
    DstParamData%nodes_per_elem = SrcParamData%nodes_per_elem
    if (allocated(SrcParamData%node_elem_idx)) then
       LB(1:2) = lbound(SrcParamData%node_elem_idx)
@@ -1687,6 +1697,7 @@ subroutine BD_PackParam(RF, Indata)
    call RegPackAlloc(RF, InData%uu0)
    call RegPackAlloc(RF, InData%rrN0)
    call RegPackAlloc(RF, InData%E10)
+   call RegPack(RF, InData%TipMass)
    call RegPack(RF, InData%nodes_per_elem)
    call RegPackAlloc(RF, InData%node_elem_idx)
    call RegPack(RF, InData%refine)
@@ -1785,6 +1796,7 @@ subroutine BD_UnPackParam(RF, OutData)
    call RegUnpackAlloc(RF, OutData%uu0); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%rrN0); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%E10); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%TipMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%nodes_per_elem); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%node_elem_idx); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%refine); if (RegCheckErr(RF, RoutineName)) return
@@ -1877,6 +1889,9 @@ subroutine BD_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
    call MeshCopy(SrcInputData%DistrLoad, DstInputData%DistrLoad, CtrlCode, ErrStat2, ErrMsg2 )
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   call MeshCopy(SrcInputData%TipLoad, DstInputData%TipLoad, CtrlCode, ErrStat2, ErrMsg2 )
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
 end subroutine
 
 subroutine BD_DestroyInput(InputData, ErrStat, ErrMsg)
@@ -1894,6 +1909,8 @@ subroutine BD_DestroyInput(InputData, ErrStat, ErrMsg)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call MeshDestroy( InputData%DistrLoad, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call MeshDestroy( InputData%TipLoad, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
 
 subroutine BD_PackInput(RF, Indata)
@@ -1904,6 +1921,7 @@ subroutine BD_PackInput(RF, Indata)
    call MeshPack(RF, InData%RootMotion) 
    call MeshPack(RF, InData%PointLoad) 
    call MeshPack(RF, InData%DistrLoad) 
+   call MeshPack(RF, InData%TipLoad) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1915,6 +1933,7 @@ subroutine BD_UnPackInput(RF, OutData)
    call MeshUnpack(RF, OutData%RootMotion) ! RootMotion 
    call MeshUnpack(RF, OutData%PointLoad) ! PointLoad 
    call MeshUnpack(RF, OutData%DistrLoad) ! DistrLoad 
+   call MeshUnpack(RF, OutData%TipLoad) ! TipLoad 
 end subroutine
 
 subroutine BD_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrMsg)
@@ -1933,6 +1952,9 @@ subroutine BD_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrMsg
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
    call MeshCopy(SrcOutputData%BldMotion, DstOutputData%BldMotion, CtrlCode, ErrStat2, ErrMsg2 )
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   call MeshCopy(SrcOutputData%TipMotion, DstOutputData%TipMotion, CtrlCode, ErrStat2, ErrMsg2 )
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
    DstOutputData%RootMxr = SrcOutputData%RootMxr
@@ -1964,6 +1986,8 @@ subroutine BD_DestroyOutput(OutputData, ErrStat, ErrMsg)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call MeshDestroy( OutputData%BldMotion, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call MeshDestroy( OutputData%TipMotion, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (allocated(OutputData%WriteOutput)) then
       deallocate(OutputData%WriteOutput)
    end if
@@ -1976,6 +2000,7 @@ subroutine BD_PackOutput(RF, Indata)
    if (RF%ErrStat >= AbortErrLev) return
    call MeshPack(RF, InData%ReactionForce) 
    call MeshPack(RF, InData%BldMotion) 
+   call MeshPack(RF, InData%TipMotion) 
    call RegPack(RF, InData%RootMxr)
    call RegPack(RF, InData%RootMyr)
    call RegPackAlloc(RF, InData%WriteOutput)
@@ -1992,6 +2017,7 @@ subroutine BD_UnPackOutput(RF, OutData)
    if (RF%ErrStat /= ErrID_None) return
    call MeshUnpack(RF, OutData%ReactionForce) ! ReactionForce 
    call MeshUnpack(RF, OutData%BldMotion) ! BldMotion 
+   call MeshUnpack(RF, OutData%TipMotion) ! TipMotion 
    call RegUnpack(RF, OutData%RootMxr); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RootMyr); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%WriteOutput); if (RegCheckErr(RF, RoutineName)) return
@@ -3380,6 +3406,8 @@ SUBROUTINE BD_Input_ExtrapInterp1(u1, u2, tin, u_out, tin_out, ErrStat, ErrMsg )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp1(u1%DistrLoad, u2%DistrLoad, tin, u_out%DistrLoad, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   CALL MeshExtrapInterp1(u1%TipLoad, u2%TipLoad, tin, u_out%TipLoad, tin_out, ErrStat2, ErrMsg2)
+      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
 END SUBROUTINE
 
 SUBROUTINE BD_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, ErrStat, ErrMsg )
@@ -3440,6 +3468,8 @@ SUBROUTINE BD_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, ErrStat, ErrM
    CALL MeshExtrapInterp2(u1%PointLoad, u2%PointLoad, u3%PointLoad, tin, u_out%PointLoad, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp2(u1%DistrLoad, u2%DistrLoad, u3%DistrLoad, tin, u_out%DistrLoad, tin_out, ErrStat2, ErrMsg2)
+      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   CALL MeshExtrapInterp2(u1%TipLoad, u2%TipLoad, u3%TipLoad, tin, u_out%TipLoad, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
 END SUBROUTINE
 
@@ -3544,6 +3574,8 @@ SUBROUTINE BD_Output_ExtrapInterp1(y1, y2, tin, y_out, tin_out, ErrStat, ErrMsg 
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp1(y1%BldMotion, y2%BldMotion, tin, y_out%BldMotion, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   CALL MeshExtrapInterp1(y1%TipMotion, y2%TipMotion, tin, y_out%TipMotion, tin_out, ErrStat2, ErrMsg2)
+      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    y_out%RootMxr = a1*y1%RootMxr + a2*y2%RootMxr
    y_out%RootMyr = a1*y1%RootMyr + a2*y2%RootMyr
    IF (ALLOCATED(y_out%WriteOutput) .AND. ALLOCATED(y1%WriteOutput)) THEN
@@ -3610,6 +3642,8 @@ SUBROUTINE BD_Output_ExtrapInterp2(y1, y2, y3, tin, y_out, tin_out, ErrStat, Err
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp2(y1%BldMotion, y2%BldMotion, y3%BldMotion, tin, y_out%BldMotion, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   CALL MeshExtrapInterp2(y1%TipMotion, y2%TipMotion, y3%TipMotion, tin, y_out%TipMotion, tin_out, ErrStat2, ErrMsg2)
+      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    y_out%RootMxr = a1*y1%RootMxr + a2*y2%RootMxr + a3*y3%RootMxr
    y_out%RootMyr = a1*y1%RootMyr + a2*y2%RootMyr + a3*y3%RootMyr
    IF (ALLOCATED(y_out%WriteOutput) .AND. ALLOCATED(y1%WriteOutput)) THEN
@@ -3629,6 +3663,8 @@ function BD_InputMeshPointer(u, DL) result(Mesh)
        Mesh => u%PointLoad
    case (BD_u_DistrLoad)
        Mesh => u%DistrLoad
+   case (BD_u_TipLoad)
+       Mesh => u%TipLoad
    end select
 end function
 
@@ -3642,6 +3678,8 @@ function BD_OutputMeshPointer(y, DL) result(Mesh)
        Mesh => y%ReactionForce
    case (BD_y_BldMotion)
        Mesh => y%BldMotion
+   case (BD_y_TipMotion)
+       Mesh => y%TipMotion
    end select
 end function
 
@@ -3764,6 +3802,8 @@ subroutine BD_VarPackInput(V, u, ValAry)
          call MV_PackMesh(V, u%PointLoad, ValAry)                             ! Mesh
       case (BD_u_DistrLoad)
          call MV_PackMesh(V, u%DistrLoad, ValAry)                             ! Mesh
+      case (BD_u_TipLoad)
+         call MV_PackMesh(V, u%TipLoad, ValAry)                               ! Mesh
       case default
          VarVals = 0.0_R8Ki
       end select
@@ -3792,6 +3832,8 @@ subroutine BD_VarUnpackInput(V, ValAry, u)
          call MV_UnpackMesh(V, ValAry, u%PointLoad)                           ! Mesh
       case (BD_u_DistrLoad)
          call MV_UnpackMesh(V, ValAry, u%DistrLoad)                           ! Mesh
+      case (BD_u_TipLoad)
+         call MV_UnpackMesh(V, ValAry, u%TipLoad)                             ! Mesh
       end select
    end associate
 end subroutine
@@ -3806,6 +3848,8 @@ function BD_InputFieldName(DL) result(Name)
        Name = "u%PointLoad"
    case (BD_u_DistrLoad)
        Name = "u%DistrLoad"
+   case (BD_u_TipLoad)
+       Name = "u%TipLoad"
    case default
        Name = "Unknown Field"
    end select
@@ -3831,6 +3875,8 @@ subroutine BD_VarPackOutput(V, y, ValAry)
          call MV_PackMesh(V, y%ReactionForce, ValAry)                         ! Mesh
       case (BD_y_BldMotion)
          call MV_PackMesh(V, y%BldMotion, ValAry)                             ! Mesh
+      case (BD_y_TipMotion)
+         call MV_PackMesh(V, y%TipMotion, ValAry)                             ! Mesh
       case (BD_y_RootMxr)
          VarVals(1) = y%RootMxr                                               ! Scalar
       case (BD_y_RootMyr)
@@ -3863,6 +3909,8 @@ subroutine BD_VarUnpackOutput(V, ValAry, y)
          call MV_UnpackMesh(V, ValAry, y%ReactionForce)                       ! Mesh
       case (BD_y_BldMotion)
          call MV_UnpackMesh(V, ValAry, y%BldMotion)                           ! Mesh
+      case (BD_y_TipMotion)
+         call MV_UnpackMesh(V, ValAry, y%TipMotion)                           ! Mesh
       case (BD_y_RootMxr)
          y%RootMxr = VarVals(1)                                               ! Scalar
       case (BD_y_RootMyr)
@@ -3881,6 +3929,8 @@ function BD_OutputFieldName(DL) result(Name)
        Name = "y%ReactionForce"
    case (BD_y_BldMotion)
        Name = "y%BldMotion"
+   case (BD_y_TipMotion)
+       Name = "y%TipMotion"
    case (BD_y_RootMxr)
        Name = "y%RootMxr"
    case (BD_y_RootMyr)

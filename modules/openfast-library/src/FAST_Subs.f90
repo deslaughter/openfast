@@ -392,7 +392,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
 
 
    !----------------------------------------------------------------------------
-   ! Initialize BeamDyn
+   ! Initialize BeamDyn Blades
    !----------------------------------------------------------------------------
 
    if (p_FAST%CompElast == Module_BD) then
@@ -401,13 +401,18 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       else
          p_FAST%NumBD = sum(Init%OutData_ED%NumBl)          ! initialize number of BeamDyn instances = number of blades
       end if
-      ! Allocate array to map BeamDyn instance number to rotor number
-      call AllocAry(p_FAST%BDRotMap, p_FAST%NumBD, "BDRotMap", ErrStat2, ErrMsg2); if (Failed()) return
-      call AllocAry(p_FAST%BDBldMap, p_FAST%NumBD, "BDBldMap", ErrStat2, ErrMsg2); if (Failed()) return
    else
       p_FAST%NumBD = 0
    end if
 
+   ! If using BeamDyn tower, add number of rotors to number of BeamDyn instances
+   if (p_FAST%CompTower == Module_BD) p_FAST%NumBD = p_FAST%NumBD + p_FAST%NRotors
+
+   ! Allocate array to map BeamDyn instance number to rotor number
+   call AllocAry(p_FAST%BDRotMap, p_FAST%NumBD, "BDRotMap", ErrStat2, ErrMsg2); if (Failed()) return
+   call AllocAry(p_FAST%BDBldMap, p_FAST%NumBD, "BDBldMap", ErrStat2, ErrMsg2); if (Failed()) return
+   call AllocAry(p_FAST%BDTwrMap, p_FAST%NumBD, "BDTwrMap", ErrStat2, ErrMsg2); if (Failed()) return
+   
    ! Allocate module data arrays
    allocate(BD%Input        (InputAryLB:InputAryUB, p_FAST%NumBD), stat=ErrStat2); if (FailedAlloc("BD%Input")) return
    allocate(BD%InputTimes   (InputAryUB,            p_FAST%NumBD), stat=ErrStat2); if (FailedAlloc("BD%InputTimes")) return
@@ -427,7 +432,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_BD%Linearize      = p_FAST%Linearize
       Init%InData_BD%CompAeroMaps   = p_FAST%CompAeroMaps
       Init%InData_BD%gravity        = [0.0_ReKi, 0.0_ReKi, -p_FAST%Gravity]     ! "Gravitational acceleration" m/s^2
-
 
       p_FAST%BD_OutputSibling = .true.
 
@@ -470,6 +474,70 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
          END DO
       end do
    END IF
+
+   !----------------------------------------------------------------------------
+   ! Initialize BeamDyn Tower
+   !----------------------------------------------------------------------------
+
+   if (p_FAST%CompTower == Module_BD) then
+
+      ! Set initialization input
+      Init%InData_BD%DynamicSolve   = .TRUE.                                    ! FAST can only couple to BeamDyn when dynamic solve is used.
+      Init%InData_BD%Linearize      = p_FAST%Linearize
+      Init%InData_BD%CompAeroMaps   = .false.
+      Init%InData_BD%gravity        = [0.0_ReKi, 0.0_ReKi, -p_FAST%Gravity]     ! "Gravitational acceleration" m/s^2
+
+      p_FAST%BD_OutputSibling = .true.
+
+      do iRot = 1, p_FAST%NRotors
+
+         j = p_FAST%NumBD - p_FAST%NRotors + iRot
+
+         p_FAST%BDTwrMap(j) = iRot
+
+         Init%InData_BD%RootName     = TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_BD))&
+            &//'.R'//TRIM(Num2LStr(iRot))//'.T'
+         Init%InData_BD%InputFile    = p_FAST%BDTowerFile(iRot)
+         Init%InData_BD%GlbPos       = ED%y(iRot)%TowerLn2Mesh%Position(:,1)          ! {:}    - - "Initial Position Vector of the local blade coordinate system"
+         Init%InData_BD%GlbRot       = matmul(ED%y(iRot)%TowerLn2Mesh%RefOrientation(:,:,1), quat_to_dcm(rvec_to_quat([Pi_D, 0.0_R8Ki, 0.0_R8Ki])))  ! Initial direction cosine matrix of the local tower coordinate system (-Z)
+
+         ! These outputs are set in ElastoDyn only when BeamDyn is used:
+         Init%InData_BD%RootDisp     = ED%y(iRot)%TowerLn2Mesh%TranslationDisp(:,1)   ! {:}    - - "Initial root displacement"
+         Init%InData_BD%RootOri      = matmul(ED%y(iRot)%TowerLn2Mesh%Orientation(:,:,1), quat_to_dcm(rvec_to_quat([Pi_D, 0.0_R8Ki, 0.0_R8Ki]))) ! Initial root orientation (-Z)
+         Init%InData_BD%RootVel(1:3) = ED%y(iRot)%TowerLn2Mesh%TranslationVel(:,1)    ! {:}    - - "Initial root velocities and angular velocities"
+         Init%InData_BD%RootVel(4:6) = ED%y(iRot)%TowerLn2Mesh%RotationVel(:,1)       ! {:}    - - "Initial root velocities and angular velocities"
+
+         ! block
+         ! No CG offset and off-diagonal inertia terms
+         !    real(R8Ki) :: twrLen ! Distance from tower ref point to top of tower
+         !    twrlen = ED%y(iRot)%TowerLn2Mesh%Position(:,1) - &
+         !             [ED%p(iRot)%PtfmRefxt,ED%p(iRot)%PtfmRefyt, ED%p(iRot)%PtfmRefz] 
+
+         ! end block
+         Init%InData_BD%TipMass = reshape([ED%p(iRot)%PtfmMass, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, &
+                                           0.0_ReKi, ED%p(iRot)%PtfmMass, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, &
+                                           0.0_ReKi, 0.0_ReKi, ED%p(iRot)%PtfmMass, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, &
+                                           0.0_ReKi, 0.0_ReKi, 0.0_ReKi, ED%p(iRot)%PtfmRIner, 0.0_ReKi, 0.0_ReKi, &
+                                           0.0_ReKi, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, ED%p(iRot)%PtfmPIner, 0.0_ReKi, &
+                                           0.0_ReKi, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, 0.0_ReKi, ED%p(iRot)%PtfmYIner &
+                                          ], [6,6])
+
+         ! Call module initialization routine
+         dt_module = p_FAST%DT
+         CALL BD_Init(Init%InData_BD, BD%Input(INPUT_CURR,j), BD%p(j), BD%x(j,STATE_CURR), BD%xd(j,STATE_CURR), BD%z(j,STATE_CURR), &
+                     BD%OtherSt(j,STATE_CURR), BD%y(j), BD%m(j), dt_module, Init%OutData_BD(j), ErrStat2, ErrMsg2)
+         if (Failed()) return
+
+         ! We're going to do fewer computations if the BD input and output meshes that couple to AD are siblings (but it needs to be true for all instances):
+         if (BD%p(j)%BldMotionNodeLoc /= BD_MESH_QP) p_FAST%BD_OutputSibling = .false.
+
+         ! Add module instance to array of modules, return on failure
+         CALL MV_AddModule(m_Glue%ModData, Module_BD, 'BD', j, dt_module, &
+                           p_FAST%DT, Init%OutData_BD(j)%Vars, p_FAST%Linearize, ErrStat2, ErrMsg2, iRotor=iRot)
+         if (Failed()) return
+      end do
+   END IF
+
 
    !----------------------------------------------------------------------------
    ! Initialize InflowWind
@@ -2431,17 +2499,19 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
    ! BeamDyn
    if (y_FAST%numOuts(Module_BD) > 0) then
       k = 0
-      do iRot = 1, p_FAST%NRotors
-         do i = 1, Init%OutData_ED(iRot)%NumBl
-            k = k + 1
-            if (.not. allocated(Init%OutData_BD(k)%WriteOutputHdr)) cycle
-            prefix = 'B'//Num2LStr(i)
-            if (p_FAST%NRotors > 1) prefix = 'R'//trim(Num2LStr(iRot))//prefix
-            do j = 1, size(Init%OutData_BD(k)%WriteOutputHdr)
-               y_FAST%ChannelNames(indxNext) = trim(prefix)//Init%OutData_BD(k)%WriteOutputHdr(j)
-               y_FAST%ChannelUnits(indxNext) = Init%OutData_BD(k)%WriteOutputUnt(j)
-               indxNext = indxNext + 1
-            end do
+      do k = 1, p_FAST%NumBD
+         iRot = p_FAST%BDRotMap(k)
+         if (.not. allocated(Init%OutData_BD(k)%WriteOutputHdr)) cycle
+         if (p_FAST%BDBldMap(k) /= 0) then
+            prefix = 'B'//Num2LStr(p_FAST%BDBldMap(k))
+         else
+            prefix = 'T'
+         end if
+         if (p_FAST%NRotors > 1) prefix = 'R'//trim(Num2LStr(iRot))//prefix
+         do j = 1, size(Init%OutData_BD(k)%WriteOutputHdr)
+            y_FAST%ChannelNames(indxNext) = trim(prefix)//Init%OutData_BD(k)%WriteOutputHdr(j)
+            y_FAST%ChannelUnits(indxNext) = Init%OutData_BD(k)%WriteOutputUnt(j)
+            indxNext = indxNext + 1
          end do
       end do
    end if
@@ -2877,6 +2947,20 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
       p%CompElast = Module_Unknown
    end select
 
+      ! CompTower - Compute structural dynamics (switch) {1=ElastoDyn; 2=BeamDyn for tower}:
+   CALL ReadVar( UnIn, InputFile, p%CompTower, "CompTower", "Compute structural dynamics (switch) {1=ElastoDyn; 2=BeamDyn for tower}", ErrStat2, ErrMsg2, UnEc)
+   if (Failed()) return
+
+      ! immediately convert to values used inside the code:
+   select case (p%CompTower)
+   case (0)
+      p%CompTower = Module_None
+   case (1)
+      p%CompTower = Module_BD
+   case default
+      p%CompTower = Module_Unknown
+   end select
+
       ! CompInflow - inflow wind velocities (switch) {0=still air; 1=InflowWind}:
    CALL ReadVar( UnIn, InputFile, p%CompInflow, "CompInflow", "inflow wind velocities (switch) {0=still air; 1=InflowWind}", ErrStat2, ErrMsg2, UnEc)
          if (Failed()) return
@@ -2954,7 +3038,7 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
    end select
 
       ! CompSub - Compute sub-structural dynamics (switch) {0=None; 1=SubDyn; 2=ExtPtfm_MCKF}:
-   CALL ReadVar( UnIn, InputFile, p%CompSub, "CompSub", "Compute sub-structural dynamics (switch) {0=None; 1=SubDyn}", ErrStat2, ErrMsg2, UnEc)
+   CALL ReadVar( UnIn, InputFile, p%CompSub, "CompSub", "Compute sub-structural dynamics (switch) {0=None; 1=SubDyn, 2=ExtPtfm_MCKF}", ErrStat2, ErrMsg2, UnEc)
          if (Failed()) return
 
       ! immediately convert to values used inside the code:
@@ -3077,6 +3161,7 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
       ! Allocate file path arrays that depend on number of rotors
    call AllocAry(p%EDFile, p%NRotors, "p%EDFile", ErrStat2, ErrMsg2); if (Failed()) return
    call AllocAry(p%BDBldFile, MaxBladesBD, p%NRotors, "p%BDBldFile", ErrStat2, ErrMsg2); if (Failed()) return
+   call AllocAry(p%BDTowerFile, p%NRotors, "p%BDTowerFile", ErrStat2, ErrMsg2); if (Failed()) return
    call AllocAry(p%ServoFile, p%NRotors, "p%ServoFile", ErrStat2, ErrMsg2); if (Failed()) return
 
       ! Read section header
@@ -3089,11 +3174,16 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
    IF ( PathIsRelative( p%EDFile(1) ) ) p%EDFile(1) = TRIM(PriPath)//TRIM(p%EDFile(1))
 
    DO i = 1, MaxBladesBD
-         ! BDBldFile - Name of file containing BeamDyn blade input parameters (-):
+      ! BDBldFile - Name of file containing BeamDyn blade input parameters (-):
       CALL ReadVar( UnIn, InputFile, p%BDBldFile(i,1), "BDBldFile("//TRIM(num2LStr(i))//")", "Name of file containing BeamDyn blade "//trim(num2lstr(i))//"input parameters (-)", ErrStat2, ErrMsg2, UnEc)
       if (Failed()) return
       IF ( PathIsRelative( p%BDBldFile(i,1) ) ) p%BDBldFile(i,1) = TRIM(PriPath)//TRIM(p%BDBldFile(i,1))
    END DO
+
+      ! BDTowerFile - Name of file containing ElastoDyn input parameters (-):
+   CALL ReadVar( UnIn, InputFile, p%BDTowerFile(1), "BDTowerFile", "Name of file containing ElastoDyn input parameters (-)", ErrStat2, ErrMsg2, UnEc)
+   if (Failed()) return
+   IF ( PathIsRelative( p%BDTowerFile(1) ) ) p%BDTowerFile(1) = TRIM(PriPath)//TRIM(p%BDTowerFile(1))
 
       ! InflowFile - Name of file containing inflow wind input parameters (-):
    CALL ReadVar( UnIn, InputFile, p%InflowFile, "InflowFile", "Name of file containing inflow wind input parameters (-)", ErrStat2, ErrMsg2, UnEc)
@@ -3158,6 +3248,11 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
          if (Failed()) return
          IF ( PathIsRelative( p%BDBldFile(i,iRot) ) ) p%BDBldFile(i,iRot) = TRIM(PriPath)//TRIM(p%BDBldFile(i,iRot))
       END DO
+
+         ! BDTowerFile - Name of file containing BeamDyn Tower input parameters (-):
+      CALL ReadVar( UnIn, InputFile, p%BDTowerFile(iRot), "BDTowerFile", "Name of file containing BeamDyn Tower input parameters (-)", ErrStat2, ErrMsg2, UnEc)
+      if (Failed()) return
+      IF ( PathIsRelative( p%BDTowerFile(iRot) ) ) p%BDTowerFile(iRot) = TRIM(PriPath)//TRIM(p%BDTowerFile(iRot))
 
          ! ServoFile - Name of file containing control and electrical-drive input parameters (-):
       CALL ReadVar( UnIn, InputFile, p%ServoFile(iRot), "ServoFile", "Name of file containing control and electrical-drive input parameters for rotor "//TRIM(num2LStr(iRot))//" (-)", ErrStat2, ErrMsg2, UnEc)
@@ -5788,6 +5883,14 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
                         y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, ED%y(iRot)%TFinCMMotion)
          call MeshWrVTK(p_FAST%TurbinePos, ED%Input(INPUT_CURR,iRot)%PlatformPtMesh, trim(p_FAST%VTK_OutFileRoot)//'.ED_PlatformPtMesh'//Suffix, &
                         y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, ED%y(iRot)%PlatformPtMesh)
+      end do
+   end if
+
+   IF (p_FAST%CompTower == Module_BD) then
+      do iRot = 1, p_FAST%NRotors
+         k = p_FAST%NumBD - p_FAST%NRotors + iRot
+         call MeshWrVTK(p_FAST%TurbinePos, BD%y(k)%BldMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_TwrMotion'//'_R'//trim(Num2LStr(iRot)), &
+                        y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
       end do
    end if
 

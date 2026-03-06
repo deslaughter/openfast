@@ -897,6 +897,8 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
       ! Gravity vector -- inertial frame!  This must be multiplied by OtherState%GlbRot to get into the BD rotating reference frame
    p%gravity = InitInp%gravity
 
+      ! Tip Mass
+   p%TipMass = InitInp%TipMass
 
    !....................
    ! data copied/derived from input file
@@ -1185,7 +1187,6 @@ subroutine Init_y( p, OtherState, u, y, ErrStat, ErrMsg)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       if (ErrStat>=AbortErrLev) RETURN
 
-
    !.................................
    ! y%BldMotion (for coupling with AeroDyn)
    !.................................
@@ -1279,7 +1280,16 @@ subroutine Init_y( p, OtherState, u, y, ErrStat, ErrMsg)
    END SELECT   
    y%BldMotion%RefNode = 1
 
-
+   call MeshCopy(u%TipLoad, y%TipMotion, MESH_SIBLING, ErrStat2, ErrMsg2, &
+                 TranslationDisp  = .TRUE., &
+                 Orientation      = .TRUE., &
+                 TranslationVel   = .TRUE., &
+                 RotationVel      = .TRUE., &
+                 TranslationAcc   = .TRUE., &
+                 RotationAcc      = .TRUE., &
+                IOS= COMPONENT_OUTPUT)
+   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      if (ErrStat>=AbortErrLev) RETURN
 
    !.................................
    ! y%WriteOutput (for writing columns to output file)
@@ -1502,6 +1512,40 @@ subroutine Init_u( InitInp, p, OtherState, u, ErrStat, ErrMsg )
    u%DistrLoad%Force  = 0.0_ReKi
    u%DistrLoad%Moment = 0.0_ReKi
 
+   CALL MeshCreate(BlankMesh  = u%TipLoad       &
+                  ,IOS        = COMPONENT_INPUT &
+                  ,NNodes     = 1               &
+                  ,force      = .true.          &
+                  ,moment     = .true.          &
+                  ,ErrStat    = ErrStat2        &
+                  ,ErrMess    = ErrMsg2         )
+   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat>=AbortErrLev) RETURN
+
+   CALL MeshPositionNode(Mesh    = u%TipLoad    &
+                        ,INode   = 1            &
+                        ,Pos     = u%PointLoad%Position(:,u%PointLoad%Nnodes) &
+                        ,ErrStat = ErrStat2      &
+                        ,ErrMess = ErrMsg2       &
+                        ,Orient  = u%PointLoad%RefOrientation(:,:,u%PointLoad%Nnodes))
+   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   if (ErrStat>=AbortErrLev) RETURN
+
+   CALL MeshConstructElement(Mesh     = u%TipLoad     &
+                            ,Xelement = ELEMENT_POINT &
+                            ,P1       = 1             &
+                            ,ErrStat  = ErrStat2      &
+                            ,ErrMess  = ErrMsg2       ) 
+   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   if (ErrStat>=AbortErrLev) RETURN
+
+   CALL MeshCommit(u%TipLoad, ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat>=AbortErrLev) RETURN
+
+      ! initial guesses
+   u%TipLoad%Force  = 0.0_ReKi
+   u%TipLoad%Moment = 0.0_ReKi
 
 end subroutine Init_u
 !-----------------------------------------------------------------------------------------------------------------------------------
@@ -5484,7 +5528,11 @@ SUBROUTINE BD_InputGlobalLocal(p, OtherState, u)
 
    ! Transform DCM to Rotation Tensor (RT)   
    u%RootMotion%Orientation(:,:,1) = TRANSPOSE(u%RootMotion%Orientation(:,:,1)) ! matrix that now transfers from local to global (FAST's DCMs convert from global to local)
-   
+
+   ! Add tip load to point force for last load
+   u%TipLoad%Force(:,1) = matmul(u%TipLoad%Force(:,1),OtherState%GlbRot)
+   u%TipLoad%Moment(:,1) = matmul(u%TipLoad%Moment(:,1),OtherState%GlbRot)
+
    ! Transform Applied Forces from Global to Local (Blade) frame
    DO i=1,p%node_total
       u%PointLoad%Force(1:3,i)  = MATMUL(u%PointLoad%Force(:,i),OtherState%GlbRot)
@@ -5538,6 +5586,10 @@ SUBROUTINE BD_DistrLoadCopy( p, u, m, RampScaling )
       m%PointLoadLcl(1:3,i) = u%PointLoad%Force(:,i) * ScalingFactor    ! Type conversion!!
       m%PointLoadLcl(4:6,i) = u%PointLoad%Moment(:,i) * ScalingFactor    ! Type conversion!!
    ENDDO
+   
+   ! Add the tip load
+   m%PointLoadLcl(1:3,p%node_total) = u%TipLoad%Force(:,1) * ScalingFactor
+   m%PointLoadLcl(4:6,p%node_total) = u%TipLoad%Moment(:,1) * ScalingFactor
    
 END SUBROUTINE BD_DistrLoadCopy
 
@@ -5893,6 +5945,7 @@ SUBROUTINE BD_CalcForceAcc( u, p, x, OtherState, m, ErrStat, ErrMsg )
 
    ! Full mass matrix (n_dof, n_dof)
    m%LP_MassM = reshape(m%MassM, [p%dof_total, p%dof_total])
+   m%LP_MassM(p%dof_total-5:,p%dof_total-5:) = m%LP_MassM(p%dof_total-5:,p%dof_total-5:) + p%TipMass
 
    ! Mass matrix for free nodes
    m%LP_MassM_LU = m%LP_MassM(7:p%dof_total, 7:p%dof_total)
@@ -6251,6 +6304,13 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
                       Perturbs=[MaxThrust/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes), &  ! FieldForce
                                 MaxTorque/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes)])   ! FieldMoment
 
+   call MV_AddMeshVar(InitOut%Vars%u, "TipLoad", LoadFields, &
+                      DatLoc(BD_u_TipLoad), &
+                      Mesh=u%TipLoad, &
+                      Perturbs=[MaxThrust/(100.0_R8Ki*3.0_R8Ki*u%TipLoad%Nnodes), &  ! FieldForce
+                                MaxTorque/(100.0_R8Ki*3.0_R8Ki*u%TipLoad%Nnodes)])   ! FieldMoment
+
+
    !----------------------------------------------------------------------------
    ! Output variables
    !----------------------------------------------------------------------------
@@ -6263,6 +6323,9 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
                       Mesh=y%BldMotion)
    call MV_AddMeshVar(InitOut%Vars%y, 'Blade motion', [FieldTransAcc, FieldAngularAcc], DatLoc(BD_y_BldMotion), &
                       Mesh=y%BldMotion)
+
+   call MV_AddMeshVar(InitOut%Vars%y, 'Blade tip motion', MotionFields, DatLoc(BD_y_TipMotion), &
+                     Mesh=y%TipMotion)
 
    do i = 1, p%NumOuts
       call MV_AddVar(InitOut%Vars%y, p%OutParam(i)%Name, FieldScalar, &
